@@ -1,0 +1,34 @@
+Index: platform.py
+===================================================================
+--- platform.py	(revisión: 21)
++++ platform.py	(copia de trabajo)
+@@ -312,7 +312,29 @@
+         args given as parameters.
+ 
+     """
++    # Detect Android
+     try:
++        f = open('/system/build.prop', 'r')
++        build_props = f.read()
++        f.close()
++        distname = 'Android'
++        for bp in build_props.split('\n'):
++            if bp.startswith('ro.build.version.release'):
++                version = bp.split('=')[1]
++                if version.startswith('2.0') or version.startswith('2.1'):
++                    id = 'Eclair'
++                elif version.startswith('2.2'):
++                    id = 'Froyo'
++                elif version.startswith('2.3'):
++                    id = 'Gingerbread'
++                elif version.startswith('3.0') or version.startswith('3.1') or version.startswith('3.2'):
++                    id = 'Honeycomb'
++
++                return distname, version, id
++    except:
++        pass
++    
++    try:
+         etc = os.listdir('/etc')
+     except os.error:
+         # Probably not a Unix system

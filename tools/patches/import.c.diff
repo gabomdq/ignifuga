@@ -1,0 +1,6 @@
+1266a1267,1271
+>     if (is_builtin(fullname)) {
+>         strcpy(buf, fullname);
+>         return &fd_builtin;
+>     }
+> 

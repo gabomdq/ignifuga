@@ -1,0 +1,892 @@
+diff -r 92cda988b481 include/SDL_render.h
+--- a/include/SDL_render.h  dom sep 04 20:45:38 2011 -0700
++++ b/include/SDL_render.h  lun sep 05 19:18:56 2011 -0300
+@@ -88,7 +88,8 @@
+ typedef enum
+ {
+     SDL_TEXTUREACCESS_STATIC,    /**< Changes rarely, not lockable */
+-    SDL_TEXTUREACCESS_STREAMING  /**< Changes frequently, lockable */
++    SDL_TEXTUREACCESS_STREAMING, /**< Changes frequently, lockable */
++    SDL_TEXTUREACCESS_TARGET     /**< Texture can be used as a render target */
+ } SDL_TextureAccess;
+
+ /**
+@@ -561,6 +562,42 @@
+                                            const SDL_Rect * srcrect,
+                                            const SDL_Rect * dstrect);
+
++
++/**
++ * \fn SDL_bool SDL_RenderTargetSupported(SDL_Renderer *renderer)
++ *
++ * \brief Determines whether a window supports the use of render targets
++ *
++ * \param window The renderer that will be checked
++ *
++ * \return SDL_TRUE if supported, SDL_FALSE if not.
++ */
++extern DECLSPEC SDL_bool SDLCALL SDL_RenderTargetSupported(SDL_Renderer *renderer);
++
++/**
++ * \fn int SDL_SetTargetTexture(SDL_TextureID textureID)
++ *
++ * \brief Set a texture as the current rendering target.
++ *
++ * \param textureId The targeted texture, or 0 to target the current window.
++ *
++ * \return 0 on success, or -1 if there is no rendering context current, or the driver doesn't support the requested operation.
++ */
++extern DECLSPEC int SDLCALL SDL_SetTargetTexture(SDL_Texture *texture);
++
++/**
++ * \fn SDL_bool SDL_ResetTargetTexture(SDL_Renderer *renderer)
++ *
++ * \brief Restores rendering to the default location
++ *
++ * \param renderer The renderer that will be reset
++ *
++ * \return SDL_TRUE if supported, SDL_FALSE if not.
++ */
++extern DECLSPEC SDL_bool SDLCALL SDL_ResetTargetTexture(SDL_Renderer *renderer);
++
++
++
+ /**
+  *  \brief Read pixels from the current rendering target.
+  *
+diff -r 92cda988b481 src/render/SDL_render.c
+--- a/src/render/SDL_render.c   dom sep 04 20:45:38 2011 -0700
++++ b/src/render/SDL_render.c   lun sep 05 19:18:56 2011 -0300
+@@ -1116,6 +1116,44 @@
+                                       format, pixels, pitch);
+ }
+
++SDL_bool
++SDL_RenderTargetSupported(SDL_Renderer *renderer)
++{
++   if ((!renderer) || (!renderer->SetTargetTexture)){
++       return SDL_FALSE;
++   }
++   return SDL_TRUE;
++}
++
++int
++SDL_SetTargetTexture(SDL_Texture *texture)
++{
++    SDL_Renderer *renderer;
++
++    CHECK_TEXTURE_MAGIC(texture, -1);
++   renderer = texture->renderer;
++    if ((!renderer) || (!texture)) {
++        return -1;
++    }
++    if (!renderer->SetTargetTexture) {
++        SDL_Unsupported();
++        return -1;
++    }
++    return renderer->SetTargetTexture(renderer, texture);
++}
++
++SDL_bool
++SDL_ResetTargetTexture(SDL_Renderer *renderer) {
++    if ( !renderer || !SDL_RenderTargetSupported(renderer) ){
++       return SDL_FALSE;
++   }
++
++    if (renderer->SetTargetTexture(renderer, NULL) < 0) return -1;
++
++    return 0;
++}
++
++
+ void
+ SDL_RenderPresent(SDL_Renderer * renderer)
+ {
+diff -r 92cda988b481 src/render/SDL_sysrender.h
+--- a/src/render/SDL_sysrender.h    dom sep 04 20:45:38 2011 -0700
++++ b/src/render/SDL_sysrender.h    lun sep 05 19:18:56 2011 -0300
+@@ -87,6 +87,7 @@
+                             int count);
+     int (*RenderCopy) (SDL_Renderer * renderer, SDL_Texture * texture,
+                        const SDL_Rect * srcrect, const SDL_Rect * dstrect);
++    int (*SetTargetTexture) (SDL_Renderer * renderer, SDL_Texture * texture);
+     int (*RenderReadPixels) (SDL_Renderer * renderer, const SDL_Rect * rect,
+                              Uint32 format, void * pixels, int pitch);
+     void (*RenderPresent) (SDL_Renderer * renderer);
+diff -r 92cda988b481 src/render/direct3d/SDL_render_d3d.c
+--- a/src/render/direct3d/SDL_render_d3d.c  dom sep 04 20:45:38 2011 -0700
++++ b/src/render/direct3d/SDL_render_d3d.c  lun sep 05 19:18:56 2011 -0300
+@@ -111,6 +111,7 @@
+                           const SDL_Rect * srcrect, const SDL_Rect * dstrect);
+ static int D3D_RenderReadPixels(SDL_Renderer * renderer, const SDL_Rect * rect,
+                                 Uint32 format, void * pixels, int pitch);
++static int D3D_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture);
+ static void D3D_RenderPresent(SDL_Renderer * renderer);
+ static void D3D_DestroyTexture(SDL_Renderer * renderer,
+                                SDL_Texture * texture);
+@@ -138,6 +139,9 @@
+     SDL_bool updateSize;
+     SDL_bool beginScene;
+     D3DTEXTUREFILTERTYPE scaleMode;
++    IDirect3DSurface9 *defaultRenderTarget;
++    IDirect3DSurface9 *currentRenderTarget;
++    Uint32 NumSimultaneousRTs;
+ } D3D_RenderData;
+
+ typedef struct
+@@ -392,6 +396,7 @@
+     renderer->RenderFillRects = D3D_RenderFillRects;
+     renderer->RenderCopy = D3D_RenderCopy;
+     renderer->RenderReadPixels = D3D_RenderReadPixels;
++    renderer->SetTargetTexture = D3D_SetTargetTexture;
+     renderer->RenderPresent = D3D_RenderPresent;
+     renderer->DestroyTexture = D3D_DestroyTexture;
+     renderer->DestroyRenderer = D3D_DestroyRenderer;
+@@ -478,6 +483,7 @@
+     IDirect3DDevice9_GetDeviceCaps(data->device, &caps);
+     renderer->info.max_texture_width = caps.MaxTextureWidth;
+     renderer->info.max_texture_height = caps.MaxTextureHeight;
++    data->NumSimultaneousRTs = caps.NumSimultaneousRTs;
+
+     /* Set up parameters for rendering */
+     IDirect3DDevice9_SetVertexShader(data->device, NULL);
+@@ -507,6 +513,10 @@
+     IDirect3DDevice9_SetTextureStageState(data->device, 1, D3DTSS_ALPHAOP,
+                                           D3DTOP_DISABLE);
+
++    /* Store the default render target */
++    IDirect3DDevice9_GetRenderTarget(data->device, 0, &data->defaultRenderTarget );
++    data->currentRenderTarget = NULL;
++
+     /* Set an identity world and view matrix */
+     matrix.m[0][0] = 1.0f;
+     matrix.m[0][1] = 0.0f;
+@@ -555,6 +565,70 @@
+ }
+
+ static int
++D3D_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture)
++{
++    D3D_RenderData *data = (D3D_RenderData *) renderer->driverdata;
++    D3D_TextureData *texturedata;
++    HRESULT result;
++
++    if (!renderer) return -1;
++    D3D_ActivateRenderer(renderer);
++
++    if (data->NumSimultaneousRTs < 2) {
++        SDL_Unsupported();
++        return -1;
++    }
++
++    // Release the previous render target if it wasn't the default one
++    if (data->currentRenderTarget != NULL) {
++        IDirect3DSurface9_Release(data->currentRenderTarget);
++        data->currentRenderTarget = NULL;
++    }
++
++    /* Prepare an identity world and view matrix */
++    D3DMATRIX matrix;
++    matrix.m[0][0] = 1.0f;
++    matrix.m[0][1] = 0.0f;
++    matrix.m[0][2] = 0.0f;
++    matrix.m[0][3] = 0.0f;
++    matrix.m[1][0] = 0.0f;
++    matrix.m[1][1] = 1.0f;
++    matrix.m[1][2] = 0.0f;
++    matrix.m[1][3] = 0.0f;
++    matrix.m[2][0] = 0.0f;
++    matrix.m[2][1] = 0.0f;
++    matrix.m[2][2] = 1.0f;
++    matrix.m[2][3] = 0.0f;
++    matrix.m[3][0] = 0.0f;
++    matrix.m[3][1] = 0.0f;
++    matrix.m[3][2] = 0.0f;
++    matrix.m[3][3] = 1.0f;
++
++    if (texture == NULL) {
++        IDirect3DDevice9_SetRenderTarget(data->device, 0, data->defaultRenderTarget );
++        renderer->viewport.w = data->pparams.BackBufferWidth;
++        renderer->viewport.h = data->pparams.BackBufferHeight;
++        D3D_UpdateViewport(renderer);
++        return 0;
++    }
++    else if (renderer != texture->renderer) return -1;
++
++    texturedata = (D3D_TextureData *) texture->driverdata;
++    result = IDirect3DTexture9_GetSurfaceLevel(texturedata->texture, 0, &data->currentRenderTarget );
++    if(FAILED(result)) {
++        return -1;
++    }
++    result = IDirect3DDevice9_SetRenderTarget(data->device, 0, data->currentRenderTarget );
++    if(FAILED(result)) {
++        return -1;
++    }
++    renderer->viewport.w = texture->w;
++    renderer->viewport.h = texture->h;
++    D3D_UpdateViewport(renderer);
++    return 0;
++}
++
++static int
+ D3D_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
+ {
+     D3D_RenderData *renderdata = (D3D_RenderData *) renderer->driverdata;
+@@ -580,6 +654,11 @@
+         usage = D3DUSAGE_DYNAMIC;
+     } else
+ #endif
++    if (texture->access == SDL_TEXTUREACCESS_TARGET) {
++        pool = D3DPOOL_DEFAULT;         // D3DPOOL_MANAGED does not work with usage=D3DUSAGE_RENDERTARGET
++        usage = D3DUSAGE_RENDERTARGET;
++    }
++    else
+     {
+         pool = D3DPOOL_MANAGED;
+         usage = 0;
+@@ -1186,6 +1265,13 @@
+     D3D_RenderData *data = (D3D_RenderData *) renderer->driverdata;
+
+     if (data) {
++        // Release the render target
++        IDirect3DSurface9_Release(data->defaultRenderTarget);
++        if (data->currentRenderTarget != NULL) {
++            IDirect3DSurface9_Release(data->currentRenderTarget);
++            data->currentRenderTarget = NULL;
++        }
++
+         if (data->device) {
+             IDirect3DDevice9_Release(data->device);
+         }
+diff -r 92cda988b481 src/render/opengl/SDL_render_gl.c
+--- a/src/render/opengl/SDL_render_gl.c dom sep 04 20:45:38 2011 -0700
++++ b/src/render/opengl/SDL_render_gl.c lun sep 05 19:18:56 2011 -0300
+@@ -66,6 +66,7 @@
+                          const SDL_Rect * srcrect, const SDL_Rect * dstrect);
+ static int GL_RenderReadPixels(SDL_Renderer * renderer, const SDL_Rect * rect,
+                                Uint32 pixel_format, void * pixels, int pitch);
++static int GL_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture);
+ static void GL_RenderPresent(SDL_Renderer * renderer);
+ static void GL_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture);
+ static void GL_DestroyRenderer(SDL_Renderer * renderer);
+@@ -82,6 +83,15 @@
+      0}
+ };
+
++typedef struct GL_FBOList GL_FBOList;
++
++struct GL_FBOList
++{
++   Uint32 w, h;
++   GLuint FBO;
++   GL_FBOList *next;
++};
++
+ typedef struct
+ {
+     SDL_GLContext context;
+@@ -91,6 +101,9 @@
+         Uint32 color;
+         int blendMode;
+     } current;
++
++    SDL_bool GL_EXT_framebuffer_object_supported;
++    GL_FBOList *framebuffers;
+
+     /* OpenGL functions */
+ #define SDL_PROC(ret,func,params) ret (APIENTRY *func) params;
+@@ -101,6 +114,12 @@
+     SDL_bool GL_ARB_multitexture_supported;
+     PFNGLACTIVETEXTUREARBPROC glActiveTextureARB;
+     GLint num_texture_units;
++
++    PFNGLGENFRAMEBUFFERSEXTPROC glGenFramebuffersEXT;
++    PFNGLDELETEFRAMEBUFFERSEXTPROC glDeleteFramebuffersEXT;
++    PFNGLFRAMEBUFFERTEXTURE2DEXTPROC glFramebufferTexture2DEXT;
++    PFNGLBINDFRAMEBUFFEREXTPROC glBindFramebufferEXT;
++    PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC glCheckFramebufferStatusEXT;
+
+     /* Shader support */
+     GL_ShaderContext *shaders;
+@@ -123,6 +142,8 @@
+     SDL_bool yuv;
+     GLuint utexture;
+     GLuint vtexture;
++
++    GL_FBOList *fbo;
+ } GL_TextureData;
+
+
+@@ -227,6 +248,27 @@
+     data->glLoadIdentity();
+ }
+
++
++GL_FBOList *
++GL_GetFBO(GL_RenderData *data, Uint32 w, Uint32 h)
++{
++   GL_FBOList *result = data->framebuffers;
++   while ((result) && ((result->w != w) || (result->h != h)) )
++   {
++       result = result->next;
++   }
++   if (result == NULL)
++   {
++       result = SDL_malloc(sizeof(GL_FBOList));
++       result->w = w;
++       result->h = h;
++       data->glGenFramebuffersEXT(1, &result->FBO);
++       result->next = data->framebuffers;
++       data->framebuffers = result;
++   }
++   return result;
++}
++
+ SDL_Renderer *
+ GL_CreateRenderer(SDL_Window * window, Uint32 flags)
+ {
+@@ -267,6 +309,7 @@
+     renderer->RenderDrawLines = GL_RenderDrawLines;
+     renderer->RenderFillRects = GL_RenderFillRects;
+     renderer->RenderCopy = GL_RenderCopy;
++    renderer->SetTargetTexture = GL_SetTargetTexture;
+     renderer->RenderReadPixels = GL_RenderReadPixels;
+     renderer->RenderPresent = GL_RenderPresent;
+     renderer->DestroyTexture = GL_DestroyTexture;
+@@ -338,6 +381,21 @@
+         renderer->info.texture_formats[renderer->info.num_texture_formats++] = SDL_PIXELFORMAT_YV12;
+         renderer->info.texture_formats[renderer->info.num_texture_formats++] = SDL_PIXELFORMAT_IYUV;
+     }
++
++    if (SDL_GL_ExtensionSupported("GL_EXT_framebuffer_object")) {
++        data->GL_EXT_framebuffer_object_supported = SDL_TRUE;
++        data->glGenFramebuffersEXT = (PFNGLGENFRAMEBUFFERSEXTPROC)
++            SDL_GL_GetProcAddress("glGenFramebuffersEXT");
++        data->glDeleteFramebuffersEXT = (PFNGLDELETEFRAMEBUFFERSEXTPROC)
++            SDL_GL_GetProcAddress("glDeleteFramebuffersEXT");
++        data->glFramebufferTexture2DEXT = (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC)
++            SDL_GL_GetProcAddress("glFramebufferTexture2DEXT");
++        data->glBindFramebufferEXT = (PFNGLBINDFRAMEBUFFEREXTPROC)
++            SDL_GL_GetProcAddress("glBindFramebufferEXT");
++       data->glCheckFramebufferStatusEXT = (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC)
++            SDL_GL_GetProcAddress("glCheckFramebufferStatusEXT");
++    }
++   data->framebuffers = NULL;
+
+     /* Set up parameters for rendering */
+     GL_ResetState(renderer);
+@@ -402,6 +460,63 @@
+ }
+
+ static int
++GL_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture)
++{
++    GL_RenderData *data = (GL_RenderData *) renderer->driverdata;
++    int w, h;
++
++    GL_TextureData *texturedata;
++    GLenum status;
++
++    if (!renderer) return -1;
++    GL_ActivateRenderer(renderer);
++
++    if (! data->GL_EXT_framebuffer_object_supported) {
++        SDL_Unsupported();
++        return -1;
++    }
++
++    if (texture == NULL) {
++        SDL_GetWindowSize(renderer->window, &w, &h);
++        data->glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
++        data->glMatrixMode(GL_PROJECTION);
++        data->glLoadIdentity();
++        data->glMatrixMode(GL_MODELVIEW);
++        data->glLoadIdentity();
++        data->glViewport(0, 0, w, h);
++        data->glOrtho(0.0, (GLdouble) w, (GLdouble) h, 0.0, 0.0, 1.0);
++        return 0;
++    }
++    else if (renderer != texture->renderer) return -1;
++
++
++    texturedata = (GL_TextureData *) texture->driverdata;
++    if (!texturedata) {
++        if (texture->native && texture->native->driverdata) {
++            texture = texture->native;
++            texturedata = texture->driverdata;
++        }
++        else return -1;
++    }
++   data->glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, texturedata->fbo->FBO);
++    /* TODO: check if texture pixel format allows this operation */
++    data->glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, texturedata->type, texturedata->texture, 0);
++    /* Check FBO status */
++    status = data->glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
++    if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
++        return -1;
++    }
++
++    data->glMatrixMode(GL_PROJECTION);
++    data->glLoadIdentity();
++    data->glOrtho(0.0, (GLdouble) texture->w, 0.0, (GLdouble) texture->h, 0.0, 1.0);
++    data->glMatrixMode(GL_MODELVIEW);
++    data->glLoadIdentity();
++    data->glViewport(0, 0, texture->w, texture->h);
++    return 0;
++}
++
++static int
+ GL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
+ {
+     GL_RenderData *renderdata = (GL_RenderData *) renderer->driverdata;
+@@ -445,10 +560,17 @@
+     }
+
+     texture->driverdata = data;
++
++    if (texture->access == SDL_TEXTUREACCESS_TARGET) {
++       data->fbo = GL_GetFBO(renderdata, texture->w, texture->h);
++   } else {
++       data->fbo = NULL;
++   }
+
+     renderdata->glGetError();
+     renderdata->glGenTextures(1, &data->texture);
+-    if (renderdata->GL_ARB_texture_rectangle_supported) {
++    if ((renderdata->GL_ARB_texture_rectangle_supported)
++        /*&& texture->access != SDL_TEXTUREACCESS_TARGET*/){
+         data->type = GL_TEXTURE_RECTANGLE_ARB;
+         texture_w = texture->w;
+         texture_h = texture->h;
+@@ -1015,6 +1137,13 @@
+             GL_DestroyShaderContext(data->shaders);
+         }
+         if (data->context) {
++            while (data->framebuffers) {
++               GL_FBOList *nextnode = data->framebuffers->next;
++                /* delete the framebuffer object */
++               data->glDeleteFramebuffersEXT(1, &data->framebuffers->FBO);
++               SDL_free(data->framebuffers);
++               data->framebuffers = nextnode;
++            }
+             /* SDL_GL_MakeCurrent(0, NULL); *//* doesn't do anything */
+             SDL_GL_DeleteContext(data->context);
+         }
+diff -r 92cda988b481 src/render/opengles/SDL_render_gles.c
+--- a/src/render/opengles/SDL_render_gles.c dom sep 04 20:45:38 2011 -0700
++++ b/src/render/opengles/SDL_render_gles.c lun sep 05 19:18:56 2011 -0300
+@@ -68,6 +68,16 @@
+ static void GLES_DestroyTexture(SDL_Renderer * renderer,
+                                 SDL_Texture * texture);
+ static void GLES_DestroyRenderer(SDL_Renderer * renderer);
++static int GLES_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture);
++
++typedef struct GLES_FBOList GLES_FBOList;
++
++struct GLES_FBOList
++{
++   Uint32 w, h;
++   GLuint FBO;
++   GLES_FBOList *next;
++};
+
+
+ SDL_RenderDriver GLES_RenderDriver = {
+@@ -89,6 +99,9 @@
+         int blendMode;
+         SDL_bool tex_coords;
+     } current;
++    SDL_bool GL_OES_framebuffer_object_supported;
++    GLES_FBOList *framebuffers;
++    SDL_bool renderTargetActive;
+
+     SDL_bool useDrawTexture;
+     SDL_bool GL_OES_draw_texture_supported;
+@@ -104,6 +117,7 @@
+     GLenum formattype;
+     void *pixels;
+     int pitch;
++    GLES_FBOList *fbo;
+ } GLES_TextureData;
+
+ static void
+@@ -142,6 +156,27 @@
+
+ static SDL_GLContext SDL_CurrentContext = NULL;
+
++GLES_FBOList *
++GLES_GetFBO(GLES_RenderData *data, Uint32 w, Uint32 h)
++{
++   GLES_FBOList *result = data->framebuffers;
++   while ((result) && ((result->w != w) || (result->h != h)) )
++   {
++       result = result->next;
++   }
++   if (result == NULL)
++   {
++       result = SDL_malloc(sizeof(GLES_FBOList));
++       result->w = w;
++       result->h = h;
++       glGenFramebuffersOES(1, &result->FBO);
++       result->next = data->framebuffers;
++       data->framebuffers = result;
++   }
++   return result;
++}
++
++
+ static int
+ GLES_ActivateRenderer(SDL_Renderer * renderer)
+ {
+@@ -184,6 +219,60 @@
+     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+ }
+
++static int
++GLES_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture)
++{
++    GLES_RenderData *data = (GLES_RenderData *) renderer->driverdata;
++    int w, h;
++    GLES_TextureData *texturedata = NULL;
++    GLenum status;
++
++    if (!renderer) return -1;
++    GLES_ActivateRenderer(renderer);
++    if (! data->GL_OES_framebuffer_object_supported) {
++        SDL_Unsupported();
++        return -1;
++    }
++    data->renderTargetActive = SDL_FALSE;
++    if (texture == NULL) {
++        SDL_GetWindowSize(renderer->window, &w, &h);
++        glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
++        glMatrixMode(GL_PROJECTION);
++        glLoadIdentity();
++        glMatrixMode(GL_MODELVIEW);
++        glLoadIdentity();
++        glViewport(0, 0, w, h);
++        glOrthof(0.0, (GLfloat) w, (GLfloat) h, 0.0, 0.0, 1.0);
++
++        return 0;
++    }
++    else if (renderer != texture->renderer) return -1;
++    texturedata = (GLES_TextureData *) texture->driverdata;
++    if (!texturedata) {
++        if (texture->native && texture->native->driverdata) {
++            texture = texture->native;
++            texturedata = texture->driverdata;
++        }
++        else return -1;
++    }
++    glBindFramebufferOES(GL_FRAMEBUFFER_OES, texturedata->fbo->FBO);
++    /* TODO: check if texture pixel format allows this operation */
++    glFramebufferTexture2DOES(GL_FRAMEBUFFER_OES, GL_COLOR_ATTACHMENT0_OES, texturedata->type, texturedata->texture, 0);
++    /* Check FBO status */
++    status = glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES);
++    if (status != GL_FRAMEBUFFER_COMPLETE_OES) {
++        return -1;
++    }
++    glMatrixMode(GL_PROJECTION);
++    glLoadIdentity();
++    glOrthof(0.0, (GLfloat) texture->w, 0.0, (GLfloat) texture->h, 0.0, 1.0);
++    glMatrixMode(GL_MODELVIEW);
++    glLoadIdentity();
++    glViewport(0, 0, texture->w, texture->h);
++    data->renderTargetActive = SDL_TRUE;
++    return 0;
++}
++
+ SDL_Renderer *
+ GLES_CreateRenderer(SDL_Window * window, Uint32 flags)
+ {
+@@ -222,6 +311,7 @@
+     renderer->info = GLES_RenderDriver.info;
+     renderer->info.flags = SDL_RENDERER_ACCELERATED;
+     renderer->driverdata = data;
++    renderer->SetTargetTexture = GLES_SetTargetTexture;
+
+     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
+     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+@@ -263,6 +353,12 @@
+     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &value);
+     renderer->info.max_texture_height = value;
+
++    if (SDL_GL_ExtensionSupported("GL_OES_framebuffer_object")) {
++        data->GL_OES_framebuffer_object_supported = SDL_TRUE;
++    }
++    data->framebuffers = NULL;
++    data->renderTargetActive = SDL_FALSE;
++
+     /* Set up parameters for rendering */
+     GLES_ResetState(renderer);
+
+@@ -341,6 +437,11 @@
+     }
+
+     texture->driverdata = data;
++    if (texture->access == SDL_TEXTUREACCESS_TARGET) {
++       data->fbo = GLES_GetFBO(renderer->driverdata, texture->w, texture->h);
++    } else {
++       data->fbo = NULL;
++    }
+
+     glGetError();
+     glEnable(GL_TEXTURE_2D);
+@@ -690,14 +791,26 @@
+         SDL_Window *window = renderer->window;
+
+         SDL_GetWindowSize(window, &w, &h);
+-        cropRect[0] = srcrect->x;
+-        cropRect[1] = srcrect->y + srcrect->h;
+-        cropRect[2] = srcrect->w;
+-        cropRect[3] = -srcrect->h;
+-        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_CROP_RECT_OES,
+-                               cropRect);
+-        glDrawTexiOES(dstrect->x, h - dstrect->y - dstrect->h, 0,
+-                            dstrect->w, dstrect->h);
++        if (data->renderTargetActive) {
++            cropRect[0] = srcrect->x;
++            cropRect[1] = srcrect->y;
++            cropRect[2] = srcrect->w;
++            cropRect[3] = srcrect->h;
++            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_CROP_RECT_OES,
++                                   cropRect);
++            glDrawTexiOES(dstrect->x, dstrect->y, 0,
++                                dstrect->w, dstrect->h);
++        }
++        else {
++            cropRect[0] = srcrect->x;
++            cropRect[1] = srcrect->y + srcrect->h;
++            cropRect[2] = srcrect->w;
++            cropRect[3] = -srcrect->h;
++            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_CROP_RECT_OES,
++                                   cropRect);
++            glDrawTexiOES(dstrect->x, h - dstrect->y - dstrect->h, 0,
++                                dstrect->w, dstrect->h);
++        }
+     } else {
+
+         minx = dstrect->x;
+@@ -779,6 +892,12 @@
+
+     if (data) {
+         if (data->context) {
++            while (data->framebuffers) {
++               GLES_FBOList *nextnode = data->framebuffers->next;
++               glDeleteFramebuffersOES(1, &data->framebuffers->FBO);
++               SDL_free(data->framebuffers);
++               data->framebuffers = nextnode;
++            }
+             SDL_GL_DeleteContext(data->context);
+         }
+         SDL_free(data);
+diff -r 7f8ecebbcbf6 src/render/opengles2/SDL_render_gles2.c
+--- a/src/render/opengles2/SDL_render_gles2.c	Wed Sep 14 11:37:41 2011 -0300
++++ b/src/render/opengles2/SDL_render_gles2.c	Fri Sep 16 21:22:38 2011 -0300
+@@ -49,6 +49,15 @@
+  * Context structures                                                                            *
+  *************************************************************************************************/
+ 
++typedef struct GLES2_FBOList GLES2_FBOList;
++
++struct GLES2_FBOList
++{
++   Uint32 w, h;
++   GLuint FBO;
++   GLES2_FBOList *next;
++};
++
+ typedef struct GLES2_TextureData
+ {
+     GLenum texture;
+@@ -57,6 +66,7 @@
+     GLenum pixel_type;
+     void *pixel_data;
+     size_t pitch;
++    GLES2_FBOList *fbo;
+ } GLES2_TextureData;
+ 
+ typedef struct GLES2_ShaderCacheEntry
+@@ -122,6 +132,9 @@
+         SDL_bool tex_coords;
+     } current;
+ 
++    GLES2_FBOList *framebuffers;
++    SDL_bool renderTargetActive;
++
+     int shader_format_count;
+     GLenum *shader_formats;
+     GLES2_ShaderCache shader_cache;
+@@ -141,8 +154,31 @@
+ static int GLES2_UpdateViewport(SDL_Renderer * renderer);
+ static void GLES2_DestroyRenderer(SDL_Renderer *renderer);
+ 
++static int GLES2_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture);
++
+ static SDL_GLContext SDL_CurrentContext = NULL;
+ 
++
++GLES2_FBOList *
++GLES2_GetFBO(GLES2_DriverContext *data, Uint32 w, Uint32 h)
++{
++   GLES2_FBOList *result = data->framebuffers;
++   while ((result) && ((result->w != w) || (result->h != h)) )
++   {
++       result = result->next;
++   }
++   if (result == NULL)
++   {
++       result = SDL_malloc(sizeof(GLES2_FBOList));
++       result->w = w;
++       result->h = h;
++       glGenFramebuffers(1, &result->FBO);
++       result->next = data->framebuffers;
++       data->framebuffers = result;
++   }
++   return result;
++}
++
+ static int
+ GLES2_ActivateRenderer(SDL_Renderer * renderer)
+ {
+@@ -209,6 +245,12 @@
+             entry = next;
+         }
+         if (rdata->context) {
++            while (rdata->framebuffers) {
++                GLES2_FBOList *nextnode = rdata->framebuffers->next;
++                glDeleteFramebuffers(1, &rdata->framebuffers->FBO);
++                SDL_free(rdata->framebuffers);
++                rdata->framebuffers = nextnode;
++            }
+             SDL_GL_DeleteContext(rdata->context);
+         }
+         if (rdata->shader_formats) {
+@@ -309,6 +351,13 @@
+         return -1;
+     }
+     texture->driverdata = tdata;
++
++    if (texture->access == SDL_TEXTUREACCESS_TARGET) {
++       tdata->fbo = GLES2_GetFBO(renderer->driverdata, texture->w, texture->h);
++    } else {
++       tdata->fbo = NULL;
++    }
++    
+     return 0;
+ }
+ 
+@@ -1020,14 +1069,27 @@
+     GLES2_SetTexCoords(rdata, SDL_TRUE);
+ 
+     /* Emit the textured quad */
+-    vertices[0] = (GLfloat)dstrect->x;
+-    vertices[1] = (GLfloat)dstrect->y;
+-    vertices[2] = (GLfloat)(dstrect->x + dstrect->w);
+-    vertices[3] = (GLfloat)dstrect->y;
+-    vertices[4] = (GLfloat)dstrect->x;
+-    vertices[5] = (GLfloat)(dstrect->y + dstrect->h);
+-    vertices[6] = (GLfloat)(dstrect->x + dstrect->w);
+-    vertices[7] = (GLfloat)(dstrect->y + dstrect->h);
++    if (rdata->renderTargetActive) {
++        // Flip the texture vertically to compensate for the inversion it'll be subjected to later when it's rendered to the screen
++        vertices[0] = (GLfloat)dstrect->x;
++        vertices[1] = (GLfloat)renderer->viewport.h-dstrect->y;
++        vertices[2] = (GLfloat)(dstrect->x + dstrect->w);
++        vertices[3] = (GLfloat)renderer->viewport.h-dstrect->y;
++        vertices[4] = (GLfloat)dstrect->x;
++        vertices[5] = (GLfloat)renderer->viewport.h-(dstrect->y + dstrect->h);
++        vertices[6] = (GLfloat)(dstrect->x + dstrect->w);
++        vertices[7] = (GLfloat)renderer->viewport.h-(dstrect->y + dstrect->h);
++    }
++    else {
++        vertices[0] = (GLfloat)dstrect->x;
++        vertices[1] = (GLfloat)dstrect->y;
++        vertices[2] = (GLfloat)(dstrect->x + dstrect->w);
++        vertices[3] = (GLfloat)dstrect->y;
++        vertices[4] = (GLfloat)dstrect->x;
++        vertices[5] = (GLfloat)(dstrect->y + dstrect->h);
++        vertices[6] = (GLfloat)(dstrect->x + dstrect->w);
++        vertices[7] = (GLfloat)(dstrect->y + dstrect->h);
++    }
+     glVertexAttribPointer(GLES2_ATTRIBUTE_POSITION, 2, GL_FLOAT, GL_FALSE, 0, vertices);
+     texCoords[0] = srcrect->x / (GLfloat)texture->w;
+     texCoords[1] = srcrect->y / (GLfloat)texture->h;
+@@ -1080,6 +1142,59 @@
+     glDisableVertexAttribArray(GLES2_ATTRIBUTE_TEXCOORD);
+ }
+ 
++static int
++GLES2_SetTargetTexture(SDL_Renderer * renderer, SDL_Texture * texture)
++{
++    GLES2_DriverContext *data = (GLES2_DriverContext *) renderer->driverdata;
++    int w, h;
++    GLES2_TextureData *texturedata = NULL;
++    GLenum status;
++    GLES2_ImageSource sourceType;
++    SDL_BlendMode blendMode;
++
++    if (!renderer) return -1;
++    
++    blendMode = texture->blendMode;
++    sourceType = GLES2_IMAGESOURCE_TEXTURE;
++    
++    if (texture == NULL) {
++        if (data->renderTargetActive) {
++            SDL_GetWindowSize(renderer->window, &w, &h);
++            glBindFramebuffer(GL_FRAMEBUFFER, 0);
++            renderer->viewport.w = w;
++            renderer->viewport.h = h;
++            data->renderTargetActive = SDL_FALSE;
++            glViewport(0, 0, w, h);
++            if(data->current_program) GLES2_SetOrthographicProjection(renderer);
++        }
++        return 0;
++    }
++    else if (renderer != texture->renderer) return -1;
++    
++    texturedata = (GLES2_TextureData *) texture->driverdata;
++    if (!texturedata) {
++        if (texture->native && texture->native->driverdata) {
++            texture = texture->native;
++            texturedata = texture->driverdata;
++        }
++        else return -1;
++    }
++    glBindFramebuffer(GL_FRAMEBUFFER, texturedata->fbo->FBO);
++    /* TODO: check if texture pixel format allows this operation */
++    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texturedata->texture_type, texturedata->texture, 0);
++    /* Check FBO status */
++    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    if (status != GL_FRAMEBUFFER_COMPLETE) {
++        return -1;
++    }
++    renderer->viewport.w = texture->w;
++    renderer->viewport.h = texture->h;
++    data->renderTargetActive = SDL_TRUE;
++    glViewport(0, 0, texture->w, texture->h);
++    if(data->current_program) GLES2_SetOrthographicProjection(renderer);
++    return 0;
++}
++
+ static SDL_Renderer *
+ GLES2_CreateRenderer(SDL_Window *window, Uint32 flags)
+ {
+@@ -1164,6 +1279,9 @@
+         rdata->shader_formats[nFormats - 1] = (GLenum)-1;
+ #endif /* ZUNE_HD */
+ 
++    rdata->framebuffers = NULL;
++    rdata->renderTargetActive = SDL_FALSE;
++
+     /* Populate the function pointers for the module */
+     renderer->WindowEvent         = &GLES2_WindowEvent;
+     renderer->CreateTexture       = &GLES2_CreateTexture;
+@@ -1179,6 +1297,7 @@
+     renderer->RenderPresent       = &GLES2_RenderPresent;
+     renderer->DestroyTexture      = &GLES2_DestroyTexture;
+     renderer->DestroyRenderer     = &GLES2_DestroyRenderer;
++    renderer->SetTargetTexture    = &GLES2_SetTargetTexture;
+ 
+     GLES2_ResetState(renderer);
+ 

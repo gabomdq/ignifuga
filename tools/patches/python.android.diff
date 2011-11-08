@@ -1,0 +1,687 @@
+Index: Python/pythonrun.c
+===================================================================
+--- Python/pythonrun.c	(revisión: 29)
++++ Python/pythonrun.c	(copia de trabajo)
+@@ -158,6 +158,10 @@
+         return;
+     initialized = 1;
+ 
++    // Redirect stderr, stdout
++    freopen("/sdcard/python.stdout.log", "w", stdout);
++    freopen("/sdcard/python.stderr.log", "w", stderr);
++
+     if ((p = Py_GETENV("PYTHONDEBUG")) && *p != '\0')
+         Py_DebugFlag = add_flag(Py_DebugFlag, p);
+     if ((p = Py_GETENV("PYTHONVERBOSE")) && *p != '\0')
+Index: Python/pystrtod.c
+===================================================================
+--- Python/pystrtod.c	(revisión: 29)
++++ Python/pystrtod.c	(copia de trabajo)
+@@ -126,7 +126,6 @@
+ {
+     char *fail_pos;
+     double val = -1.0;
+-    struct lconv *locale_data;
+     const char *decimal_point;
+     size_t decimal_point_len;
+     const char *p, *decimal_point_pos;
+@@ -138,8 +137,7 @@
+ 
+     fail_pos = NULL;
+ 
+-    locale_data = localeconv();
+-    decimal_point = locale_data->decimal_point;
++    decimal_point = ".";
+     decimal_point_len = strlen(decimal_point);
+ 
+     assert(decimal_point_len != 0);
+@@ -375,8 +373,7 @@
+ Py_LOCAL_INLINE(void)
+ change_decimal_from_locale_to_dot(char* buffer)
+ {
+-    struct lconv *locale_data = localeconv();
+-    const char *decimal_point = locale_data->decimal_point;
++    const char *decimal_point = ".";
+ 
+     if (decimal_point[0] != '.' || decimal_point[1] != 0) {
+         size_t decimal_point_len = strlen(decimal_point);
+Index: Python/dynload_win.c
+===================================================================
+--- Python/dynload_win.c	(revisión: 29)
++++ Python/dynload_win.c	(copia de trabajo)
+@@ -28,21 +28,7 @@
+ /* Case insensitive string compare, to avoid any dependencies on particular
+    C RTL implementations */
+ 
+-static int strcasecmp (char *string1, char *string2)
+-{
+-    int first, second;
+ 
+-    do {
+-        first  = tolower(*string1);
+-        second = tolower(*string2);
+-        string1++;
+-        string2++;
+-    } while (first && first == second);
+-
+-    return (first - second);
+-}
+-
+-
+ /* Function to return the name of the "python" DLL that the supplied module
+    directly imports.  Looks through the list of imported modules and
+    returns the first entry that starts with "python" (case sensitive) and
+Index: Python/getplatform.c
+===================================================================
+--- Python/getplatform.c	(revisión: 29)
++++ Python/getplatform.c	(copia de trabajo)
+@@ -1,6 +1,31 @@
+-
+ #include "Python.h"
+ 
++#ifdef ANDROID
++#include <sys/utsname.h>
++#include <string.h>
++
++char _PLATFORM[20]={0}; // taken as base linux-armv7l-2.6
++
++const char *
++Py_GetPlatform(void)
++{
++    if (_PLATFORM[0]!=0)
++	return _PLATFORM;
++
++    struct utsname u;
++    int i;
++    if ( uname(&u) < 0 )
++	return "unknown";
++
++    strcat (_PLATFORM, u.sysname);
++    strcat (_PLATFORM, "-");
++    strcat (_PLATFORM, u.machine);
++    for (i=0; _PLATFORM[i]; i++)
++	_PLATFORM[i]=tolower(_PLATFORM[i]);
++    return _PLATFORM;
++}
++#else
++
+ #ifndef PLATFORM
+ #define PLATFORM "unknown"
+ #endif
+@@ -10,3 +35,4 @@
+ {
+ 	return PLATFORM;
+ }
++#endif
+Index: configure
+===================================================================
+--- configure	(revisión: 29)
++++ configure	(copia de trabajo)
+@@ -13673,7 +13673,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  ac_cv_have_long_long_format=no
++  ac_cv_have_long_long_format=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -13738,15 +13738,15 @@
+ fi
+ 
+ 
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for %zd printf() format support" >&5
+-$as_echo_n "checking for %zd printf() format support... " >&6; }
+-if ${ac_cv_have_size_t_format+:} false; then :
+-  $as_echo_n "(cached) " >&6
+-else
+-  if test "$cross_compiling" = yes; then :
+-  ac_cv_have_size_t_format="cross -- assuming yes"
++#{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for %zd printf() format support" >&5
++#$as_echo_n "checking for %zd printf() format support... " >&6; }
++#if ${ac_cv_have_size_t_format+:} false; then :
++#  $as_echo_n "(cached) " >&6
++#else
++#  if test "$cross_compiling" = yes; then :
++#  ac_cv_have_size_t_format="cross -- assuming yes"
+ 
+-else
++#else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+@@ -13793,17 +13793,9 @@
+ fi
+ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+-fi
++#fi
+ 
+-fi
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_have_size_t_format" >&5
+-$as_echo "$ac_cv_have_size_t_format" >&6; }
+-if test "$ac_cv_have_size_t_format" != no ; then
+ 
+-$as_echo "#define PY_FORMAT_SIZE_T \"z\"" >>confdefs.h
+-
+-fi
+-
+ ac_fn_c_check_type "$LINENO" "socklen_t" "ac_cv_type_socklen_t" "
+ #ifdef HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+Index: configure.in
+===================================================================
+--- configure.in	(revisión: 29)
++++ configure.in	(copia de trabajo)
+@@ -4171,106 +4171,45 @@
+   AC_MSG_RESULT(no)
+ fi
+ 
+-if test "$have_long_long" = yes
+-then
+-  AC_MSG_CHECKING(for %lld and %llu printf() format support)
+-  AC_CACHE_VAL(ac_cv_have_long_long_format,
+-  AC_RUN_IFELSE([AC_LANG_SOURCE([[[
+-  #include <stdio.h>
+-  #include <stddef.h>
+-  #include <string.h>
++#AC_MSG_CHECKING(for %zd printf() format support)
++#AC_TRY_RUN([#include <stdio.h>
++##include <stddef.h>
++##include <string.h>
++#
++##ifdef HAVE_SYS_TYPES_H
++##include <sys/types.h>
++##endif
++#
++##ifdef HAVE_SSIZE_T
++#typedef ssize_t Py_ssize_t;
++##elif SIZEOF_VOID_P == SIZEOF_LONG
++#typedef long Py_ssize_t;
++##else
++#typedef int Py_ssize_t;
++##endif
++#
++#int main()
++#{
++#    char buffer[256];
++#
++#    if(sprintf(buffer, "%zd", (size_t)123) < 0)
++#       	return 1;
++#
++#    if (strcmp(buffer, "123"))
++#	return 1;
++#
++#    if (sprintf(buffer, "%zd", (Py_ssize_t)-123) < 0)
++#       	return 1;
++#
++#    if (strcmp(buffer, "-123"))
++#	return 1;
++#
++#    return 0;
++#}],
++#[AC_MSG_RESULT(yes)
++# AC_DEFINE(PY_FORMAT_SIZE_T, "z", [Define to printf format modifier for Py_ssize_t])],
++# AC_MSG_RESULT(no))
+ 
+-  #ifdef HAVE_SYS_TYPES_H
+-  #include <sys/types.h>
+-  #endif
+-
+-  int main()
+-  {
+-      char buffer[256];
+-
+-      if (sprintf(buffer, "%lld", (long long)123) < 0)
+-          return 1;
+-      if (strcmp(buffer, "123"))
+-          return 1;
+-
+-      if (sprintf(buffer, "%lld", (long long)-123) < 0)
+-          return 1;
+-      if (strcmp(buffer, "-123"))
+-          return 1;
+-
+-      if (sprintf(buffer, "%llu", (unsigned long long)123) < 0)
+-          return 1;
+-      if (strcmp(buffer, "123"))
+-          return 1;
+-
+-      return 0;
+-  }
+-  ]]])],
+-  [ac_cv_have_long_long_format=yes],
+-  [ac_cv_have_long_long_format=no],
+-  [ac_cv_have_long_long_format=no])
+-  )
+-  AC_MSG_RESULT($ac_cv_have_long_long_format)
+-fi
+-
+-if test "$ac_cv_have_long_long_format" = yes
+-then
+-  AC_DEFINE(PY_FORMAT_LONG_LONG, "ll",
+-  [Define to printf format modifier for long long type])
+-fi
+-
+-if test $ac_sys_system = Darwin
+-then
+-	LIBS="$LIBS -framework CoreFoundation"
+-fi
+-
+-
+-AC_CACHE_CHECK([for %zd printf() format support], ac_cv_have_size_t_format, [dnl
+-AC_RUN_IFELSE([AC_LANG_SOURCE([[
+-#include <stdio.h>
+-#include <stddef.h>
+-#include <string.h>
+-
+-#ifdef HAVE_SYS_TYPES_H
+-#include <sys/types.h>
+-#endif
+-
+-#ifdef HAVE_SSIZE_T
+-typedef ssize_t Py_ssize_t;
+-#elif SIZEOF_VOID_P == SIZEOF_LONG
+-typedef long Py_ssize_t;
+-#else
+-typedef int Py_ssize_t;
+-#endif
+-
+-int main()
+-{
+-    char buffer[256];
+-
+-    if(sprintf(buffer, "%zd", (size_t)123) < 0)
+-       	return 1;
+-
+-    if (strcmp(buffer, "123"))
+-	return 1;
+-
+-    if (sprintf(buffer, "%zd", (Py_ssize_t)-123) < 0)
+-       	return 1;
+-
+-    if (strcmp(buffer, "-123"))
+-	return 1;
+-
+-    return 0;
+-}
+-]])],
+-[ac_cv_have_size_t_format=yes],
+-[ac_cv_have_size_t_format=no],
+-[ac_cv_have_size_t_format="cross -- assuming yes"
+-])])
+-if test "$ac_cv_have_size_t_format" != no ; then
+-  AC_DEFINE(PY_FORMAT_SIZE_T, "z",
+-  [Define to printf format modifier for Py_ssize_t])
+-fi
+-
+ AC_CHECK_TYPE(socklen_t,,
+   AC_DEFINE(socklen_t,int,
+             [Define to `int' if <sys/socket.h> does not define.]),[
+Index: setup.py
+===================================================================
+--- setup.py	(revisión: 29)
++++ setup.py	(copia de trabajo)
+@@ -304,13 +304,15 @@
+             self.announce('WARNING: skipping import check for Cygwin-based "%s"'
+                 % ext.name)
+             return
++        if os.environ.get('CROSS_COMPILE_TARGET') == 'yes':
++            return
+         ext_filename = os.path.join(
+             self.build_lib,
+             self.get_ext_filename(self.get_ext_fullname(ext.name)))
+         try:
+             imp.load_dynamic(ext.name, ext_filename)
+         except ImportError, why:
+-            self.failed.append(ext.name)
++            if os.environ.get('CROSS_COMPILE_TARGET') != "yes":
+             self.announce('*** WARNING: renaming "%s" since importing it'
+                           ' failed: %s' % (ext.name, why), level=3)
+             assert not self.inplace
+@@ -331,6 +333,10 @@
+                     os.remove(filename)
+             except AttributeError:
+                 self.announce('unable to remove files (ignored)')
++            else:
++                self.announce('WARNING: "%s" failed importing, but we leave it '
++                              'because we are cross-compiling' %
++                              ext.name)
+         except:
+             exc_type, why, tb = sys.exc_info()
+             self.announce('*** WARNING: importing extension "%s" '
+@@ -754,7 +760,7 @@
+         min_openssl_ver = 0x00907000
+         have_any_openssl = ssl_incs is not None and ssl_libs is not None
+         have_usable_openssl = (have_any_openssl and
+-                               openssl_ver >= min_openssl_ver)
++                               openssl_ver >= min_openssl_ver and False)
+ 
+         if have_any_openssl:
+             if have_usable_openssl:
+@@ -779,7 +785,7 @@
+                             depends = ['md5.h']) )
+ 
+         min_sha2_openssl_ver = 0x00908000
+-        if COMPILED_WITH_PYDEBUG or openssl_ver < min_sha2_openssl_ver:
++        if COMPILED_WITH_PYDEBUG or (True or openssl_ver < min_sha2_openssl_ver):
+             # OpenSSL doesn't do these until 0.9.8 so we'll bring our own hash
+             exts.append( Extension('_sha256', ['sha256module.c']) )
+             exts.append( Extension('_sha512', ['sha512module.c']) )
+@@ -1860,7 +1866,7 @@
+                                          ffi_configfile):
+                 from distutils.dir_util import mkpath
+                 mkpath(ffi_builddir)
+-                config_args = []
++                config_args =  sysconfig.get_config_var("CONFIG_ARGS").split(" ")
+ 
+                 # Pass empty CFLAGS because we'll just append the resulting
+                 # CFLAGS to Python's; -g or -O2 is to be avoided.
+Index: Objects/stringlib/localeutil.h
+===================================================================
+--- Objects/stringlib/localeutil.h	(revisión: 29)
++++ Objects/stringlib/localeutil.h	(copia de trabajo)
+@@ -202,10 +202,8 @@
+                                   Py_ssize_t n_digits,
+                                   Py_ssize_t min_width)
+ {
+-        struct lconv *locale_data = localeconv();
+-        const char *grouping = locale_data->grouping;
+-        const char *thousands_sep = locale_data->thousands_sep;
+-
++        const char *grouping = 3;
++        const char *thousands_sep = ",";
+         return _Py_InsertThousandsGrouping(buffer, n_buffer, digits, n_digits,
+                                            min_width, grouping, thousands_sep);
+ }
+Index: Objects/stringlib/formatter.h
+===================================================================
+--- Objects/stringlib/formatter.h	(revisión: 29)
++++ Objects/stringlib/formatter.h	(copia de trabajo)
+@@ -639,13 +639,7 @@
+ get_locale_info(int type, LocaleInfo *locale_info)
+ {
+     switch (type) {
+-    case LT_CURRENT_LOCALE: {
+-        struct lconv *locale_data = localeconv();
+-        locale_info->decimal_point = locale_data->decimal_point;
+-        locale_info->thousands_sep = locale_data->thousands_sep;
+-        locale_info->grouping = locale_data->grouping;
+-        break;
+-    }
++    case LT_CURRENT_LOCALE:
+     case LT_DEFAULT_LOCALE:
+         locale_info->decimal_point = ".";
+         locale_info->thousands_sep = ",";
+Index: Objects/longobject.c
+===================================================================
+--- Objects/longobject.c	(revisión: 29)
++++ Objects/longobject.c	(copia de trabajo)
+@@ -813,13 +813,18 @@
+     return (void *)x;
+ }
+ 
++#ifdef ANDROID
++    #define IS_LITTLE_ENDIAN (int)*(unsigned char*)&one
++#endif
++
+ #ifdef HAVE_LONG_LONG
+ 
+ /* Initial PY_LONG_LONG support by Chris Herborth (chrish@qnx.com), later
+  * rewritten to use the newer PyLong_{As,From}ByteArray API.
+  */
+-
+-#define IS_LITTLE_ENDIAN (int)*(unsigned char*)&one
++#ifndef ANDROID
++    #define IS_LITTLE_ENDIAN (int)*(unsigned char*)&one
++#endif
+ #define PY_ABS_LLONG_MIN (0-(unsigned PY_LONG_LONG)PY_LLONG_MIN)
+ 
+ /* Create a new long int object from a C PY_LONG_LONG int. */
+@@ -891,7 +896,7 @@
+     }
+     return (PyObject *)v;
+ }
+-
++#ifndef ANDROID
+ /* Create a new long int object from a C Py_ssize_t. */
+ 
+ PyObject *
+@@ -913,6 +918,7 @@
+     return _PyLong_FromByteArray((unsigned char *)&bytes,
+                                  SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
+ }
++#endif
+ 
+ /* Get a C PY_LONG_LONG int from a long int object.
+    Return -1 and set an error if overflow occurs. */
+@@ -1121,7 +1127,32 @@
+     }
+     return res;
+ }
++#ifdef ANDROID
++/* Create a new long int object from a C Py_ssize_t. */
+ 
++PyObject *
++PyLong_FromSsize_t(Py_ssize_t ival)
++{
++	Py_ssize_t bytes = ival;
++	int one = 1;
++	return _PyLong_FromByteArray(
++			(unsigned char *)&bytes,
++			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 1);
++}
++
++/* Create a new long int object from a C size_t. */
++
++PyObject *
++PyLong_FromSize_t(size_t ival)
++{
++	size_t bytes = ival;
++	int one = 1;
++	return _PyLong_FromByteArray(
++			(unsigned char *)&bytes,
++			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
++}
++#endif
++
+ #undef IS_LITTLE_ENDIAN
+ 
+ #endif /* HAVE_LONG_LONG */
+Index: Lib/ctypes/__init__.py
+===================================================================
+--- Lib/ctypes/__init__.py	(revisión: 29)
++++ Lib/ctypes/__init__.py	(copia de trabajo)
+@@ -6,6 +6,13 @@
+ import os as _os, sys as _sys
+ 
+ __version__ = "1.1.0"
++import _ctypes
++odlopen = getattr(_ctypes, 'dlopen')
++def __dlopen(name, flag=_ctypes.RTLD_GLOBAL|_ctypes.RTLD_LOCAL):
++  if name:
++    return odlopen(name, flag)
++  return 0L
++_sys.modules["_ctypes"].dlopen=__dlopen
+ 
+ from _ctypes import Union, Structure, Array
+ from _ctypes import _Pointer
+@@ -438,7 +445,7 @@
+ elif _sys.platform == "cygwin":
+     pythonapi = PyDLL("libpython%d.%d.dll" % _sys.version_info[:2])
+ else:
+-    pythonapi = PyDLL(None)
++    pythonapi = PyDLL("libpython%d.%d.so" % _sys.version_info[:2])
+ 
+ 
+ if _os.name in ("nt", "ce"):
+Index: Makefile.pre.in
+===================================================================
+--- Makefile.pre.in	(revisión: 29)
++++ Makefile.pre.in	(copia de trabajo)
+@@ -182,6 +182,7 @@
+ 
+ PYTHON=		python$(EXE)
+ BUILDPYTHON=	python$(BUILDEXE)
++HOSTPYTHON=	./$(BUILDPYTHON)
+ 
+ # The task to run while instrument when building the profile-opt target
+ PROFILE_TASK=	$(srcdir)/Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
+@@ -407,8 +408,8 @@
+ # Build the shared modules
+ sharedmods: $(BUILDPYTHON)
+ 	@case $$MAKEFLAGS in \
+-	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+-	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
++	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)'  $(HOSTPYTHON) -E $(srcdir)/setup.py -q build;; \
++	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)'  $(HOSTPYTHON) -E $(srcdir)/setup.py build;; \
+ 	esac
+ 
+ # Build static library
+@@ -540,9 +541,9 @@
+ 
+ # Use a stamp file to prevent make -j invoking pgen twice
+ $(GRAMMAR_H) $(GRAMMAR_C): Parser/pgen.stamp
+-Parser/pgen.stamp: $(PGEN) $(GRAMMAR_INPUT)
++Parser/pgen.stamp: $(HOSTPGEN) $(GRAMMAR_INPUT)
+ 		-@$(INSTALL) -d Include
+-		$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
++		$(HOSTPGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+ 		-touch Parser/pgen.stamp
+ 
+ $(PGEN):	$(PGENOBJS)
+@@ -926,25 +927,25 @@
+ 	done
+ 	$(INSTALL_DATA) $(srcdir)/LICENSE $(DESTDIR)$(LIBDEST)/LICENSE.txt
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
+ 		$(DESTDIR)$(LIBDEST)
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
+ 		$(DESTDIR)$(LIBDEST)
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
++		$(HOSTPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
+ 
+ # Create the PLATDIR source directory, if one wasn't distributed..
+ $(srcdir)/Lib/$(PLATDIR):
+@@ -1049,7 +1050,7 @@
+ # Install the dynamically loadable modules
+ # This goes into $(exec_prefix)
+ sharedinstall: sharedmods
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E $(srcdir)/setup.py install \
++	$(RUNSHARED) $(HOSTPYTHON) -E $(srcdir)/setup.py install \
+ 	   	--prefix=$(prefix) \
+ 		--install-scripts=$(BINDIR) \
+ 		--install-platlib=$(DESTSHARED) \
+Index: Modules/_localemodule.c
+===================================================================
+--- Modules/_localemodule.c	(revisión: 29)
++++ Modules/_localemodule.c	(copia de trabajo)
+@@ -205,6 +205,7 @@
+ static PyObject*
+ PyLocale_localeconv(PyObject* self)
+ {
++#ifndef ANDROID
+     PyObject* result;
+     struct lconv *l;
+     PyObject *x;
+@@ -265,6 +266,7 @@
+   failed:
+     Py_XDECREF(result);
+     Py_XDECREF(x);
++#endif
+     return NULL;
+ }
+ 
+Index: Modules/termios.c
+===================================================================
+--- Modules/termios.c	(revisión: 29)
++++ Modules/termios.c	(copia de trabajo)
+@@ -227,6 +227,7 @@
+     return Py_None;
+ }
+ 
++#ifndef ANDROID
+ PyDoc_STRVAR(termios_tcdrain__doc__,
+ "tcdrain(fd) -> None\n\
+ \n\
+@@ -246,6 +247,7 @@
+     Py_INCREF(Py_None);
+     return Py_None;
+ }
++#endif
+ 
+ PyDoc_STRVAR(termios_tcflush__doc__,
+ "tcflush(fd, queue) -> None\n\
+@@ -301,8 +303,10 @@
+      METH_VARARGS, termios_tcsetattr__doc__},
+     {"tcsendbreak", termios_tcsendbreak,
+      METH_VARARGS, termios_tcsendbreak__doc__},
++#ifndef ANDROID
+     {"tcdrain", termios_tcdrain,
+      METH_VARARGS, termios_tcdrain__doc__},
++#endif
+     {"tcflush", termios_tcflush,
+      METH_VARARGS, termios_tcflush__doc__},
+     {"tcflow", termios_tcflow,
+Index: Modules/pwdmodule.c
+===================================================================
+--- Modules/pwdmodule.c	(revisión: 29)
++++ Modules/pwdmodule.c	(copia de trabajo)
+@@ -68,14 +68,14 @@
+ #define SETS(i,val) sets(v, i, val)
+ 
+     SETS(setIndex++, p->pw_name);
+-#ifdef __VMS
++#if defined(__VMS) || defined(ANDROID)
+     SETS(setIndex++, "");
+ #else
+     SETS(setIndex++, p->pw_passwd);
+ #endif
+     SETI(setIndex++, p->pw_uid);
+     SETI(setIndex++, p->pw_gid);
+-#ifdef __VMS
++#if defined(__VMS) || defined(ANDROID)
+     SETS(setIndex++, "");
+ #else
+     SETS(setIndex++, p->pw_gecos);
+Index: Modules/posixmodule.c
+===================================================================
+--- Modules/posixmodule.c	(revisión: 29)
++++ Modules/posixmodule.c	(copia de trabajo)
+@@ -155,6 +155,9 @@
+ #define HAVE_SYSTEM     1
+ #define HAVE_WAIT       1
+ #define HAVE_TTYNAME    1
++#ifdef ANDROID
++    #undef HAVE_TTYNAME
++#endif
+ #endif  /* PYOS_OS2 && PYCC_GCC && __VMS */
+ #endif  /* _MSC_VER */
+ #endif  /* __BORLANDC__ */
+@@ -3787,7 +3790,7 @@
+     slave_fd = open(slave_name, O_RDWR | O_NOCTTY); /* open slave */
+     if (slave_fd < 0)
+         return posix_error();
+-#if !defined(__CYGWIN__) && !defined(HAVE_DEV_PTC)
++#if !defined(__CYGWIN__) && !defined(HAVE_DEV_PTC) && !defined(ANDROID)
+     ioctl(slave_fd, I_PUSH, "ptem"); /* push ptem */
+     ioctl(slave_fd, I_PUSH, "ldterm"); /* push ldterm */
+ #ifndef __hpux

@@ -1,0 +1,129 @@
+diff -r fe1df351ca3d src/core/android/SDL_android.cpp
+--- a/src/core/android/SDL_android.cpp	Thu Aug 25 03:11:28 2011 -0400
++++ b/src/core/android/SDL_android.cpp	Thu Aug 25 12:14:16 2011 -0300
+@@ -262,6 +262,7 @@
+ static int Android_JNI_FileOpen(SDL_RWops* ctx)
+ {
+     jstring fileNameJString = (jstring)ctx->hidden.androidio.fileName;
++    mEnv->PushLocalFrame(10);
+ 
+     // context = SDLActivity.getContext();
+     jmethodID mid = mEnv->GetStaticMethodID(mActivityClass,
+@@ -282,6 +283,7 @@
+         mEnv->ExceptionDescribe();
+         mEnv->ExceptionClear();
+         mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.fileNameRef);
++        mEnv->PopLocalFrame(NULL);
+         return -1;
+     } else {
+         ctx->hidden.androidio.inputStream = inputStream;
+@@ -309,6 +311,7 @@
+         mEnv->ExceptionClear();
+         mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.fileNameRef);
+         mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.inputStreamRef);
++        mEnv->PopLocalFrame(NULL);
+         return -1;
+     }
+ 
+@@ -325,6 +328,7 @@
+         mEnv->ExceptionClear();
+         mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.fileNameRef);
+         mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.inputStreamRef);
++        mEnv->PopLocalFrame(NULL);
+         return -1;
+     } else {
+         ctx->hidden.androidio.readableByteChannel = readableByteChannel;
+@@ -338,7 +342,7 @@
+     ctx->hidden.androidio.readMethod = mid;
+ 
+     ctx->hidden.androidio.position = 0;
+-
++    mEnv->PopLocalFrame(NULL);
+     return 0;
+ }
+ 
+@@ -361,7 +365,7 @@
+ {
+     int bytesRemaining = size * maxnum;
+     int bytesRead = 0;
+-
++    mEnv->PushLocalFrame(10);
+     jobject readableByteChannel = (jobject)ctx->hidden.androidio.readableByteChannel;
+     jmethodID readMethod = (jmethodID)ctx->hidden.androidio.readMethod;
+     jobject byteBuffer = mEnv->NewDirectByteBuffer(buffer, bytesRemaining);
+@@ -374,6 +378,7 @@
+         if (mEnv->ExceptionOccurred()) {
+             mEnv->ExceptionDescribe();
+             mEnv->ExceptionClear();
++            mEnv->PopLocalFrame(NULL);
+             return 0;
+         }
+ 
+@@ -385,7 +390,7 @@
+         bytesRead += result;
+         ctx->hidden.androidio.position += result;
+     }
+-
++    mEnv->PopLocalFrame(NULL);
+     return bytesRead / size;
+ }
+ 
+@@ -399,7 +404,7 @@
+ static int Android_JNI_FileClose(SDL_RWops* ctx, bool release)
+ {
+     int result = 0;
+-
++    mEnv->PushLocalFrame(10);
+     if (ctx) {
+         if (release) {
+             mEnv->DeleteGlobalRef((jobject)ctx->hidden.androidio.fileNameRef);
+@@ -424,7 +429,7 @@
+             SDL_FreeRW(ctx);
+         }
+     }
+-
++    mEnv->PopLocalFrame(NULL);
+     return result;
+ }
+ 
+@@ -432,6 +437,7 @@
+ extern "C" long Android_JNI_FileSeek(SDL_RWops* ctx, long offset, int whence)
+ {
+     long newPosition;
++    
+ 
+     switch (whence) {
+         case RW_SEEK_SET:
+@@ -445,6 +451,7 @@
+             break;
+         default:
+             SDL_SetError("Unknown value for 'whence'");
++            
+             return -1;
+     }
+     if (newPosition < 0) {
+@@ -453,6 +460,7 @@
+     if (newPosition > ctx->hidden.androidio.size) {
+         newPosition = ctx->hidden.androidio.size;
+     }
++    mEnv->PushLocalFrame(10);
+ 
+     long movement = newPosition - ctx->hidden.androidio.position;
+     jobject inputStream = (jobject)ctx->hidden.androidio.inputStream;
+@@ -468,6 +476,7 @@
+                 mEnv->ExceptionDescribe();
+                 mEnv->ExceptionClear();
+                 SDL_SetError("Exception while seeking");
++                mEnv->PopLocalFrame(NULL);
+                 return -1;
+             }
+         }
+@@ -480,7 +489,7 @@
+     }
+ 
+     ctx->hidden.androidio.position = newPosition;
+-
++    mEnv->PopLocalFrame(NULL);
+     return ctx->hidden.androidio.position;
+ }
+ 

@@ -1,0 +1,162 @@
+diff -r 022880331cac android-project/src/org/libsdl/app/SDLActivity.java
+--- a/android-project/src/org/libsdl/app/SDLActivity.java	Fri Aug 26 03:38:46 2011 -0400
++++ b/android-project/src/org/libsdl/app/SDLActivity.java	Mon Aug 29 22:27:38 2011 -0300
+@@ -93,7 +93,8 @@
+     public static native void onNativeResize(int x, int y, int format);
+     public static native void onNativeKeyDown(int keycode);
+     public static native void onNativeKeyUp(int keycode);
+-    public static native void onNativeTouch(int action, float x, 
++    public static native void onNativeTouch(int touchDevId, int pointerFingerId,
++                                            int action, float x, 
+                                             float y, float p);
+     public static native void onNativeAccel(float x, float y, float z);
+     public static native void nativeRunAudioThread();
+@@ -459,16 +460,34 @@
+ 
+     // Touch events
+     public boolean onTouch(View v, MotionEvent event) {
+-    
+-        int action = event.getAction();
+-        float x = event.getX();
+-        float y = event.getY();
+-        float p = event.getPressure();
++        {
++             final int touchDevId = event.getDeviceId();
++             final int pointerCount = event.getPointerCount();
++             // touchId, pointerId, action, x, y, pressure
++             int actionPointerIndex = event.getActionIndex();
++             int pointerFingerId = event.getPointerId(actionPointerIndex);
++             int action = event.getActionMasked();
+ 
+-        // TODO: Anything else we need to pass?        
+-        SDLActivity.onNativeTouch(action, x, y, p);
+-        return true;
+-    }
++             float x = event.getX(actionPointerIndex);
++             float y = event.getY(actionPointerIndex);
++             float p = event.getPressure(actionPointerIndex);
++
++             if (action == MotionEvent.ACTION_MOVE && pointerCount > 1) {
++                // TODO send motion to every pointer if its position has
++                // changed since prev event.
++                for (int i = 0; i < pointerCount; i++) {
++                    pointerFingerId = event.getPointerId(i);
++                    x = event.getX(i);
++                    y = event.getY(i);
++                    p = event.getPressure(i);
++                    SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
++                }
++             } else {
++                SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
++             }
++        }
++      return true;
++   } 
+ 
+     // Sensor events
+     public void enableSensor(int sensortype, boolean enabled) {
+diff -r 022880331cac src/core/android/SDL_android.cpp
+--- a/src/core/android/SDL_android.cpp	Fri Aug 26 03:38:46 2011 -0400
++++ b/src/core/android/SDL_android.cpp	Mon Aug 29 22:27:38 2011 -0300
+@@ -123,9 +123,10 @@
+ // Touch
+ extern "C" void Java_org_libsdl_app_SDLActivity_onNativeTouch(
+                                     JNIEnv* env, jclass jcls,
++                                    jint touch_device_id_in, jint pointer_finger_id_in,
+                                     jint action, jfloat x, jfloat y, jfloat p)
+ {
+-    Android_OnTouch(action, x, y, p);
++    Android_OnTouch(touch_device_id_in, pointer_finger_id_in, action, x, y, p);
+ }
+ 
+ // Accelerometer
+diff -r 022880331cac src/video/android/SDL_androidtouch.c
+--- a/src/video/android/SDL_androidtouch.c	Fri Aug 26 03:38:46 2011 -0400
++++ b/src/video/android/SDL_androidtouch.c	Mon Aug 29 22:27:38 2011 -0300
+@@ -24,6 +24,7 @@
+ 
+ #include "SDL_events.h"
+ #include "../../events/SDL_mouse_c.h"
++#include "../../events/SDL_touch_c.h"
+ 
+ #include "SDL_androidtouch.h"
+ 
+@@ -34,13 +35,16 @@
+ #define ACTION_CANCEL 3
+ #define ACTION_OUTSIDE 4
+ 
+-void Android_OnTouch(int action, float x, float y, float p)
++void Android_OnTouch(int touch_device_id_in, int pointer_finger_id_in, int action, float x, float y, float p) 
+ {
++    SDL_TouchID touchDeviceId = 0;
++    SDL_FingerID fingerId = 0;
++    
+     if (!Android_Window) {
+         return;
+     }
+ 
+-    if ((action != ACTION_CANCEL) && (action != ACTION_OUTSIDE)) {
++    /*if ((action != ACTION_CANCEL) && (action != ACTION_OUTSIDE)) {
+         SDL_SetMouseFocus(Android_Window);
+         SDL_SendMouseMotion(Android_Window, 0, (int)x, (int)y);
+         switch(action) {
+@@ -53,7 +57,48 @@
+         }
+     } else {
+         SDL_SetMouseFocus(NULL);
++    }*/
++
++    
++    touchDeviceId = (SDL_TouchID)touch_device_id_in;
++    if (!SDL_GetTouch(touchDeviceId)) {
++        SDL_Touch touch;
++        memset( &touch, 0, sizeof(touch) );
++        touch.id = touchDeviceId;
++        touch.x_min = 0.0f;
++        touch.x_max = (float)Android_ScreenWidth;
++        // touch.native_xres should be the difference between the min and max values, but as touch.xres is fixed to be 32768 in SDL_AddTouch,
++        // we set native_xres to be the same to compensate it. Beats me what's the logic behind this.
++        //touch.native_xres = touch.x_max - touch.x_min;
++        touch.native_xres = (1<<(16-1));
++        touch.y_min = 0.0f;
++        touch.y_max = (float)Android_ScreenHeight;
++        // Ditto for native_yres
++        //touch.native_yres = touch.y_max - touch.y_min;
++        touch.native_yres = (1<<(16-1));
++        touch.pressure_min = 0.0f;
++        touch.pressure_max = 1.0f;
++        touch.native_pressureres = touch.pressure_max - touch.pressure_min;
++        if (SDL_AddTouch(&touch, "") < 0) {
++             SDL_Log("error: can't add touch %s, %d", __FILE__, __LINE__);
++        }
+     }
++
++    
++    fingerId = (SDL_FingerID)pointer_finger_id_in;
++    switch (action) {
++        case ACTION_DOWN:
++            SDL_SendFingerDown(touchDeviceId, fingerId, SDL_TRUE, x, y, p);
++            break;
++        case ACTION_MOVE:
++            SDL_SendTouchMotion(touchDeviceId, fingerId, SDL_FALSE, x, y, p);
++            break;
++        case ACTION_UP:
++            SDL_SendFingerDown(touchDeviceId, fingerId, SDL_FALSE, x, y, p);
++            break;
++        default:
++            break;
++    } 
+ }
+ 
+ /* vi: set ts=4 sw=4 expandtab: */
+diff -r 022880331cac src/video/android/SDL_androidtouch.h
+--- a/src/video/android/SDL_androidtouch.h	Fri Aug 26 03:38:46 2011 -0400
++++ b/src/video/android/SDL_androidtouch.h	Mon Aug 29 22:27:38 2011 -0300
+@@ -22,6 +22,6 @@
+ 
+ #include "SDL_androidvideo.h"
+ 
+-extern void Android_OnTouch(int action, float x, float y, float p);
++extern void Android_OnTouch( int touch_device_id_in, int pointer_finger_id_in, int action, float x, float y, float p);
+ 
+ /* vi: set ts=4 sw=4 expandtab: */

@@ -1,0 +1,21 @@
+Index: Lib/site.py
+===================================================================
+--- Lib/site.py	(revisión: 21)
++++ Lib/site.py	(copia de trabajo)
+@@ -67,13 +67,13 @@
+ PREFIXES = [sys.prefix, sys.exec_prefix]
+ # Enable per user site-packages directory
+ # set it to False to disable the feature or True to force the feature
+-ENABLE_USER_SITE = None
++ENABLE_USER_SITE = False
+ 
+ # for distutils.commands.install
+ # These values are initialized by the getuserbase() and getusersitepackages()
+ # functions, through the main() function when Python starts.
+-USER_SITE = None
+-USER_BASE = None
++USER_SITE = "."
++USER_BASE = "."
+ 
+ 
+ def makepath(*paths):
