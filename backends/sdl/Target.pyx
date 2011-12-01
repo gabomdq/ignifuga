@@ -94,13 +94,15 @@ cdef class Target (TargetBase):
 
         SDL_GetRendererInfo(self.renderer, &self.render_info)
 
-        if bytes(self.render_info.name) in ['opengles', 'opengles2', 'direct3d']:
+        #if bytes(self.render_info.name) in ['opengles', 'opengles2', 'direct3d']:
             # This renderers have 2 or more separate render surfaces, we have to render the whole screen all the time
-            self._doublebuffered = True
-        else:
+            #self._doublebuffered = True
+        #else:
             # OPENGL, etc
             # Not double buffered, we can render only the required parts of the screen
-            self._doublebuffered = False
+            #self._doublebuffered = False
+            
+        # Test: Render it all as if doublebuffered
         self._doublebuffered = True
         debug('SDL backend is %s' % bytes(self.render_info.name))
         

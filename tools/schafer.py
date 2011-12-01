@@ -38,9 +38,9 @@
 
 # Schafer: The Ignifuga Builder utility
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
-# Requires: RSync
+# Requires: RSync, Cython, GNU Tools, MINGW32, Android SDK, etc
 
-import os, sys, shutil, shlex, fnmatch, imp, marshal
+import os, sys, shutil, shlex, fnmatch, imp, marshal, platform, tempfile, re
 from subprocess import Popen, PIPE
 from os.path import *
 from optparse import OptionParser
@@ -61,6 +61,11 @@ class loglevel:
     ERROR = 30
 
 
+AVAILABLE_PLATFORMS = ['linux64', 'mingw32', 'android']
+CYTHON_GIT = 'https://github.com/cython/cython.git'
+ANDROID_NDK_URL = 'http://dl.google.com/android/ndk/android-ndk-r7-linux-x86.tar.bz2'
+ANDROID_SDK_URL = 'http://dl.google.com/android/android-sdk_r15-linux.tgz'
+
 ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
 HOST_DIST_DIR = join(ROOT_DIR, 'host')
 HOSTPYTHON = join(HOST_DIST_DIR, 'bin', 'python')
@@ -77,10 +82,11 @@ JPG_SRC = join(ROOT_DIR, 'external', 'jpeg')
 ZLIB_SRC = join(ROOT_DIR, 'external', 'zlib')
 GREENLET_SRC = join(ROOT_DIR, 'external', 'greenlet')
 BITARRAY_SRC = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
-ANDROID_NDK =  abspath(join(ROOT_DIR, '..', 'mdqinc', 'android-ndk'))
-ANDROID_SDK =  abspath(join(ROOT_DIR, '..', 'mdqinc', 'android-sdk'))
+ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
+ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
 PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
 IGNIFUGA_SRC = ROOT_DIR
+
 
 PLATFORM_FILE = ""
 PYTHON_BUILD = ""
@@ -144,7 +150,21 @@ def find_cython():
     output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
     cython = output.split('\n')[0]
     if isfile(cython):
-        return cython
+        # Get the version
+        cmd = '%s -V' % cython
+        output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
+        version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
+        v = re.search("(\d+)\.(\d+)\.(.*)", version)
+        # We are looking for 0.15.1+ or higher
+        if v.groups(0) > 0:
+            return cython
+        if v.groups(0) == 0:
+            if v.groups(1) > 15:
+                return cython
+            if v.groups(1) == 15:
+                if v.groups(2).startswith('1+') or v.groups(2) >= 2:
+                    return cython
+        error ('Cython version %s is incompatible')
     return None
 
 def find_rsync():
@@ -155,22 +175,130 @@ def find_rsync():
         return rsync
     return None
 
-def clean_modules(modules, everything=False):
+def find_git():
+    cmd = 'which git'
+    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
+    git = output.split('\n')[0]
+    if isfile(git):
+        return git
+    return None
+
+def check_gnutools():
+    tools = ['make', 'gcc']
+
+    for tool in tools:
+        cmd = 'which ' + tool
+        output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
+        tool_path = output.split('\n')[0]
+        if not isfile(tool_path):
+            error('Could not find ' + tool)
+            exit()
+
+    return True
+
+def check_mingw32tools():
+    tools = ['i586-mingw32msvc-gcc', 'i586-mingw32msvc-g++', 'i586-mingw32msvc-ar', 'i586-mingw32msvc-ranlib', 'i586-mingw32msvc-strip', 'i586-mingw32msvc-ld', 'i586-mingw32msvc-as',
+            'i586-mingw32msvc-nm', 'i586-mingw32msvc-dlltool', 'i586-mingw32msvc-objdump', 'i586-mingw32msvc-windres']
+
+    for tool in tools:
+        cmd = 'which ' + tool
+        output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
+        tool_path = output.split('\n')[0]
+        if not isfile(tool_path):
+            error('Could not find ' + tool)
+            exit()
+
+    return True
+
+def install_host_tools():
+    """ Install all the required host tools.
+    Platforms supported:
+    * Ubuntu 64 Natty
+    """
+
+
+    log ('Installing development packages')
+    cmd = 'sudo apt-get -y install rsync python-dev mingw32 mingw32-binutils mingw32-runtime make gcc-4.5 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
+    Popen(shlex.split(cmd)).communicate()
+    
+    cython = find_cython()
+    if cython == None:
+        git = find_git()
+        if git == None:
+            # Try to install GIT
+            log('Trying to install GIT')
+            cmd = 'sudo apt-get -y install git'
+            Popen(shlex.split(cmd)).communicate()
+            git = find_git()
+            if git == None:
+                error('Could not install GIT. Try installing it manually')
+                exit()
+        log ('GIT is available')
+    
+        log ('Trying to install Cython')
+        tmp_cython = tempfile.mkdtemp()
+        cmd = 'chmod 777 %s' % tmp_cython
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'git clone %s %s' % (CYTHON_GIT, tmp_cython)
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo python setup.py install'
+        Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
+        cmd = 'sudo rm -rf %s' % tmp_cython
+        Popen(shlex.split(cmd)).communicate()
+        cython = find_cython()
+        if cython == None:
+            error('Could not install Cython (0.15.1+ or higher). Try installing it manually')
+            exit()
+
+    # Android SDK and NDK
+    if ANDROID_NDK == None or not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")):
+        log('Installing Android NDK')
+        cmd = 'wget %s' % ANDROID_NDK_URL
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        cmd = 'tar -jxvf %s' % ANDROID_NDK_URL.split('/')[-1]
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        cmd = 'sudo mv android-ndk-r7 %s' % ANDROID_NDK
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        log('Adding ANDROID_NDK variable %s to .bashrc' % ANDROID_NDK)
+        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
+        f.write('export ANDROID_NDK="%s"\n' % ANDROID_NDK)
+        f.close()
+        
+    if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
+        log('Installing Android SDK')
+        cmd = 'wget %s' % ANDROID_SDK_URL
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        cmd = 'tar -zxvf %s' % ANDROID_SDK_URL.split('/')[-1]
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        cmd = 'sudo mv android-sdk-linux %s' % ANDROID_SDK
+        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
+        log('Adding ANDROID_SDK variable %s to .bashrc' % ANDROID_SDK)
+        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
+        f.write('export ANDROID_SDK="%s"\n' % ANDROID_SDK)
+        f.close()
+    
+    
+def clean_modules(platforms, modules, everything=False):
     log('Cleaning Build Directories')
-    if not everything:
-        if isdir(TMP_DIR):
-            if 'ignifuga' in modules:
-                if isdir(IGNIFUGA_BUILD):
-                    shutil.rmtree(IGNIFUGA_BUILD)
-                if isdir(PYTHON_BUILD):
-                    shutil.rmtree(PYTHON_BUILD)
-            if 'sdl' in modules and isdir(SDL_BUILD):
-                shutil.rmtree(SDL_BUILD)
-    else:
-        if isdir(TMP_DIR):
-            shutil.rmtree(TMP_DIR)
-        if isdir(DIST_DIR):
-            shutil.rmtree(DIST_DIR)
+    if isinstance(platforms, str):
+        platforms = [platforms,]
+
+    for platform in platforms:
+        setup_variables(join (ROOT_DIR, 'dist', platform), join (ROOT_DIR, 'tmp', platform))
+        if not everything:
+            if isdir(TMP_DIR):
+                if 'ignifuga' in modules:
+                    if isdir(IGNIFUGA_BUILD):
+                        shutil.rmtree(IGNIFUGA_BUILD)
+                    if isdir(PYTHON_BUILD):
+                        shutil.rmtree(PYTHON_BUILD)
+                if 'sdl' in modules and isdir(SDL_BUILD):
+                    shutil.rmtree(SDL_BUILD)
+        else:
+            if isdir(TMP_DIR):
+                shutil.rmtree(TMP_DIR)
+            if isdir(DIST_DIR):
+                shutil.rmtree(DIST_DIR)
 
 def locate(pattern, root=os.curdir):
     '''Locate all files matching supplied filename pattern in and below
@@ -194,17 +322,37 @@ def read_platform():
 
 def check_host_tools():
     """ Check if the required host tools are present """
+    setup_variables(join (ROOT_DIR, 'dist'), join (ROOT_DIR, 'tmp'))
+
+    # Check the host distro
+    arch, exe = platform.architecture()
+    system = platform.system()
+    distro_name, distro_version, distro_id = platform.linux_distribution()
+    supported_platform = False
+    if system == 'Linux':
+        if arch == '64bit':
+            if distro_name == 'Ubuntu':
+                if distro_id in ['natty', 'oeniric']:
+                    supported_platform = True
+
+    if not supported_platform:
+        error('Warning: Unsupported host platform/architecture. Proceed with caution. No really, this thing may blow up any minute now')
+    
     if find_cython() == None:
-        error("Can not find Cython, please install it")
+        error("Can not find Cython, run with -D to install dependencies automatically")
         exit()
 
     if find_rsync() == None:
-        error("Can not find Rsync, please install it")
+        error("Can not find Rsync, run with -D to install dependencies automatically")
+        exit()
+
+    if not check_gnutools():
+        error("Can not find compilation tools (Make, GCC), run with -D to install dependencies automatically")
         exit()
 
     if not isfile(HOSTPYTHON) or not isfile(HOSTPGEN):
         info('Building Python for the host')
-        python_build = join(TMP_DIR, 'python_host')
+        python_build = join(ROOT_DIR, 'tmp', 'python_host')
         prepare_python('linux64', None, python_build)
         # First let's make the host version of Python, statically linked
         cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
@@ -213,6 +361,19 @@ def check_host_tools():
         Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         shutil.copy(join(python_build, 'Parser', 'pgen'), HOSTPGEN)
 
+
+def check_ignifuga_libraries(platform):
+    if platform == 'linux64' or platform == 'mingw32':
+        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
+            return True
+    elif platform == 'android':
+        if isfile(join(DIST_DIR, 'jni', 'python', 'libpython2.7.so')) and \
+        isfile(join(DIST_DIR, 'jni', 'SDL', 'libSDL.so')) and \
+        isfile(join(DIST_DIR, 'jni', 'SDL_image', 'libSDL_image.so')) and \
+        isfile(join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL_ttf.so')):
+            return True
+
+    return False
     
 def prepare_source(name, src, dst):
     if not isdir(src):
@@ -826,7 +987,7 @@ def make_sdl(platform, env=None):
         # Build freetype
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
             env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (DIST_DIR,ANDROID_NDK)
+            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (ANDROID_NDK,DIST_DIR)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
@@ -934,7 +1095,7 @@ def make_sdl(platform, env=None):
         if isfile(join(DIST_DIR, 'lib', 'libSDL_image.a')):
             os.remove(join(DIST_DIR, 'lib', 'libSDL_image.a'))
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = './configure LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
+            cmd = './configure LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
@@ -951,7 +1112,7 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
             env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
@@ -971,7 +1132,7 @@ def make_sdl(platform, env=None):
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
 
         if not isfile(join(SDL_TTF_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
@@ -1015,8 +1176,6 @@ def build_generic(options, platform, env=None):
 
     if not isdir(TMP_DIR):
         os.makedirs(TMP_DIR)
-
-    
             
     # Compile SDL statically
     if 'sdl' in options.modules:
@@ -1036,6 +1195,10 @@ def build_generic(options, platform, env=None):
 # LINUX 64
 def build_linux64 (options):
     platform = 'linux64'
+    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+
+    if options.main and check_ignifuga_libraries(platform):
+            return
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(DIST_DIR):
         os.makedirs(DIST_DIR)
@@ -1046,18 +1209,34 @@ def prepare_android_env():
     """ Set up the environment variables for Android compilation"""
 
     # Check that the NDK and SDK exist
+    if ANDROID_NDK == None:
+        error('No Android NDK location provided (use command line parameters or environment variable ANDROID_NDK)')
+        exit()
+    if ANDROID_SDK == None:
+        error('No Android SDK location provided (use command line parameters or environment variable ANDROID_SDK)')
+        exit()
+        
     if not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")):
         error('Can not locate Valid Android NDK at %s, install or update it' % (ANDROID_NDK,))
         exit()
-    if not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
-        error('Can not locate Android SDK at %s') % (ANDROID_SDK,)
+    if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
+        error('Can not locate Android SDK at %s' % ANDROID_SDK)
         exit()
+
+
         
     env = deepcopy(os.environ)
+    if 'JAVA_HOME' not in os.environ:
+        env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
+
+    if not isdir(env['JAVA_HOME']) or  not isfile(join(env['JAVA_HOME'], 'bin', 'java')):
+        error('Can not locate JAVA at %s' % (env['JAVA_HOME'],))
+        exit()
+    
     env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "armeabi"
     env['SDK'] = ANDROID_SDK
-    env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
+    
     #env['ARCH'] = "armeabi-v7a"
     env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" % (ANDROID_NDK)
     if env['ARCH'] == "armeabi-v7a":
@@ -1083,6 +1262,9 @@ def prepare_android_skeleton():
     
 def build_android (options):
     platform = 'android'
+    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    if options.main != None and check_ignifuga_libraries(platform):
+        return
     info('Building Ignifuga For Android')
     env = prepare_android_env()
     prepare_android_skeleton()
@@ -1115,6 +1297,10 @@ def prepare_mingw32_env():
 
 def build_mingw32 (options):
     platform = 'mingw32'
+    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    check_mingw32tools()
+    if options.main and check_ignifuga_libraries(platform):
+        return
     info('Building Ignifuga For Windows 32 bits')
     if not isdir(DIST_DIR):
         os.makedirs(DIST_DIR)
@@ -1126,10 +1312,10 @@ if __name__ == '__main__':
     info('Schafer - The Ignifuga Builder Utility')
     usage = "schafer.py -p platform [options]"
     parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
-    parser.add_option("-p", "--platform", dest="platform", default=None,
+    parser.add_option("-P", "--platform", dest="platform", default=None,
                   help="Platform (iphone, android, linux, windows, osx, all)")
-    parser.add_option("-m", "--module", dest="module", default="all",
-                  help="Module to build (all, python, sdl) Default: all")
+    parser.add_option("-M", "--module", dest="module", default="all",
+                  help="Ignifuga module to build (all, ignifuga, sdl) Default: all")
     parser.add_option("-c", "--clean",
                   action="store_true", dest="clean", default=False,
                   help="Clean temporary files before building")
@@ -1139,53 +1325,72 @@ if __name__ == '__main__':
     parser.add_option("-s", "--shell",
                   action="store_true", dest="shell", default=False,
                   help="Create a shell with environment variables set up")
+    parser.add_option("--androidndk",
+                  dest="androidndk", default=None,
+                  help="Location of the Android NDK (otherwise looks in env variable ANDROID_NDK)")
+    parser.add_option("--androidsdk",
+                  dest="androidsdk", default=None,
+                  help="Location of the Android SDK (otherwise looks in env variable ANDROID_SDK)")
+    parser.add_option("-m", "--main", dest="main", default=None,
+                  help="Main Python File (required to compile a project)")
+    parser.add_option("-p", "--project", dest="project", default="com.mdqinc.ignifuga",
+                  help="Project Name (default: com.mdqinc.ignifuga)")
+    parser.add_option("-a", "--asset", dest="assets", default=None, action="append",
+                  help="Asset location")
+    parser.add_option("-D", "--dependencies", dest="dependencies", default=False, action="store_true",
+                  help="Install required dependencies and exit")
     (options, args) = parser.parse_args()
+
+
+    if options.dependencies:
+        install_host_tools()
+        exit()
 
     options.platform = str(options.platform).lower()
 
-    if options.platform not in ('iphone','android', 'linux64', 'linux32', 'mingw32', 'mingw64', 'osx', 'all'):
+    #if options.platform not in ('iphone','android', 'linux64', 'linux32', 'mingw32', 'mingw64', 'osx', 'all'):
+    if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
         parser.print_help()
         exit()
+
+    if options.platform == 'all':
+        platforms = AVAILABLE_PLATFORMS
+    else:
+        platforms = [options.platform,]
+
+    if options.androidndk != None:
+        ANDROID_NDK = options.androidndk
+    if options.androidsdk != None:
+        ANDROID_SDK = options.androidsdk
 
     if options.shell and options.platform != 'all':
         spawn_shell(options.platform)
         exit()
 
-    if options.module == 'all':
+    if options.module == 'all' or options.main != None:
         options.modules = [ 'sdl', 'ignifuga']
         del options.module
     else:
         options.modules = [options.module,]
 
-    setup_variables(join(DIST_DIR, options.platform), join(TMP_DIR, options.platform))
-    check_host_tools()
+    
     if options.clean or options.forceclean:
-        clean_modules(options.modules, options.forceclean)
+        clean_modules(platforms, options.modules, options.forceclean)
 
-    if options.platform == 'linux64':
-        build_linux64(options)
-    elif options.platform == 'android':
-        build_android(options)
-    elif options.platform == 'mingw32':
-        build_mingw32(options)
-    elif options.platform == 'all':
-        dist_dir = os.sep.join(DIST_DIR.split(os.sep)[:-1])
-        tmp_dir = os.sep.join(TMP_DIR.split(os.sep)[:-1])
-        options.platform='linux64'
-        setup_variables(join(dist_dir, options.platform), join(tmp_dir, options.platform))
-        if options.clean or options.forceclean:
-            clean_modules(options.modules, options.forceclean)
-        build_linux64(options)
-        options.platform='android'
-        setup_variables(join(dist_dir, options.platform), join(tmp_dir, options.platform))
-        if options.clean or options.forceclean:
-            clean_modules(options.modules, options.forceclean)
-        build_android(options)
-        options.platform='mingw32'
-        setup_variables(join(dist_dir, options.platform), join(tmp_dir, options.platform))
-        if options.clean or options.forceclean:
-            clean_modules(options.modules, options.forceclean)
-        build_mingw32(options)
-    else:
-        error("Platform not yet implemented")
+    check_host_tools()
+    for platform in platforms:
+        locals()["build_"+platform](options)
+
+    info ('Ignifuga engine files are ready.')
+
+    if options.main == None:
         exit()
+
+    if not isfile(options.main):
+        error('Can not find main project file')
+        exit()
+            
+    info('Compiling project: ' + options.project )
+
+    
+    
