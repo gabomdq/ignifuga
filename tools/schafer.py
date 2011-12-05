@@ -1211,24 +1211,8 @@ def build_generic(options, platform, env=None):
         info('Building Python')
         prepare_python(platform, ignifuga_src, PYTHON_BUILD)
         make_python(platform, ignifuga_src, env)
-        
-# ===============================================================================================================
-# LINUX 64
-# ===============================================================================================================
 
-def build_linux64 (options):
-    platform = 'linux64'
-    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
-
-    if options.main and check_ignifuga_libraries(platform):
-        return
-    info('Building Ignifuga For Linux 64 bits')
-    if not isdir(DIST_DIR):
-        os.makedirs(DIST_DIR)
-    build_generic(options, platform)
-
-def build_project_linux64(options):
-    platform = 'linux64'
+def build_project_generic(options, platform, env=None):
     package = options.project.split('.')[-1]
     if package == 'ignifuga':
         error('Name your project something else than ignifuga please')
@@ -1241,19 +1225,13 @@ def build_project_linux64(options):
     platform_build = join(PROJECT_BUILD, platform)
     main_file = join(platform_build, options.main)
     cython_src = join(PROJECT_BUILD, platform, 'cython_src')
-    info('Building %s For Linux 64 bits (package: %s)' % (options.project, package))
+    info('Building %s for %s  (package: %s)' % (options.project, platform, package))
     if not isdir(PROJECT_BUILD):
         os.makedirs(PROJECT_BUILD)
-    
+
     # Prepare and cythonize project sources
     prepare_project(PROJECT_ROOT, platform_build)
     cfiles, glue_h, glue_c = cythonize(platform_build, package, [options.main,])
-#    glue = make_glue(package, glue_h, glue_c)
-#    glue_file = join(cython_src, package + '_glue.c' )
-#    f = open(glue_file, 'w')
-#    f.write(glue)
-#    f.close()
-#    cfiles.append(glue_file)
 
     # Cythonize main file
     main_file_ct = getctime(main_file)
@@ -1268,6 +1246,8 @@ def build_project_linux64(options):
         if not isfile(mfc):
             error ('Could not cythonize main file')
             exit()
+        cmd = "sed -i '1i#include \"SDL.h\"' %s" % mfc
+        Popen(shlex.split(cmd), cwd = platform_build).communicate()
         shutil.move(mfc, main_file_c)
 
     # Build the executable
@@ -1281,18 +1261,106 @@ def build_project_linux64(options):
         sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
         freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        if platform == 'linux64':
+            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL_ttf -lSDL_image -lSDL -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
+            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
+        elif platform == 'mingw32':
+            extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
+            cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL_ttf -lSDL_image -lSDLmain -lSDL -lpng -ljpeg -lfreetype -lz %s %s %s -o %s' % (env['CC'], sources, join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, extralibs, options.project)
+            print cmd
+            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
 
-    cmd = 'gcc -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL_ttf -lSDL_image -lSDL -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
-    Popen(shlex.split(cmd), cwd = cython_src).communicate()
+        if not isfile(join(cython_src, options.project)):
+            error('Error during compilation of project')
+            exit()
+        cmd = '%s %s' % (env['STRIP'], join(cython_src, options.project))
+        Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
+        if platform == 'linux64':
+            shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
+        elif platform == 'mingw32':
+            shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project+'.exe'))
+            
+    elif platform == 'android':
+        # Copy/update the skeleton
+        android_project = join(platform_build, 'android_project')
+        jni_src = join(android_project, 'jni', 'src')
+        local_cfiles = []
+        for cfile in cfiles:
+            local_cfiles.append(basename(cfile))
 
-    if not isfile(join(cython_src, options.project)):
-        error('Error during compilation of project')
-        exit()
+        cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (DIST_DIR, android_project)
+        Popen(shlex.split(cmd), cwd = DIST_DIR).communicate()
+        # Modify the glue code to suit the project
+        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'AndroidManifest.xml'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'build.xml'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[SDK_LOCATION\]\]|%s|g' %s" % (ANDROID_SDK, join(android_project, 'local.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
 
-    cmd = 'strip %s' % join(cython_src, options.project)
-    Popen(shlex.split(cmd), cwd = cython_src).communicate()
+        # Make the correct structure inside src
+        sdlActivityDir = join(android_project, 'src', options.project.replace('.', os.sep))
+        if not isdir(sdlActivityDir):
+            os.makedirs(sdlActivityDir)
+        shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
 
-    shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
+        # Copy cythonized sources
+        cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (cython_src, jni_src)
+        Popen(shlex.split(cmd), cwd = cython_src).communicate()
+
+        # Copy assets
+        for asset in options.assets:
+            cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s %s' % (asset, join(android_project, 'assets'))
+            Popen(shlex.split(cmd)).communicate()
+
+        # Build it
+        cmd = 'ndk-build'
+        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
+        cmd = 'ant debug'
+        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
+
+        apk = join(android_project, 'bin', options.project+'-debug.apk')
+        if not isfile(apk):
+            error ('Error during compilation of the project')
+            exit()
+
+        shutil.move(apk, join(PROJECT_BUILD, '..', options.project+'.apk'))
+
+
+    info('Project built successfully')
+
+        
+# ===============================================================================================================
+# LINUX 64
+# ===============================================================================================================
+def prepare_linux64_env():
+    """ Set up the environment variables for Linux64 compilation"""
+    env = deepcopy(os.environ)
+    env['CC'] = 'gcc'
+    env['STRIP'] = 'strip'
+    return env
+
+def build_linux64 (options):
+    platform = 'linux64'
+    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+
+    if options.main and check_ignifuga_libraries(platform):
+        return
+    info('Building Ignifuga For Linux 64 bits')
+    if not isdir(DIST_DIR):
+        os.makedirs(DIST_DIR)
+    build_generic(options, platform)
+
+def build_project_linux64(options):
+    platform = 'linux64'
+    env = prepare_linux64_env()
+    build_project_generic(options, platform, env)
 
 
 # ===============================================================================================================
@@ -1360,6 +1428,11 @@ def build_android (options):
     prepare_android_skeleton()
     build_generic(options, platform, env)
 
+def build_project_android(options):
+    platform = 'android'
+    env = prepare_android_env()
+    build_project_generic(options, platform, env)
+
 # ===============================================================================================================
 # Windows - Mingw32
 # ===============================================================================================================
@@ -1400,6 +1473,10 @@ def build_mingw32 (options):
     env = prepare_mingw32_env()
     build_generic(options, platform, env)
 
+def build_project_mingw32(options):
+    platform = 'mingw32'
+    env = prepare_mingw32_env()
+    build_project_generic(options, platform, env)
 
 # ===============================================================================================================
 # MAIN

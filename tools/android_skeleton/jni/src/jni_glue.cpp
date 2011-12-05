@@ -70,7 +70,7 @@ extern "C" {
 };
 
 // Resize
-extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeResize(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeResize(
                                     JNIEnv* env, jclass jcls,
                                     jint width, jint height, jint format)
 {
@@ -78,21 +78,21 @@ extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeResize(
 }
 
 // Keydown
-extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeKeyDown(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeKeyDown(
                                     JNIEnv* env, jclass jcls, jint keycode)
 {
     Java_org_libsdl_app_SDLActivity_onNativeKeyDown(env, jcls, keycode);
 }
 
 // Keyup
-extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeKeyUp(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeKeyUp(
                                     JNIEnv* env, jclass jcls, jint keycode)
 {
     Java_org_libsdl_app_SDLActivity_onNativeKeyUp(env, jcls, keycode);
 }
 
 // Touch
-extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeTouch(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeTouch(
                                     JNIEnv* env, jclass jcls,
                                     jint touch_device_id_in, jint pointer_finger_id_in,
                                     jint action, jfloat x, jfloat y, jfloat p)
@@ -101,7 +101,7 @@ extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeTouch(
 }
 
 // Accelerometer
-extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeAccel(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeAccel(
                                     JNIEnv* env, jclass jcls,
                                     jfloat x, jfloat y, jfloat z)
 {
@@ -109,18 +109,18 @@ extern "C" void Java_com_mdqinc_dp_SDLActivity_onNativeAccel(
 }
 
 // Quit
-extern "C" void Java_com_mdqinc_dp_SDLActivity_nativeQuit(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeQuit(
                                     JNIEnv* env, jclass cls)
 {    
     Java_org_libsdl_app_SDLActivity_nativeQuit(env, cls);
 }
 
-extern "C" void Java_com_mdqinc_dp_SDLActivity_nativeRunAudioThread(
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeRunAudioThread(
                                     JNIEnv* env, jclass cls)
 {
     Java_org_libsdl_app_SDLActivity_nativeRunAudioThread(env, cls);
 }
 
-extern "C" void Java_com_mdqinc_dp_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj) {
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj) {
     Java_org_libsdl_app_SDLActivity_nativeInit(env, cls, obj);
 }

@@ -18,8 +18,8 @@ LOCAL_CFLAGS := \
 	-DPLAY_MOD
 
 # Add your application source files here...
-LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
-	dp.c jni_glue.cpp
+LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp jni_glue.cpp \
+[[LOCAL_SRC_FILES]]
 
 #LOCAL_SHARED_LIBRARIES := SDL SDL_image python2.7
 
