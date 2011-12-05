@@ -87,6 +87,9 @@ ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/o
 PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
 IGNIFUGA_SRC = ROOT_DIR
 
+PROJECT_ROOT = ""
+PROJECT_BUILD = ""
+
 
 PLATFORM_FILE = ""
 PYTHON_BUILD = ""
@@ -184,7 +187,7 @@ def find_git():
     return None
 
 def check_gnutools():
-    tools = ['make', 'gcc']
+    tools = ['make', 'gcc', 'strip']
 
     for tool in tools:
         cmd = 'which ' + tool
@@ -215,8 +218,6 @@ def install_host_tools():
     Platforms supported:
     * Ubuntu 64 Natty
     """
-
-
     log ('Installing development packages')
     cmd = 'sudo apt-get -y install rsync python-dev mingw32 mingw32-binutils mingw32-runtime make gcc-4.5 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
     Popen(shlex.split(cmd)).communicate()
@@ -389,8 +390,10 @@ def prepare_source(name, src, dst):
     
     return retval
 
-
+# ===============================================================================================================
 # PYTHON BUILDING - Requires Ignifuga building!
+# ===============================================================================================================
+
 def prepare_python(platform, ignifuga_src, python_build):
     if prepare_source('Python', PYTHON_SRC, python_build):
         # Now copy the Setup.dist files
@@ -628,7 +631,7 @@ compileall.compile_dir("%s")
             f = f + '.pyc'
             
         if isfile(f):
-            print "Freezing...%s" % f
+            log("Freezing...%s" % f)
             fp = open(f, 'rb')
             if fp.read(4) == imp.get_magic():
                 fp.read(4)
@@ -659,76 +662,80 @@ compileall.compile_dir("%s")
     f.write(frozen_h)
     f.close()
 
+# ===============================================================================================================
 # Ignifuga BUILDING
+# ===============================================================================================================
+
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqP --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
     Popen(shlex.split(cmd), cwd = IGNIFUGA_SRC).communicate()
 
-def make_ignifuga_glue(glue_h, glue_c):
-    ignifuga_c = """
+def make_glue(package, glue_h, glue_c):
+    glue = """
 #include "Python.h"
 static PyMethodDef nomethods[] = {  {NULL, NULL}};
 %s
 
 PyMODINIT_FUNC
-initignifuga(){
+init%s(){
     PyObject* module;
     PyObject* __path__;
 
     // Add a __path__ attribute so Python knows that this is a package
-    PyObject* package_ignifuga = PyImport_AddModule("ignifuga");
-    Py_InitModule("ignifuga", nomethods);
+    PyObject* package_%s = PyImport_AddModule("%s");
+    Py_InitModule("%s", nomethods);
     __path__ = PyList_New(1);
-    PyList_SetItem(__path__, 0, PyString_FromString("ignifuga"));
-    PyModule_AddObject(package_ignifuga, "__path__", __path__);
+    PyList_SetItem(__path__, 0, PyString_FromString("%s"));
+    PyModule_AddObject(package_%s, "__path__", __path__);
 %s
 
     }
 
-    """ % (glue_h, glue_c)
+    """ % (glue_h, package, package, package, package, package, package, glue_c)
 
-    f = open(join(IGNIFUGA_BUILD, 'cython_src', 'ignifuga.c'), 'w')
-    f.write(ignifuga_c)
-    f.close()
+    return glue
 
-def make_ignifuga(platform):
+def make_ignifuga():
+    return cythonize(IGNIFUGA_BUILD, 'ignifuga')
+    
+def cythonize(build_dir, package_name, skip=[]):
     files = []
     cfiles = []
     updatedfiles = []
     
-    for f in locate('*.py', IGNIFUGA_BUILD):
+    for f in locate('*.py', build_dir):
         files.append(f)
-    for f in locate('*.pyx', IGNIFUGA_BUILD):
+    for f in locate('*.pyx', build_dir):
         files.append(f)
 
     # Cythonize the source files
     for f in files:
-        mf = getctime(f)
-        cf = splitext(f)[0] + '.c'
-        if not isfile(cf) or getctime(cf) < mf:
-            ccf = join(IGNIFUGA_BUILD, 'cython_src', cf.replace(os.sep, '+')[len(IGNIFUGA_BUILD)+1:])
-            if not isfile(ccf) or getctime(ccf) < mf:
-                log('Cythonizing %s' % basename(f))
-                cmd = 'cython "%s"' % f
-                Popen(shlex.split(cmd), cwd = IGNIFUGA_BUILD).communicate()
-                updatedfiles.append(cf)
-        else:
-            log('Skipping Cython for %s' % basename(f))
-            
-        cfiles.append(cf)
+        if f[len(build_dir):] not in skip and f[len(build_dir)+1:] not in skip:
+            mf = getctime(f)
+            cf = splitext(f)[0] + '.c'
+            if not isfile(cf) or getctime(cf) < mf:
+                ccf = join(build_dir, 'cython_src', cf.replace(os.sep, '+')[len(build_dir)+1:])
+                if not isfile(ccf) or getctime(ccf) < mf:
+                    log('Cythonizing %s' % basename(f))
+                    cmd = 'cython "%s"' % f
+                    Popen(shlex.split(cmd), cwd = build_dir).communicate()
+                    updatedfiles.append(cf)
+            else:
+                log('Skipping Cython for %s' % basename(f))
 
+            cfiles.append(cf)
+            
     # Flatten the directory structure, replace / by + signs
     files = cfiles[:]
     cfiles = []
-    cython_src = join(IGNIFUGA_BUILD, 'cython_src')
+    cython_src = join(build_dir, 'cython_src')
     if not isdir(cython_src):
         os.makedirs(cython_src)
         
     for f in files:
-        d = f[len(IGNIFUGA_BUILD)+1:].replace(os.sep, '+')
+        d = f[len(build_dir)+1:].replace(os.sep, '+')
         cfile = join(cython_src, d)
-        print f,cfile
         if isfile(f):
             shutil.move(f, cfile)
         cfiles.append(cfile)
@@ -737,10 +744,10 @@ def make_ignifuga(platform):
             updatedfiles.append(cfile)
 
     # Walk the files, arrange the package in the proper hierachy
-    ignifuga_glue_h = ""
-    ignifuga_glue_c = ""
+    glue_h = ""
+    glue_c = ""
     modules = {}
-    packages = ['ignifuga',]
+    packages = [package_name,]
     for f in cfiles:
         filename = basename(f)
         package = filename.replace('+', '.').replace('.c', '')
@@ -765,9 +772,9 @@ def make_ignifuga(platform):
             subpackage = ''
         
         if package != '':
-            package = 'ignifuga.'+package
+            package = package_name+'.'+package
         else:
-            package = 'ignifuga'
+            package = package_name
         
         if package not in packages:
                 packages.append(package)
@@ -791,19 +798,24 @@ def make_ignifuga(platform):
             Popen(shlex.split(cmd), cwd = cython_src).communicate()
 
         if module != '__init__':
-            ignifuga_glue_h += "extern void init%s_%s();\n" % (package.replace('.', '_'),module)
-            ignifuga_glue_c += '    PyImport_AppendInittab("%s.%s", init%s_%s);\n' % (package, module, package.replace('.', '_'),module)
+            glue_h += "extern void init%s_%s();\n" % (package.replace('.', '_'),module)
+            glue_c += '    PyImport_AppendInittab("%s.%s", init%s_%s);\n' % (package, module, package.replace('.', '_'),module)
         else:
-            ignifuga_glue_h += "extern void init%s();\n" % (package.replace('.', '_'))
-            ignifuga_glue_c += '    PyImport_AppendInittab("%s", init%s);\n' % (package, package.replace('.', '_'))
+            glue_h += "extern void init%s();\n" % (package.replace('.', '_'))
+            glue_c += '    PyImport_AppendInittab("%s", init%s);\n' % (package, package.replace('.', '_'))
 
-    # Make ignifuga.c with no frozen modules
-    make_ignifuga_glue(ignifuga_glue_h, ignifuga_glue_c)
-    cfiles.append(join(IGNIFUGA_BUILD, 'cython_src', 'ignifuga.c'))
+    # Make package xxx_glue.c with no frozen modules
+    glue = make_glue(package_name, glue_h, glue_c)
+    f = open(join(build_dir, 'cython_src', package_name+'_glue.c'), 'w')
+    f.write(glue)
+    f.close()
+    cfiles.append(join(build_dir, 'cython_src', package_name+'_glue.c'))
     
-    return cfiles, ignifuga_glue_h, ignifuga_glue_c
-
+    return cfiles, glue_h, glue_c
+    
+# ===============================================================================================================
 # SDL BUILDING
+# ===============================================================================================================
 def prepare_sdl(platform):
     if platform == 'linux64':
         prepare_source('SDL', SDL_SRC, SDL_BUILD)
@@ -1145,10 +1157,18 @@ def make_sdl(platform, env=None):
         else:
             error('Problem building SDL TTF')
             exit()
-        
-        
 
+# ===============================================================================================================
+# USER PROJECT BUILDS
+# ===============================================================================================================
+def prepare_project(src, dst):
+    # Copy all .py, .pyx and .pxd files
+    cmd = 'rsync -aqPm --exclude .svn --exclude .hg --exclude build --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (src, dst)
+    Popen(shlex.split(cmd), cwd = src).communicate()
+        
+# ===============================================================================================================
 # PLATFORM BUILDS
+# ===============================================================================================================
 def spawn_shell(platform):
     cmd = 'bash'
     env = os.environ
@@ -1187,24 +1207,97 @@ def build_generic(options, platform, env=None):
     if 'ignifuga' in options.modules:
         info('Building Ignifuga')
         prepare_ignifuga(platform)
-        ignifuga_src, glue_h, glue_c = make_ignifuga(platform)
+        ignifuga_src, glue_h, glue_c = make_ignifuga()
         info('Building Python')
         prepare_python(platform, ignifuga_src, PYTHON_BUILD)
         make_python(platform, ignifuga_src, env)
-    
+        
+# ===============================================================================================================
 # LINUX 64
+# ===============================================================================================================
+
 def build_linux64 (options):
     platform = 'linux64'
     setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
 
     if options.main and check_ignifuga_libraries(platform):
-            return
+        return
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(DIST_DIR):
         os.makedirs(DIST_DIR)
     build_generic(options, platform)
 
+def build_project_linux64(options):
+    platform = 'linux64'
+    package = options.project.split('.')[-1]
+    if package == 'ignifuga':
+        error('Name your project something else than ignifuga please')
+        exit()
+
+    if package +'.py' == basename(options.main).lower():
+        error('Your main file can not have the same name as the project. If your project is com.mdqinc.test your main file can not be named test.py')
+        exit()
+
+    platform_build = join(PROJECT_BUILD, platform)
+    main_file = join(platform_build, options.main)
+    cython_src = join(PROJECT_BUILD, platform, 'cython_src')
+    info('Building %s For Linux 64 bits (package: %s)' % (options.project, package))
+    if not isdir(PROJECT_BUILD):
+        os.makedirs(PROJECT_BUILD)
+    
+    # Prepare and cythonize project sources
+    prepare_project(PROJECT_ROOT, platform_build)
+    cfiles, glue_h, glue_c = cythonize(platform_build, package, [options.main,])
+#    glue = make_glue(package, glue_h, glue_c)
+#    glue_file = join(cython_src, package + '_glue.c' )
+#    f = open(glue_file, 'w')
+#    f.write(glue)
+#    f.close()
+#    cfiles.append(glue_file)
+
+    # Cythonize main file
+    main_file_ct = getctime(main_file)
+    main_file_c = join(cython_src, splitext(options.main)[0] + '.c')
+    cfiles.append(main_file_c)
+
+    if not isfile(main_file_c) or getctime(main_file_c) < main_file_ct:
+        log('Cythonizing main file %s' % main_file)
+        cmd = 'cython --embed %s' % main_file
+        mfc = join(platform_build, splitext(main_file)[0] + '.c')
+        Popen(shlex.split(cmd), cwd = platform_build).communicate()
+        if not isfile(mfc):
+            error ('Could not cythonize main file')
+            exit()
+        shutil.move(mfc, main_file_c)
+
+    # Build the executable
+    sources = ''
+    for cf in cfiles:
+        sources += cf + ' '
+
+    if platform in ['linux64', 'mingw32']:
+        # Get some required flags
+        cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --cflags'
+        sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
+        freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+
+    cmd = 'gcc -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL_ttf -lSDL_image -lSDL -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
+    Popen(shlex.split(cmd), cwd = cython_src).communicate()
+
+    if not isfile(join(cython_src, options.project)):
+        error('Error during compilation of project')
+        exit()
+
+    cmd = 'strip %s' % join(cython_src, options.project)
+    Popen(shlex.split(cmd), cwd = cython_src).communicate()
+
+    shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
+
+
+# ===============================================================================================================
 # ANDROID
+# ===============================================================================================================
 def prepare_android_env():
     """ Set up the environment variables for Android compilation"""
 
@@ -1222,9 +1315,6 @@ def prepare_android_env():
     if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
         error('Can not locate Android SDK at %s' % ANDROID_SDK)
         exit()
-
-
-        
     env = deepcopy(os.environ)
     if 'JAVA_HOME' not in os.environ:
         env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
@@ -1270,7 +1360,10 @@ def build_android (options):
     prepare_android_skeleton()
     build_generic(options, platform, env)
 
+# ===============================================================================================================
 # Windows - Mingw32
+# ===============================================================================================================
+
 def prepare_mingw32_env():
     """ Set up the environment variables for Mingw32 compilation"""
     env = deepcopy(os.environ)
@@ -1306,7 +1399,11 @@ def build_mingw32 (options):
         os.makedirs(DIST_DIR)
     env = prepare_mingw32_env()
     build_generic(options, platform, env)
-    
+
+
+# ===============================================================================================================
+# MAIN
+# ===============================================================================================================
     
 if __name__ == '__main__':
     info('Schafer - The Ignifuga Builder Utility')
@@ -1333,7 +1430,7 @@ if __name__ == '__main__':
                   help="Location of the Android SDK (otherwise looks in env variable ANDROID_SDK)")
     parser.add_option("-m", "--main", dest="main", default=None,
                   help="Main Python File (required to compile a project)")
-    parser.add_option("-p", "--project", dest="project", default="com.mdqinc.ignifuga",
+    parser.add_option("-p", "--project", dest="project", default="com.mdqinc.test",
                   help="Project Name (default: com.mdqinc.ignifuga)")
     parser.add_option("-a", "--asset", dest="assets", default=None, action="append",
                   help="Asset location")
@@ -1350,6 +1447,7 @@ if __name__ == '__main__':
 
     #if options.platform not in ('iphone','android', 'linux64', 'linux32', 'mingw32', 'mingw64', 'osx', 'all'):
     if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
+        error('Invalid target platform')
         parser.print_help()
         exit()
 
@@ -1393,4 +1491,7 @@ if __name__ == '__main__':
     info('Compiling project: ' + options.project )
 
     
-    
+    PROJECT_ROOT = abspath(dirname(options.main))
+    PROJECT_BUILD = join(PROJECT_ROOT, 'build')
+    for platform in platforms:
+        locals()["build_project_"+platform](options)
