@@ -122,27 +122,3 @@ cdef class GameLoop(GameLoopBase):
         fev.y = fev.y * self._screen_h / 32768
 
         
-"""
-  def onBrowserEvent(self, event):
-        if not self.hidden:
-            etype = DOM.eventGetType(event)
-            x = event.clientX if hasattr(event, 'clientX') else None
-            y = event.clientY if hasattr(event, 'clientY') else None
-            button = event.button if hasattr(event, 'button') else None
-            stream = event.streamId if hasattr(event, 'streamId') else 0
-            pressure = event.mozPressure if hasattr(event, 'mozPressure') else None
-            modifiers = []
-            if hasattr(event, 'ctrlKey') and event.ctrlKey:
-                modifiers.append(Event.MODIFIERS.ctrl)
-            if hasattr(event, 'altKey') and event.altKey:
-                modifiers.append(Event.MODIFIERS.alt)
-            if hasattr(event, 'shiftKey') and event.shiftKey:
-                modifiers.append(Event.MODIFIERS.shift)
-            if hasattr(event, 'metaKey') and event.metaKey:
-                modifiers.append(Event.MODIFIERS.meta)
-                
-            gev = Event(etype, x, y, button, stream, pressure, modifiers)
-            Gilbert().reportEvent(gev)
-        return False
-        
-"""

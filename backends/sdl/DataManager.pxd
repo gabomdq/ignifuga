@@ -41,21 +41,20 @@
 from ignifuga.backends.DataManagerBase cimport DataManagerBase, DataCache as _DataCache
 from ignifuga.Node cimport Node
 from ignifuga.backends.sdl.Canvas cimport Canvas
+from ignifuga.backends.sdl.Font cimport Font
 from ignifuga.backends.CanvasBase cimport CanvasBase
+from ignifuga.backends.FontBase cimport FontBase
 from SDL cimport *
 from libc.stdlib cimport free, malloc
 
-cdef class SDL_Font(object):
-    cdef TTF_Font *ttf_font
-    
 cdef class DataCache(_DataCache):
-    cdef SDL_Font font
+    pass
 
 cdef class DataManager(DataManagerBase):
-    cpdef str readFile(self, str name)
-    cpdef Node loadScene(self, str name)
-    cpdef dict getSprite(self, url)
-    cpdef CanvasBase getImage(self, url)
-    cpdef Node processScene(self, dict data)
-    cpdef SDL_Font getFont(self, url, size)
-    cpdef releaseFont(self, url, size)
+    cpdef str readFile(self, str name, owner)
+    cpdef Node loadScene(self, str name, owner)
+    cpdef dict getSprite(self, url, owner)
+    cpdef CanvasBase getImage(self, url, owner)
+    cpdef Node processScene(self, dict data, owner)
+    cpdef FontBase getFont(self, url, size, owner)
+    cpdef releaseFont(self, url, size, owner)

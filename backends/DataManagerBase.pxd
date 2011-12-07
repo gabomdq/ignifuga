@@ -39,20 +39,20 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.backends.CanvasBase cimport CanvasBase
+from ignifuga.backends.FontBase cimport FontBase
 from ignifuga.Node cimport Node
 
 cdef class DataCache(object):
-    cdef CanvasBase _canvas
-    cdef dict _data
-    cdef readonly int refCount
-    cpdef addRef(self)
-    cpdef removeRef(self)
-
+    cdef CanvasBase canvas
+    cdef FontBase font
+    cdef dict data
+    cdef list owners
 
 cdef class DataManagerBase(object):
     cdef public dict cache
-    cpdef Node loadScene(self, str name)
-    cpdef dict getSprite(self, url)
-    cpdef CanvasBase getImage(self, url)
-    cpdef Node processScene(self, dict data)
-    cpdef release(self, url)
+    cpdef Node loadScene(self, str name, owner)
+    cpdef dict getSprite(self, url, owner)
+    cpdef CanvasBase getImage(self, url, owner)
+    cpdef Node processScene(self, dict data, owner)
+    cpdef FontBase getFont(self, url, size, owner)
+    cpdef release(self, url, owner)

@@ -193,6 +193,7 @@ cdef class Node(object):
             pass
         
     property state:
+        """ The state is a full copy of the Node dictionary """
         def __get__(self):
             return self._state
         def __set__(self,value):
@@ -202,6 +203,7 @@ cdef class Node(object):
                     self._states[self._state] = deepcopy(getattr(self, '__dict__', {}))
                 # Load new state
                 if value not in self._states:
+                    # State is new, just make a new copy of the current state
                     self._states[value] = deepcopy(self._states[Node.STATE_DEFAULT])
 
                 for k,v in self._states[value].items():

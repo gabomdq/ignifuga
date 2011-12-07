@@ -43,20 +43,9 @@ from ignifuga.Gilbert import Gilbert, createNode
 from ignifuga.Log import debug, error
 from SDL import *
 
-cdef class SDL_Font(object):
+cdef class DataCache(_DataCache):
     pass
 
-cdef class DataCache(_DataCache):
-    def __init__(self):
-        super(DataCache, self).__init__()
-        self.font = None
-
-    def __dealloc__(self):
-        if self.font != None and self.font.ttf_font != NULL:
-            #debug('Releasing TTF Font')
-            TTF_CloseFont(self.font.ttf_font)
-        self.font = None
-    
 cdef class DataManager(DataManagerBase):
     cpdef str readFile(self, str name):
         cdef bytes contents = bytes()
@@ -106,16 +95,16 @@ cdef class DataManager(DataManagerBase):
     cpdef Node processScene(self, dict data):
         createNode(None, data)
 
-    cpdef SDL_Font getFont(self, url, size):
+    cpdef FontBase getFont(self, url, size):
         cdef bytes burl
         cdef DataCache dc
         cdef TTF_Font *ttf_font
-        cdef SDL_Font font
+        cdef Font font
         
         cache_url = '%s+%d' % (url, size)
         if cache_url not in self.cache:
             dc = DataCache()
-            font = SDL_Font()
+            font = Font()
             burl = bytes(url)
             ttf_font = TTF_OpenFont(burl, size)
             if ttf_font != NULL:

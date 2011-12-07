@@ -42,44 +42,25 @@ from ignifuga.Log import debug, error
 
 cdef class DataCache(object):
     def __init__(self):
-        self.refCount = 1
+        self.owners = list()
         self.canvas = None
         self.data = None
+        self.font = None
 
     def __dealloc__(self):
-        if self.refCount != 0:
-            error('Releasing DataCache with Ref Count: %d' % self.refCount)
+        if len(self.owners) != 0:
+            error('Releasing DataCache with Ref Count: %d' % len(self.owners))
             
         if self.canvas != None:
-            #debug('Releasing Canvas')
-            self._canvas.free()
+            self.canvas.free()
             self.canvas = None
-            #debug('Released Canvas')
+
+        if self.font != None:
+            self.font.free()
+            self.font = None
+
         if self.data != None:
-            #debug('Releasing Data')
             self.data = None
-            #debug('Released Data')
-
-    cpdef addRef(self):
-        self.refCount +=1
-        
-    cpdef removeRef(self):
-        self.refCount -=1
-
-    property canvas:
-        def __get__(self):
-            return self._canvas
-
-        def __set__(self, value):
-            self._canvas = value
-            
-    property data:
-        def __get__(self):
-            return self._data
-
-        def __set__(self, value):
-            self._data = value
-    
 
 
 cdef class DataManagerBase(object):
@@ -109,6 +90,9 @@ cdef class DataManagerBase(object):
         raise Exception('method not implemented')
         
     cpdef Node processScene(self, dict data):
+        raise Exception('method not implemented')
+
+    cpdef FontBase getFont(self, url, size):
         raise Exception('method not implemented')
 
     cpdef release(self, url):

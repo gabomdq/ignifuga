@@ -40,7 +40,8 @@
 
 from cpython cimport bool
 from ignifuga.backends.CanvasBase cimport CanvasBase
-from ignifuga.backends.sdl.DataManager cimport DataManager, SDL_Font
+from ignifuga.backends.sdl.DataManager cimport DataManager
+from ignifuga.backends.sdl.Font cimport Font
 from SDL cimport *
 
 cdef class Canvas (CanvasBase):
@@ -50,7 +51,7 @@ cdef class Canvas (CanvasBase):
     cdef unicode _srcURL, _fontURL
     cdef readonly bool _isRenderTarget, _hw
     cdef readonly int _width, _height, _fontSize
-    cdef SDL_Font _font
+    cdef Font _font
     cdef float _r,_g,_b,_a
     
     cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, int blend=*)

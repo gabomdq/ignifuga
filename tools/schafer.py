@@ -1279,7 +1279,7 @@ def build_project_generic(options, platform, env=None):
             shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
         elif platform == 'mingw32':
             shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project+'.exe'))
-            
+
     elif platform == 'android':
         # Copy/update the skeleton
         android_project = join(platform_build, 'android_project')
