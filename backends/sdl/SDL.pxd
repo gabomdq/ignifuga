@@ -523,4 +523,6 @@ cdef extern from "SDL_ttf.h":
 
     # Get the kerning size of two glyphs */
     cdef int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index)
-    
+
+
+cpdef str readFile(str name)

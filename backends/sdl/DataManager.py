@@ -38,23 +38,55 @@
 # Data Manager
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.backends.DataManagerBase cimport DataManagerBase, DataCache as _DataCache
-from ignifuga.Node cimport Node
-from ignifuga.backends.sdl.Canvas cimport Canvas
-from ignifuga.backends.sdl.Font cimport Font
-from ignifuga.backends.CanvasBase cimport CanvasBase
-from ignifuga.backends.FontBase cimport FontBase
-from SDL cimport *
-from libc.stdlib cimport free, malloc
+import json
+from ignifuga.Gilbert import Gilbert, createNode
+from ignifuga.Log import debug, error
+from SDL import *
+from ignifuga.backends.DataManagerBase import *
+from Canvas import Canvas
+from Font import Font
 
-cdef class DataCache(_DataCache):
-    pass
 
-cdef class DataManager(DataManagerBase):
-    cpdef str readFile(self, str name, owner)
-    cpdef Node loadScene(self, str name, owner)
-    cpdef dict getSprite(self, url, owner)
-    cpdef CanvasBase getImage(self, url, owner)
-    cpdef Node processScene(self, dict data, owner)
-    cpdef FontBase getFont(self, url, size, owner)
-    cpdef releaseFont(self, url, size, owner)
+class DataManager(DataManagerBase):
+    def loadScene(self, name):
+            return createNode(None, json.loads(readFile('data/scenes/'+name+'.json')))
+        
+    def getSprite(self, url, owner = None):
+        if owner == None:
+            try:
+                owner = sys._getframe(1).f_locals['self']
+            except:
+                error('Sprite owner was not specified and we can not automatically determine it')
+        if url not in self.cache:
+            d = WRDict()
+            d.update(json.loads(readFile(str(url))))
+            self.cache[url] = DataCache(d, url)
+
+        self.cache[url].addOwner(owner)
+        return self.cache[url].data
+
+    def getImage(self, url, owner = None):
+        if owner == None:
+            try:
+                owner = sys._getframe(1).f_locals['self']
+            except:
+                error('Image owner was not specified and we can not automatically determine it')
+
+        if url not in self.cache:
+            self.cache[url] = DataCache(Canvas(srcURL=url), url)
+
+        self.cache[url].addOwner(owner)
+        return self.cache[url].data
+
+    def getFont(self, url, size, owner = None):
+        if owner == None:
+            try:
+                owner = sys._getframe(1).f_locals['self']
+            except:
+                error('Font owner was not specified and we can not automatically determine it')
+        cache_url = '%s+%d' % (url, size)
+        if cache_url not in self.cache:
+            self.cache[cache_url] = DataCache(Font(url, size), cache_url)
+
+        self.cache[cache_url].addOwner(owner)
+        return self.cache[cache_url].data

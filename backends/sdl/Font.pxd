@@ -39,6 +39,9 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.backends.FontBase cimport FontBase
+from ignifuga.Log import *
+from SDL cimport *
 
 cdef class Font(FontBase):
-    pass
+    cdef object __weakref__
+    cdef TTF_Font *ttf_font

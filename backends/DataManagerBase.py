@@ -38,63 +38,110 @@
 # Data Manager Base
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+
 from ignifuga.Log import debug, error
+import weakref, sys
 
-cdef class DataCache(object):
-    def __init__(self):
-        self.owners = list()
-        self.canvas = None
-        self.data = None
-        self.font = None
+class WRDict(dict):
+    # We need this subclass because pure dict is not weakref-able
+    pass
 
-    def __dealloc__(self):
-        if len(self.owners) != 0:
-            error('Releasing DataCache with Ref Count: %d' % len(self.owners))
-            
-        if self.canvas != None:
-            self.canvas.free()
-            self.canvas = None
+class DataCache(object):
+    def __init__(self, data=None, url=None):
+        self.owners = []
+        self.data = data
+        self.url = url
 
-        if self.font != None:
-            self.font.free()
-            self.font = None
+    def __del__(self):
+        for o in self.owners:
+            if o() != None:
+                debug('Releasing %s still owned by %s' % (self.data, o))
 
         if self.data != None:
+            if hasattr(self.data, 'free'):
+                self.data.free()
+            del self.data
             self.data = None
 
+    def addOwner(self, owner):
+        if owner == None:
+            error('Trying to add None owner to DataCache')
+            return
 
-cdef class DataManagerBase(object):
+        if isinstance(owner, weakref.ref):
+            self.owners.append(owner)
+        else:
+            self.owners.append(weakref.ref(owner))
+
+    def removeOwner(self, owner):
+        if owner == None:
+            error('Trying to remove None owner from DataCache')
+            return
+        for o in self.owners:
+            if o() == owner:
+                self.owners.remove(o)
+                break
+
+    def cleanOwners(self):
+        """ Clean up the owner data, remove the non existent ones """
+        _owners = []
+        while len(self.owners) > 0:
+            o = self.owners.pop()
+            if o() != None:
+                _owners.append(o)
+
+        self.owners = _owners
+
+    @property
+    def ownerCount(self):
+        return len(self.owners)
+
+    def __eq__(self, other):
+        """ Compare against the data"""
+        return self.data == other
+
+class DataManagerBase(object):
     def __init__(self):
         self.cache = {}
 
     def __del__(self):        
-        self.free(True)
+        self.cleanup(True)
 
-    def free(self, force = False):
+    def cleanup(self, force = False):
         debug('Releasing Data Manager contents %s' % ('(forced)' if force else '',))
         keys = []
-        for k, dc in self.cache.iteritems():
-            if force or dc.refCount == 0:
-                keys.append(k)
+        for url, cache in self.cache.iteritems():
+            cache.cleanOwners()
+            if force or cache.ownerCount == 0:
+                keys.append(url)
 
-        for k in keys:
-            del self.cache[k]
+        for url in keys:
+            if cache.ownerCount != 0:
+                error('Error: Releasing data for %s with owner count: %d' % (url, cache.ownerCount))
+            del self.cache[url]
+
+    def free(self, obj, owner=None):
+        if owner == None:
+            try:
+                # We ask forgiveness rather than permission from the almighty gods of good Python practices
+                owner = sys._getframe(1).f_locals['self']
+            except:
+                error('Data owner was not specified and we can not automatically determine it, not freeing data')
+                return
+
+        for cache in self.cache.itervalues():
+            if cache == obj:
+                cache.removeOwner(owner)
+                break
   
-    cpdef Node loadScene(self, str name):
+    def loadScene(self, name, owner = None):
         raise Exception('method not implemented')
         
-    cpdef dict getSprite(self, url):
+    def getSprite(self, url, owner = None):
         raise Exception('method not implemented')
 
-    cpdef CanvasBase getImage(self, url):
-        raise Exception('method not implemented')
-        
-    cpdef Node processScene(self, dict data):
+    def getImage(self, url, owner = None):
         raise Exception('method not implemented')
 
-    cpdef FontBase getFont(self, url, size):
+    def getFont(self, url, size, owner = None):
         raise Exception('method not implemented')
-
-    cpdef release(self, url):
-        if url in self.cache:
-            self.cache[url].removeRef()

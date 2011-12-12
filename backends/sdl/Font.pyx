@@ -39,8 +39,17 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 cdef class Font(FontBase):
-    def free(self):
+    def __init__(self, url, size):
+        cdef bytes burl
+
+        burl = bytes(url)
+        self.ttf_font = TTF_OpenFont(burl, size)
+        if self.ttf_font == NULL:
+            error('Error loading font %s: %s' % (url, SDL_GetError()) )
+
+
+    cpdef free(self):
         if self.ttf_font != NULL:
             #debug('Releasing TTF Font')
             TTF_CloseFont(self.ttf_font)
-        self.ttf_font = None
+        self.ttf_font = NULL

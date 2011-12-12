@@ -187,6 +187,7 @@ cdef class Renderer:
         cdef Rect nr, ir, screen
         cdef int z
         cdef double extra
+        cdef CanvasBase canvas
 
         if self.frameTimestamp == 0.0:
             raise Exception ('You have to call preUpdate before calling update')

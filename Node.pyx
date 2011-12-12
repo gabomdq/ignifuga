@@ -204,7 +204,9 @@ cdef class Node(object):
                 # Load new state
                 if value not in self._states:
                     # State is new, just make a new copy of the current state
+                    #print "CREATING NEW STATE: ", value,
                     self._states[value] = deepcopy(self._states[Node.STATE_DEFAULT])
+                    #print "NEW STATE: ", self._states[value]
 
                 for k,v in self._states[value].items():
                     setattr(self, k, v)

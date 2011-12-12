@@ -54,14 +54,14 @@ cdef class TargetBase (object):
     def isDoubleBuffered(self):
         return False
 
-    def clear(self, x, y, w, h):
+    cpdef clear(self, x, y, w, h):
         raise Exception('method not implemented')
 
-    def clearRect(self, rect):
-        raise Exception('method not implemented')
-    
-    def blitCanvas(self, canvas, dx=0, dy=0, dw=None, dh=None, sx=0, sy=0, sw=None, sh=None, angle=0,offCenter=False, centerx=0, centery=0, flip=0):
+    cpdef clearRect(self, rect):
         raise Exception('method not implemented')
 
-    def flip(self):
+    cpdef blitCanvas(self, CanvasBase canvas, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, double angle=0, bool offCenter=False, int centerx=0, int centery=0, int flip=0 ):
+        raise Exception('method not implemented')
+
+    cpdef flip(self):
         raise Exception('method not implemented')

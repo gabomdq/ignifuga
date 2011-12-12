@@ -198,6 +198,7 @@ class SpriteNode(GraphicNode):
             # Check if the point on the sprite is visible
             x -= self._x
             y -= self._y
+            self.state='hover'
             if self.sprite != None:
                 return self.sprite.hits(x,y)
             return True

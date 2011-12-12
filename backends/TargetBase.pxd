@@ -38,7 +38,13 @@
 # SDL Render Target
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 from cpython cimport bool
+from ignifuga.backends.CanvasBase cimport CanvasBase
 
 cdef class TargetBase (object):    
     cdef int _width, _height
     cdef bool _fullscreen
+
+    cpdef clear(self, x, y, w, h)
+    cpdef clearRect(self, rect)
+    cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, double angle=*, bool offCenter=*, int centerx=*, int centery=*, int flip=*)
+    cpdef flip(self)

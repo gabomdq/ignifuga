@@ -130,16 +130,19 @@ cdef class Target (TargetBase):
         SDL_RenderSetViewport(self.renderer, NULL)
         debug('Window size is %d x %d' % (self._width, self._height))
 
-    def clear(self, x, y, w, h):
+    cpdef clear(self, x, y, w, h):
         self.ctx.clearRect(x,y,w,h);
 
-    def clearRect(self, rect):
+    cpdef clearRect(self, rect):
         return self.clear(rect[0], rect[1], rect[2], rect[3])
     
-    cpdef blitCanvas(self, Canvas canvas, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, double angle=0, bool offCenter=False, int centerx=0, int centery=0, int flip=0 ):
+    cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, double angle=0, bool offCenter=False, int centerx=0, int centery=0, int flip=0 ):
         cdef SDL_Rect srcRect, dstRect
         cdef SDL_Point center
-        
+        cdef Canvas canvas
+
+        canvas = <Canvas>canvasbase
+
         center.x = centerx
         center.y = centery
         
@@ -165,7 +168,7 @@ cdef class Target (TargetBase):
 
         #print "Rendering from %d,%d,%d,%d to %d,%d,%d,%d" % (sx,sy,sw,sh,dx,dy,dw,dh)
         #sys.stdout.flush()
-        
+
         if canvas.hw:
             if offCenter:
                 SDL_RenderCopyEx(self.renderer, canvas._surfacehw, &srcRect, &dstRect, angle, &center, <SDL_RendererFlip> flip)
@@ -174,7 +177,7 @@ cdef class Target (TargetBase):
         else:
             pass
 
-    def flip(self):
+    cpdef flip(self):
         """ Show the contents of the target in a coordinated manner"""
         SDL_RenderPresent(self.renderer)
         if self._doublebuffered:

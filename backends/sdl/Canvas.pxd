@@ -40,11 +40,11 @@
 
 from cpython cimport bool
 from ignifuga.backends.CanvasBase cimport CanvasBase
-from ignifuga.backends.sdl.DataManager cimport DataManager
 from ignifuga.backends.sdl.Font cimport Font
 from SDL cimport *
 
 cdef class Canvas (CanvasBase):
+    cdef object __weakref__
     cdef SDL_Renderer * _sdlRenderer
     cdef SDL_Texture * _surfacehw
     cdef SDL_Surface * _surfacesw

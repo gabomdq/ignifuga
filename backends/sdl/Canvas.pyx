@@ -119,11 +119,13 @@ cdef class Canvas (CanvasBase):
             SDL_FreeSurface(self._surfacesw)
 
         if self._font != None:
-            Gilbert().dataManager.releaseFont(self._fontURL, self._fontSize)
+            self._font = None
     
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
-        cdef Canvas canvas = <Canvas> canvasbase
-        
+        cdef Canvas canvas
+
+        canvas = <Canvas>canvasbase
+
         if sw == -1:
             sw = canvas._width
         if sh == -1:
@@ -246,10 +248,9 @@ cdef class Canvas (CanvasBase):
         """ Replaces the surface with a text created from TTF"""
         if self._font != None:
             if self._fontURL != fontURL or self._fontSize != fontSize:
-                Gilbert().dataManager.releaseFont(self._fontURL, self._fontSize)
                 self._font = None
         if self._font == None:
-            self._font = Gilbert().dataManager.getFont(fontURL, fontSize)
+            self._font = Gilbert().dataManager.getFont(fontURL, fontSize, self)
             if self._font == None:
                 self._fontURL = None
                 self._fontSize = 0

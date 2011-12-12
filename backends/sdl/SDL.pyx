@@ -34,6 +34,8 @@
 #(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from libc.stdlib cimport free, malloc
+
 DEF SDL_INIT_EVERYTHING = 0x0000FFFF
 
 cpdef initializeSDL():
@@ -52,3 +54,22 @@ cpdef getTicks():
 
 cpdef delay(Uint32 ms):
     SDL_Delay(ms)
+
+cpdef str readFile(str name):
+    cdef bytes contents = bytes()
+    cdef bytes filename = <bytes>name
+    cdef SDL_RWops *ctx = SDL_RWFromFile(filename, 'r')
+    cdef char *buf
+    cdef size_t bytesread
+    if ctx != NULL:
+        buf = <char*>malloc(1025)
+        bytesread = ctx.read(ctx, buf, 1, 1024)
+        while bytesread > 0:
+            buf[bytesread] = 0
+            contents += buf
+            bytesread = ctx.read(ctx, buf, 1, 1024)
+
+        ctx.close(ctx)
+        free(buf)
+        return str(contents)
+    return None

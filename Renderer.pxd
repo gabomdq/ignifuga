@@ -40,6 +40,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.backends.TargetBase cimport TargetBase
+from ignifuga.backends.CanvasBase cimport CanvasBase
 from cpython cimport bool
 
 cdef class Renderer:
