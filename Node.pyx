@@ -112,8 +112,8 @@ cdef class Node(object):
         self.createChildren()
 
     def __del__(self):
-        self.remove()
-        self.free()
+        if not self._released:
+            self.free()
         
     cpdef Node init(self, dict data):
         """ Initialize the required external data """
