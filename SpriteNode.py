@@ -87,8 +87,8 @@ class SpriteNode(GraphicNode):
             self.do(a)
 
     def free(self):
-        Gilbert().dataManager.release(self._spriteURL)
-        Gilbert().dataManager.release(self._atlasURL)
+        Gilbert().dataManager.free(self._spriteData, self)
+        Gilbert().dataManager.free(self._atlas, self)
         super(SpriteNode, self).free()
     
     def init(self, data):

@@ -41,7 +41,7 @@
 from ignifuga.Rect import Rect
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
-import sys, pickle, os
+import sys, pickle, os, weakref, gc
 
 class BACKENDS:
     sdl = 'sdl'
@@ -176,7 +176,7 @@ def createNode(parent, data, restore = None):
         
     if node != None:
         Gilbert().registerNode(node)
-        
+
     return node
 
 class GilbertPickler(pickle.Pickler):
@@ -221,10 +221,17 @@ class Gilbert:
         else:
             error('Unknown backend %s. Aborting' % (backend,))
             exit()
+
+        # The only dictionary that keeps strong references to the nodes
+        self.nodes = []
+        # These dictionaries keep weakrefs via WeakSet
         self.nodesType = {}
         self.nodesZ = {}
+
+        # These keep weakrefs via Task
         self.loading = []
         self.running = {}
+
         self._touches = {}
         self._touchCaptured = False
         self._touchCaptor = None
@@ -244,12 +251,10 @@ class Gilbert:
         self.gameLoop = GameLoop()
         self.gameLoop.run()
 
-        # Make sure all nodes finished loading
-        debug('Waiting for nodes to finish loading')
-        while len(self.loading) > 0:
-            self.update()
+        # Engine is exiting from here onwards
+
         debug('Saving state')
-        self.saveState()
+        #self.saveState()
 
         # Release all data
         if self.backend == BACKENDS.sdl:
@@ -257,17 +262,34 @@ class Gilbert:
             from backends.sdl import terminateBackend
 
         self.resetScene()
-        self.dataManager.free(True)
+        # DEBUG - See what's holding on to what
+        objs = gc.get_objects()
+        for n in objs:
+            if isinstance(n, Node):
+                print 'NODE: ', n
+                for ref in gc.get_referrers(n):
+                    if ref != objs:
+                        print '    REFERRER: ', ref.__class__, id(ref)
+                        if isinstance(ref, dict):
+                            print "    DICT: ", ref.keys()
+                        elif isinstance(ref, list):
+                            print "    LIST: ", len(ref), " items"
+                        elif isinstance(ref, tuple):
+                            print "    TUPLE: ", ref
+                        else:
+                            print "    INSTANCEMETHOD: ", ref.__name__
+        self.dataManager.cleanup(True)
         terminateBackend()
+
         
     def endLoop(self):
         """ End the game loop, free stuff """
         self.gameLoop.quit = True
 
-
-    def update(self, now=0):
+    def update(self, now=0, wrapup=False):
         """ Update everything, then render the scene
         now is the current time, specified in seconds
+        wrapup = True forces the update loop to be broken, all running nodes eventually stop running
         """
         # Call the pre update so we can tally how long the whole frame processing took (logic+render)
         self.renderer.preUpdate(now)
@@ -288,21 +310,22 @@ class Gilbert:
                 # Add it to the by type index
                 nodetype = node.getType()
                 if not self.nodesType.has_key(nodetype):
-                    self.nodesType[nodetype] = []
-                self.nodesType[nodetype].append(node)
+                    self.nodesType[nodetype] = weakref.WeakSet()
+                self.nodesType[nodetype].add(node)
                 #print node.save()
                 # Add it to the by z ordering index
                 zindex = node.z
                 if zindex != None:
                     if not self.nodesZ.has_key(zindex):
-                        self.nodesZ[zindex] = []
+                        self.nodesZ[zindex] = weakref.WeakSet()
                     if node not in self.nodesZ[zindex]:
-                        self.nodesZ[zindex].append(node)
-                    
-                # Fire up the task to update the node
-                task = Task(node.update, parent=Task.getcurrent())
-                req, data = task.wakeup({'now': now})
-                self.running[node] = (task, req, data)
+                        self.nodesZ[zindex].add(node)
+                if not wrapup:
+                    # Fire up the task to update the node
+                    task = Task(weakref.ref(node), node.update, parent=Task.getcurrent())
+                    req, data = task.wakeup({'now': now})
+                    self.running[node] = (task, req, data)
+
             elif req == REQUESTS.skip:
                 # Just skip this turn
                 self.loading.append((task, None, None))
@@ -310,7 +333,7 @@ class Gilbert:
                 # Load an image
                 if data.has_key('url') and data['url'] != None:
                     # Try to load an image
-                    img = self.dataManager.getImage(data['url'])
+                    img = self.dataManager.getImage(data['url'], task.node )
                     if img == None:
                         self.loading.append((task, req, data))
                     else:
@@ -323,7 +346,7 @@ class Gilbert:
                 # Load a sprite definition
                 if data.has_key('url') and data['url'] != None:
                     # Try to load a sprite
-                    sprite = self.dataManager.getSprite(data['url'])
+                    sprite = self.dataManager.getSprite(data['url'], task.node)
                     if sprite == None:
                         self.loading.append((task, req, data))
                     else:
@@ -355,10 +378,13 @@ class Gilbert:
                 req, data = task.wakeup({'now': now})
             
             if req == REQUESTS.done:
-                # Restart the update loop
-                task = Task(node.update, parent=Task.getcurrent())
-                req, data = task.wakeup({'now': now})
-                self.running[node] = (task, req, data)
+                if wrapup:
+                    del self.running[node]
+                else:
+                    # Restart the update loop
+                    task = Task(weakref.ref(node), node.update, parent=Task.getcurrent())
+                    req, data = task.wakeup({'now': now})
+                    self.running[node] = (task, req, data)
             elif req == REQUESTS.skip:
                 # Normal operation continues
                 self.running[node] = (task, None, None)
@@ -380,11 +406,16 @@ class Gilbert:
         self.renderer.update()
         
     def registerNode(self, node):
+        # Keep ONE strong reference to the node so it's not garbage collected
+        self.nodes.append(node)
+
         # Add it to the loading queue
-        task = Task(node.init, parent=Task.getcurrent())
+        task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
         self.loading.append((task, None, None))
     
     def unregisterNode(self, node):
+        """ Remove node, release its data """
+
         # Add it to the loading queue
         if node in self.loading:
             self.loading.remove(node)
@@ -400,8 +431,14 @@ class Gilbert:
         if node in self.running:
             del self.running[node]
 
+        # Remove the strong reference
+        if node in self.nodes:
+            self.nodes.remove(node)
+        else:
+            debug('Tried to unregister node %s, but Gilbert didnt know about it in the first place' % node)
+
         node.free()
-            
+
     def changeZ(self, node, new_z):
         """ Change the node's z index ordering """
         if node in self.loading:
@@ -415,8 +452,8 @@ class Gilbert:
         # Add to the new z-index
         if new_z != None:
             if not new_z in self.nodesZ:
-                self.nodesZ[new_z] = []
-            self.nodesZ[new_z].append(node)
+                self.nodesZ[new_z] = weakref.WeakSet()
+            self.nodesZ[new_z].add(node)
 
     def reportEvent(self, event):
         """ Propagate an event through the nodes """
@@ -520,21 +557,39 @@ class Gilbert:
                     
     def resetScene(self):
         """ Reset all the scene information """
-        for z in self.nodesZ.keys():
-            try:
-                while True:
-                    n = self.nodesZ[z].pop()
-                    n.free()
-            except:
-                pass
-            del self.nodesZ[z]
+        # Make sure all nodes finished loading and running
+        debug('Waiting for nodes to finish loading/running')
+        tries = 0
+        while self.loading or self.running:
+            self.update(wrapup=True)
+            tries += 1
+            if tries > 100:
+                debug('Still waiting for loading nodes: %s' % self.loading)
+                debug('Still waiting for running nodes: %s' % self.running)
+                tries = 0
 
+        # Get rid of dirty rects
+        #self.renderer.dirtyAll()
+
+        nodes = self.nodes[:]
+        for node in nodes:
+            # Remove takes the node out of self.nodes and frees the data
+            node.remove()
+
+        del nodes
+        del self.nodes
         del self.nodesZ
         del self.nodesType
         del self.loading
         del self.running
 
-        self.dataManager.free()
+        # Really remove nodes and data
+        gc.collect()
+        # Clean up cache
+        self.dataManager.cleanup()
+        gc.collect()
+
+        self.nodes = []
         self.nodesType = {}
         self.nodesZ = {}
         self.loading = []
@@ -551,6 +606,16 @@ class Gilbert:
 
     def saveState(self):
         """ Serialize the current status of the engine """
+        debug('Waiting for nodes to finish loading before saving state')
+        tries = 0
+        while self.loading:
+            self.update()
+            tries += 1
+            if tries > 100:
+                debug('Still waiting for loading nodes: %s' % self.loading)
+                tries = 0
+
+
         f = open('ignifuga.state', 'w')
         state = GilbertPickler(f, -1).dump(self.nodesType)
         f.close()
@@ -564,7 +629,7 @@ class Gilbert:
 
                 for nodeType, nodes in nodesType.iteritems():
                     for node in nodes:
-                        task = Task(node.init, parent=Task.getcurrent())
+                        task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
                         self.loading.append((task, None, None))
 
                 return True
@@ -573,7 +638,6 @@ class Gilbert:
         except:
             return False
         
-
 
 # Gilbert imports
 from Renderer import Renderer as _Renderer
@@ -584,3 +648,4 @@ from Background import Background
 from Scene import Scene
 from SpriteNode import SpriteNode
 from TextNode import TextNode
+from Node import Node

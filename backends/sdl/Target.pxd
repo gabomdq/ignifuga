@@ -40,6 +40,7 @@
 
 from ignifuga.backends.TargetBase cimport TargetBase
 from ignifuga.backends.sdl.Canvas cimport Canvas
+from ignifuga.backends.CanvasBase cimport CanvasBase
 from SDL cimport *
 from cpython cimport bool
 
@@ -49,5 +50,5 @@ cdef class Target (TargetBase):
     cdef bool _doublebuffered
     cdef SDL_RendererInfo render_info
 
-    cpdef blitCanvas(self, Canvas canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, double angle=*, bool offCenter=*, int centerx=*, int centery=*, int flip=*)
+    cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, double angle=*, bool offCenter=*, int centerx=*, int centery=*, int flip=*)
     cpdef updateSize(self)

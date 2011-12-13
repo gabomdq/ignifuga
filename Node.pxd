@@ -41,6 +41,7 @@
 from cpython cimport bool
 
 cdef class Node(object):
+    cdef object __weakref__
     cdef public unicode id
     cdef public dict children, _states
     cdef public Node parent

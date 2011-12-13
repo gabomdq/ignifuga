@@ -112,6 +112,7 @@ cdef class Node(object):
         self.createChildren()
 
     def __del__(self):
+        self.remove()
         self.free()
         
     cpdef Node init(self, dict data):
@@ -119,10 +120,22 @@ cdef class Node(object):
         return self
     
     def remove(self):
-        """ Free external data, unregister """
-        self.unregisterNode()
+        """ Unregister node in Gilbert and in parent node, keep data """
         if self.parent != None:
             self.parent.removeChild(self.id)
+            self.parent = None
+            # Unregister node frees the data
+        self.unregisterNode()
+
+    cpdef free(self):
+        """ Release external (Cython based, not Python) data """
+        if self._released:
+            error("Node %s released more than once" % self.id)
+
+        self.parent = None
+        self.actions = []
+        self.states = {}
+        self._released = True
 
     def getType(self):
         return self.__class__.__name__
@@ -278,8 +291,6 @@ cdef class Node(object):
         for k,v in data.iteritems():
             setattr(self, k, v)
 
-    cpdef free(self):
-        if self._released:
-            error("Node %s released more than once" % self.id)
 
-        self._released = True
+    def __str__(self):
+        return "Gilbert node of type %s" % (self.__class__.__name__,)

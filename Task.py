@@ -42,6 +42,11 @@ import greenlet
 from ignifuga.Gilbert import REQUESTS
 
 class Task(greenlet.greenlet):
+    def __init__(self, node_wr, run=None, parent=None):
+        # A ref or weakref to the associated node
+        self.node = node_wr
+        super(Task, self).__init__(run,parent)
+
     def wakeup(self, data=None):
         value = self.switch(data)
         if self.dead:
