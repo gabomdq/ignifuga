@@ -42,6 +42,7 @@ from ignifuga.Log import debug, info, error
 from ignifuga.Gilbert import Gilbert, Event, Renderer as getRenderer
 from ignifuga.Renderer cimport Renderer
 from ignifuga.backends.sdl.Target cimport Target
+from ignifuga.Log import *
 from sys import exit
 from SDL cimport *
 import platform, os.path
@@ -59,7 +60,6 @@ cdef class Canvas (CanvasBase):
         srclURL != None -> Load image into software canvas
         """
         cdef SDL_Surface *ss
-
         self._sdlRenderer = (<Target>getRenderer().target).renderer
         self._srcURL = srcURL
         self._isRenderTarget = isRenderTarget
@@ -101,26 +101,18 @@ cdef class Canvas (CanvasBase):
         
         if (self._hw and self._surfacehw == NULL) or ( not self._hw and self._surfacesw == NULL):
             # Error loading surface, we got a null pointer
-            print "Could not initialize canvas (srcURL: %s, hw: %s)" % (srcURL, hw)
+            error("Could not initialize canvas (srcURL: %s, hw: %s)" % (srcURL, hw))
             exit(1)
 
         SDL_SetTextureBlendMode(self._surfacehw, SDL_BLENDMODE_BLEND)
 
-    def __del__(self):
-        self.free()
-
     def __dealloc__(self):
-        self.free()
-        
-    cpdef free(self):
+        #debug( "CANVAS DEALLOC %s" % self)
         if self._hw:
             SDL_DestroyTexture(self._surfacehw)
         else:
             SDL_FreeSurface(self._surfacesw)
 
-        if self._font != None:
-            self._font = None
-    
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
         cdef Canvas canvas
 
@@ -250,7 +242,7 @@ cdef class Canvas (CanvasBase):
             if self._fontURL != fontURL or self._fontSize != fontSize:
                 self._font = None
         if self._font == None:
-            self._font = Gilbert().dataManager.getFont(fontURL, fontSize, self)
+            self._font = Gilbert().dataManager.getFont(fontURL, fontSize)
             if self._font == None:
                 self._fontURL = None
                 self._fontSize = 0

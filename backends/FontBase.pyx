@@ -39,6 +39,4 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 cdef class FontBase (object):
-    cpdef free(self):
-        pass
-  
+    pass

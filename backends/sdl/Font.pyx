@@ -37,6 +37,7 @@
 # Ignifuga Game Engine
 # SDL Font wrapper
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
+from ignifuga.Log import *
 
 cdef class Font(FontBase):
     def __init__(self, url, size):
@@ -48,8 +49,9 @@ cdef class Font(FontBase):
             error('Error loading font %s: %s' % (url, SDL_GetError()) )
 
 
-    cpdef free(self):
+    def __dealloc__(self):
+        #debug('FONT DEALLOC')
         if self.ttf_font != NULL:
             #debug('Releasing TTF Font')
             TTF_CloseFont(self.ttf_font)
-        self.ttf_font = NULL
+            self.ttf_font = NULL

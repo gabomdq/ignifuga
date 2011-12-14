@@ -44,9 +44,6 @@ cdef class CanvasBase (object):
     def __init__ (self, width=None, height=None, hw=True, srcURL = None, isRenderTarget = False):
         raise Exception('method not implemented')
 
-    cpdef free(self):
-        pass
-    
     property width:
         def __get__(self):
             return self._width

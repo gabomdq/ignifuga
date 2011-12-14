@@ -86,11 +86,6 @@ class SpriteNode(GraphicNode):
             self.green = 0.5
             self.do(a)
 
-    def free(self):
-        Gilbert().dataManager.free(self._spriteData, self)
-        Gilbert().dataManager.free(self._atlas, self)
-        super(SpriteNode, self).free()
-    
     def init(self, data):
         """ Initialize the required external data """
         super(SpriteNode, self).init(data)

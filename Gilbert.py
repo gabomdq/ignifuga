@@ -333,7 +333,7 @@ class Gilbert:
                 # Load an image
                 if data.has_key('url') and data['url'] != None:
                     # Try to load an image
-                    img = self.dataManager.getImage(data['url'], task.node )
+                    img = self.dataManager.getImage(data['url'])
                     if img == None:
                         self.loading.append((task, req, data))
                     else:
@@ -346,7 +346,7 @@ class Gilbert:
                 # Load a sprite definition
                 if data.has_key('url') and data['url'] != None:
                     # Try to load a sprite
-                    sprite = self.dataManager.getSprite(data['url'], task.node)
+                    sprite = self.dataManager.getSprite(data['url'])
                     if sprite == None:
                         self.loading.append((task, req, data))
                     else:
@@ -437,7 +437,7 @@ class Gilbert:
         else:
             debug('Tried to unregister node %s, but Gilbert didnt know about it in the first place' % node)
 
-        node.free()
+        #node.free()
 
     def changeZ(self, node, new_z):
         """ Change the node's z index ordering """

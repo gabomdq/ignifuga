@@ -50,5 +50,5 @@ cdef class Node(object):
     cdef bool _released
     
     cpdef Node init(self, dict data)
-    cpdef free(self)
+    cpdef __free__(self)
 

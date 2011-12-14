@@ -40,65 +40,66 @@
 
 
 from ignifuga.Log import debug, error
-import weakref, sys
+import weakref, sys, gc
 
 class WRDict(dict):
     # We need this subclass because pure dict is not weakref-able
     pass
 
-class DataCache(object):
-    def __init__(self, data=None, url=None):
-        self.owners = []
-        self.data = data
-        self.url = url
-
-    def __del__(self):
-        for o in self.owners:
-            if o() != None:
-                debug('Releasing %s still owned by %s' % (self.data, o))
-
-        if self.data != None:
-            if hasattr(self.data, 'free'):
-                self.data.free()
-            del self.data
-            self.data = None
-
-    def addOwner(self, owner):
-        if owner == None:
-            error('Trying to add None owner to DataCache')
-            return
-
-        if isinstance(owner, weakref.ref):
-            self.owners.append(owner)
-        else:
-            self.owners.append(weakref.ref(owner))
-
-    def removeOwner(self, owner):
-        if owner == None:
-            error('Trying to remove None owner from DataCache')
-            return
-        for o in self.owners:
-            if o() == owner:
-                self.owners.remove(o)
-                break
-
-    def cleanOwners(self):
-        """ Clean up the owner data, remove the non existent ones """
-        _owners = []
-        while len(self.owners) > 0:
-            o = self.owners.pop()
-            if o() != None:
-                _owners.append(o)
-
-        self.owners = _owners
-
-    @property
-    def ownerCount(self):
-        return len(self.owners)
-
-    def __eq__(self, other):
-        """ Compare against the data"""
-        return self.data == other
+#class DataCache(object):
+#    def __init__(self, data=None, url=None):
+#        self.owners = []
+#        self.data = data
+#        self.url = url
+#
+#    def __del__(self):
+#        for o in self.owners:
+#            if o() != None:
+#                debug('Releasing %s still owned by %s' % (self.data, o))
+#
+#        if self.data != None:
+#            if hasattr(self.data, 'free'):
+#                self.data.free()
+#            del self.data
+#            self.data = None
+#
+#    def addOwner(self, owner):
+#        if owner == None:
+#            error('Trying to add None owner to DataCache')
+#            return
+#
+#        if isinstance(owner, weakref.ref):
+#            self.owners.append(owner)
+#        else:
+#            self.owners.append(weakref.ref(owner))
+#
+#    def removeOwner(self, owner):
+#        if owner == None:
+#            error('Trying to remove None owner from DataCache')
+#            return
+#        for o in self.owners:
+#            if o() == owner:
+#                self.owners.remove(o)
+#                break
+#
+#    def cleanOwners(self):
+#        """ Clean up the owner data, remove the non existent ones """
+#        _owners = []
+#        while len(self.owners) > 0:
+#            o = self.owners.pop()
+#            if o() != None:
+#                _owners.append(o)
+#
+#        self.owners = _owners
+#
+#    @property
+#    def ownerCount(self):
+#        return len(self.owners)
+#
+#    def __eq__(self, other):
+#        """ Compare against the data"""
+#        return self.data == other
+from ignifuga.Log import *
 
 class DataManagerBase(object):
     def __init__(self):
@@ -110,38 +111,26 @@ class DataManagerBase(object):
     def cleanup(self, force = False):
         debug('Releasing Data Manager contents %s' % ('(forced)' if force else '',))
         keys = []
-        for url, cache in self.cache.iteritems():
-            cache.cleanOwners()
-            if force or cache.ownerCount == 0:
+        for url in self.cache.iterkeys():
+            refCnt = len(gc.get_referrers(self.cache[url]))
+            if force or refCnt <= 1:
                 keys.append(url)
 
+        debug( "DataManager will release: %s" % keys)
         for url in keys:
-            if cache.ownerCount != 0:
-                error('Error: Releasing data for %s with owner count: %d' % (url, cache.ownerCount))
+            refCnt = len(gc.get_referrers(self.cache[url]))
+            if refCnt > 1:
+                error('Error: Releasing data for %s with ref count: %d' % (url, refCnt))
             del self.cache[url]
 
-    def free(self, obj, owner=None):
-        if owner == None:
-            try:
-                # We ask forgiveness rather than permission from the almighty gods of good Python practices
-                owner = sys._getframe(1).f_locals['self']
-            except:
-                error('Data owner was not specified and we can not automatically determine it, not freeing data')
-                return
-
-        for cache in self.cache.itervalues():
-            if cache == obj:
-                cache.removeOwner(owner)
-                break
-  
-    def loadScene(self, name, owner = None):
+    def loadScene(self, name):
         raise Exception('method not implemented')
         
-    def getSprite(self, url, owner = None):
+    def getSprite(self, url):
         raise Exception('method not implemented')
 
-    def getImage(self, url, owner = None):
+    def getImage(self, url):
         raise Exception('method not implemented')
 
-    def getFont(self, url, size, owner = None):
+    def getFont(self, url, size):
         raise Exception('method not implemented')

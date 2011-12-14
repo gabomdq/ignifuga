@@ -71,12 +71,6 @@ class TextNode(GraphicNode):
 
         super(TextNode, self).__init__(parent, **kwargs)
 
-    def free(self):
-        # This canvas should be garbage collected when the node ceases to exist, but just to be safe...
-        if self._canvas != None:
-            self._canvas.free()
-        super(TextNode, self).free()
-
     def init(self, data):
         """ Initialize the required external data """
         super(TextNode, self).init(data)

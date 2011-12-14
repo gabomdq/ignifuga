@@ -113,8 +113,8 @@ cdef class Node(object):
 
     def __del__(self):
         if not self._released:
-            self.free()
-        
+            self.__free__()
+
     cpdef Node init(self, dict data):
         """ Initialize the required external data """
         return self
@@ -127,8 +127,11 @@ cdef class Node(object):
             # Unregister node frees the data
         self.unregisterNode()
 
-    cpdef free(self):
-        """ Release external (Cython based, not Python) data """
+    cpdef __free__(self):
+        """ This free function exists to break the dependency cycle among nodes, data, states, actions, etc.
+        If we wait to do what's done here in __del__ the cycle of dependencies is never broken and the data
+        won't be garbage collected. It should be only called from __del__ or unregisterNode """
+
         if self._released:
             error("Node %s released more than once" % self.id)
 
@@ -186,6 +189,9 @@ cdef class Node(object):
     def unregisterNode(self):
         """ Unregister Node with the Overlord """
         Gilbert().unregisterNode(self)
+        # Break dependency cycles
+        if not self._released:
+            self.__free__()
 
     def update(self, data):
         """ Update node """

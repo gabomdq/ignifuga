@@ -51,42 +51,20 @@ class DataManager(DataManagerBase):
     def loadScene(self, name):
             return createNode(None, json.loads(readFile('data/scenes/'+name+'.json')))
         
-    def getSprite(self, url, owner = None):
-        if owner == None:
-            try:
-                owner = sys._getframe(1).f_locals['self']
-            except:
-                error('Sprite owner was not specified and we can not automatically determine it')
+    def getSprite(self, url):
         if url not in self.cache:
             d = WRDict()
             d.update(json.loads(readFile(str(url))))
-            self.cache[url] = DataCache(d, url)
+            self.cache[url] = d
+        return self.cache[url]
 
-        self.cache[url].addOwner(owner)
-        return self.cache[url].data
-
-    def getImage(self, url, owner = None):
-        if owner == None:
-            try:
-                owner = sys._getframe(1).f_locals['self']
-            except:
-                error('Image owner was not specified and we can not automatically determine it')
-
+    def getImage(self, url):
         if url not in self.cache:
-            self.cache[url] = DataCache(Canvas(srcURL=url), url)
+            self.cache[url] = Canvas(srcURL=url)
+        return self.cache[url]
 
-        self.cache[url].addOwner(owner)
-        return self.cache[url].data
-
-    def getFont(self, url, size, owner = None):
-        if owner == None:
-            try:
-                owner = sys._getframe(1).f_locals['self']
-            except:
-                error('Font owner was not specified and we can not automatically determine it')
+    def getFont(self, url, size):
         cache_url = '%s+%d' % (url, size)
         if cache_url not in self.cache:
-            self.cache[cache_url] = DataCache(Font(url, size), cache_url)
-
-        self.cache[cache_url].addOwner(owner)
-        return self.cache[cache_url].data
+            self.cache[cache_url] = Font(url, size)
+        return self.cache[cache_url]

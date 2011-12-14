@@ -42,7 +42,6 @@ from cpython cimport bool
 
 cdef class CanvasBase (object):
     cdef int width, height
-    cpdef free(self)
     cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, int blend=*)
     cpdef mod(self, float r, float g, float b, float a)
     cpdef text(self, text, color, fontName, fontSize)
