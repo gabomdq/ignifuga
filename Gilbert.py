@@ -258,7 +258,6 @@ class Gilbert:
 
         # Release all data
         if self.backend == BACKENDS.sdl:
-            debug('Terminating backend %s' % (self.backend,))
             from backends.sdl import terminateBackend
 
         self.resetScene()
@@ -279,6 +278,10 @@ class Gilbert:
                         else:
                             print "    INSTANCEMETHOD: ", ref.__name__
         self.dataManager.cleanup(True)
+        # Break any remaining cycles that prevent garbage collection
+        del self.dataManager
+        del self.renderer
+        debug('Terminating backend %s' % (self.backend,))
         terminateBackend()
 
         

@@ -337,7 +337,8 @@ cdef extern from "SDL.h":
         size_t(* write) (SDL_RWops * context, void *ptr,size_t size, size_t num)
         int (* close) (SDL_RWops * context)
 
-    cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)    
+    cdef SDL_Renderer * SDL_CreateRenderer(SDL_Window * window, int index, Uint32 flags)
+    cdef void SDL_DestroyRenderer (SDL_Renderer * renderer)
     cdef SDL_Texture * SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
     cdef SDL_Texture * SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
     cdef SDL_Surface * SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
@@ -354,6 +355,7 @@ cdef extern from "SDL.h":
     cdef void SDL_UnlockTexture(SDL_Texture * texture)
     cdef void SDL_GetWindowSize(SDL_Window * window, int *w, int *h)
     cdef SDL_Window * SDL_CreateWindow(char *title, int x, int y, int w, int h, Uint32 flags)
+    cdef void SDL_DestroyWindow (SDL_Window * window)
     cdef int SDL_SetRenderDrawColor(SDL_Renderer * renderer, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
     cdef int SDL_RenderClear(SDL_Renderer * renderer)
     cdef int SDL_SetTextureBlendMode(SDL_Texture * texture, SDL_BlendMode blendMode)

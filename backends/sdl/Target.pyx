@@ -110,6 +110,11 @@ cdef class Target (TargetBase):
         SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
         SDL_RenderClear(self.renderer);
         SDL_RenderPresent(self.renderer);
+
+    def __dealloc__(self):
+        debug('Releasing SDL main render target')
+        SDL_DestroyRenderer(self.renderer)
+        SDL_DestroyWindow(self.window)
     
     @property
     def width(self):
