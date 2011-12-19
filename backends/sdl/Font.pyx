@@ -55,3 +55,12 @@ cdef class Font(FontBase):
             #debug('Releasing TTF Font')
             TTF_CloseFont(self.ttf_font)
             self.ttf_font = NULL
+
+
+    def __deepcopy__(self, memo):
+        """ Don't allow deepcopying of the Font"""
+        return self
+
+    def __copy__(self):
+        """ Don't allow copying of the Font"""
+        return self

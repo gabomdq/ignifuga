@@ -44,8 +44,10 @@ cdef class Node(object):
     cdef object __weakref__
     cdef public unicode id
     cdef public dict children, _states
+    cdef public list _stateKeys
     cdef public Node parent
-    cdef public list actions
+    cdef public dict actions
+    cdef public list runningActions, onEntryStartActions, onEntryStopActions, onExitStartActions, onExitStopActions
     cdef public str _state
     cdef bool _released
     

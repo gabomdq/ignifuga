@@ -47,39 +47,45 @@ class Action(object):
     relative: If true, the final value is that of target+initial value, if false, the final value is the target value
     increase: A function that affects the function. Possible values: 'linear', 'square'
     """
-    def __init__(self, duration=0.0, relative=False, increase='linear', doneCallback=None, *args, **kwargs):
+    def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, *args, **kwargs):
+        self.id = id if id != None else hash(self)
         self._tasks = kwargs
         self._node = None       # The target of the action
         self.reset()
         
-        self._runWith = []     # Action to be run in parallel to this one
+        self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
-        self._loopMax = 1
+        self._loopMax = loop if loop >= 0 else None
         self._duration = float(duration)
         self._loop = 0
         self._relative = relative
         self._increase = increase.lower()
-        self._doneCallback = doneCallback
+        self._stopCallback = stopCallback
         
         
     def setTarget(self, node):
-        if not self._running:
-            self._node = node
-            self.reset()
-            for a in self._runWith:
-                a.target = node
-            if self._runNext != None:
-                self._runNext.target = node
-        else:
-            raise Exception('Tried to assign a running action to a node')
+        if self._node != node:
+            if not self._running:
+                if self._node != None:
+                    self._node.detachAction(self)
+                self._node = node
+                self.reset()
+                for a in self._runWith:
+                    a.target = node
+                if self._runNext != None:
+                    self._runNext.target = node
+            else:
+                raise Exception('Tried to assign a running action to a node')
 
     def getTarget(self):
         return self._node
 
     target = property(getTarget, setTarget)
     
-    def start(self):
+    def start(self, stopCallback=None):
         """ Fire up the action chain """
+        if stopCallback != None:
+            self._stopCallback = stopCallback
         if not self._running and not self._done and self._node != None:
             if self._node != None:
                 self._tasksStatus = {}
@@ -108,8 +114,10 @@ class Action(object):
             if self._runNext !=  None:
                 self._runNext.stop()
             self.reset()
-            
-            #self._node.actionStopped(self)
+
+            # The associated node doesnt need to get a callback, it polls the action status on each update
+            if self._stopCallback != None:
+                self._stopCallback(self)
 
     def update(self, now):
         """ Update the action, dt is float specifying elapsed seconds """
@@ -169,8 +177,10 @@ class Action(object):
                         self._running = True
                 else:
                     self._loop = 0
-                    if self._doneCallback != None:
-                        self._doneCallback(self)
+                    # The associated node doesnt need to get a callback, it polls the action status on each update
+                    if self._stopCallback != None:
+                        self._stopCallback(self)
+                    self.reset()
 
             
     def _step(self, dt):
@@ -268,12 +278,19 @@ class Action(object):
     def __setstate__(self, data):
         """ Restore action from data """
         self.__dict__.update(data)
+        self.unfreeze()
+
+    def unfreeze(self):
         # Fix timing by invalidating _startTime, it will be regenerated to a proper value on the next update call
         self._startTime = None
+        for a in self._runWith:
+            a.unfreeze()
+        if self._runNext != None:
+            self._runNext.unfreeze()
 
     def __repr__(self):
         retval = ''
-        retval += "|Action: %s %s Duration: %s Loop: %s\n" % (self._tasks, 'Node: ' + self._node.id if self._node != None else '',self._duration, self._loopMax)
+        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s\n" % (self.id, self._tasks, 'Node: ' + self._node.id if self._node != None else '',self._duration, self._loopMax)
         if len(self._runWith) > 0:
             retval += "|Runs With:\n"
             for a in self._runWith:

@@ -43,9 +43,11 @@ from ignifuga.Task import *
 from pickle import dumps
 from copy import deepcopy
 from Log import error
+from Action import Action
 
 cdef class Node(object):
     STATE_DEFAULT = 'default'
+    STATE_HOVER = 'hover'
     
     def __init__(self, parent, **kwargs):
         super(Node, self).__init__()
@@ -70,7 +72,12 @@ cdef class Node(object):
         # Fields
         self.children = {}
         self.parent = parent
-        self.actions = []
+        self.actions = {}
+        self.runningActions = []
+        self.onEntryStartActions = []
+        self.onEntryStopActions = []
+        self.onExitStartActions = []
+        self.onExitStopActions = []
 
         # Preprocess kwargs
         """kwargs may be:
@@ -91,22 +98,36 @@ cdef class Node(object):
 
         self._state = None
         self._states = { Node.STATE_DEFAULT: {} }
+        self._stateKeys = ['actions', 'runningActions', 'onEntryStartActions', 'onEntryStopActions', 'onExitStartActions', 'onExitStopActions']
         states = {}
+
+        # Parse actions
+        if 'actions' in data:
+            self._parseActions(data['actions'])
+            del data['actions']
+
         # Load all the initial information
         if 'states' in data:
-            states = deepcopy(data['states'])
+            states = data['states']
             del data['states']
-            
+
+            # If the states data contains a default state, pick that information up and remove it from the states data
             if Node.STATE_DEFAULT in states:
                 self._states[Node.STATE_DEFAULT].update(states[Node.STATE_DEFAULT])
                 del states[Node.STATE_DEFAULT]
 
+        # Enter the "not per state" data into the default state
         self._states[Node.STATE_DEFAULT].update(data)
+        self._states[Node.STATE_DEFAULT]['actions'] = self.actions
+        self._states[Node.STATE_DEFAULT]['runningActions'] = []
 
         for state, values in states.items():
+            # Make a copy of the default state into each state, THEN copy the state values on top of that
             self._states[state] = deepcopy(self._states[Node.STATE_DEFAULT])
             self._states[state].update(values)
-        
+            if 'actions' in values:
+                self._states[state]['actions'] = self._parseActions(values['actions'])
+
         self.state = Node.STATE_DEFAULT
 
         self.createChildren()
@@ -136,8 +157,9 @@ cdef class Node(object):
             error("Node %s released more than once" % self.id)
 
         self.parent = None
-        self.actions = []
-        self.states = {}
+        self._states = {}
+        self.actions = {}
+        self.runningActions = []
         self._released = True
 
     def getType(self):
@@ -196,12 +218,16 @@ cdef class Node(object):
     def update(self, data):
         """ Update node """
         now = data['now']
-        for action in self.actions[:]:
+        stoppedActions = []
+        for action in self.runningActions:
             if action.isRunning:
                 action.update(now)
             else:
                 # action expired, remove it
-                self.actions.remove(action)
+                stoppedActions.append(action)
+
+        for action in stoppedActions:
+            self.runningActions.remove(action)
         
         return self
 
@@ -212,25 +238,57 @@ cdef class Node(object):
             pass
         
     property state:
-        """ The state is a full copy of the Node dictionary """
+        """ The state is a full copy of the values mentioned in _stateKeys """
         def __get__(self):
             return self._state
         def __set__(self,value):
-            if self._state != value:
-                # Save current state
+            if self._state != value and value != None:
+                # Pre and post states
                 if self._state != None:
-                    self._states[self._state] = deepcopy(getattr(self, '__dict__', {}))
-                # Load new state
-                if value not in self._states:
-                    # State is new, just make a new copy of the current state
-                    #print "CREATING NEW STATE: ", value,
-                    self._states[value] = deepcopy(self._states[Node.STATE_DEFAULT])
-                    #print "NEW STATE: ", self._states[value]
+                    fpreexit = getattr(self, 'preExitState_'+self._state, None)
+                    fpostexit = getattr(self, 'postExitState_'+self._state, None)
+                else:
+                    fpreexit = fpostexit = None
 
-                for k,v in self._states[value].items():
-                    setattr(self, k, v)
+                fpreenter = getattr(self, 'preEnterState_'+value, None)
+                fpostenter = getattr(self, 'postEnterState_'+value, None)
+
+                if fpreexit != None:
+                    save_current = fpreexit()
+                else:
+                    save_current = True
+                self._exitState()
+                if save_current:
+                    # Save current state
+                    if self._state != None:
+                        for k in self._stateKeys:
+                            self._states[self._state][k] = getattr(self, k, None)
+                if fpostexit != None:
+                    fpostexit()
+
+                if fpreenter != None:
+                    load_new_state = fpreenter()
+                else:
+                    load_new_state = True
+                if load_new_state:
+                    # Load new state
+                    if value not in self._states:
+                        # State is new, just make a new copy of the current state
+                        self._states[value] = deepcopy(self._states[self._state if self._state != None else Node.STATE_DEFAULT])
+                    for k,v in self._states[value].iteritems():
+
+                        setattr(self, k, v)
 
                 self._state = value
+
+                # Force a fix in the timing in all running actions to prevent abrupt
+                # jumps due to the action being paused. Similar to what it's done when unserializing actions
+                for action in self.runningActions:
+                    action.unfreeze()
+
+                self._enterState()
+                if fpostenter != None:
+                    fpostenter()
 
     property nodes:
         def __get__(self):
@@ -261,7 +319,17 @@ cdef class Node(object):
         if not action.isRunning:
             action.target = self
             action.start()
-            self.actions.append(action)
+            if action.id not in self.actions:
+                self.actions[action.id] = action
+            self.runningActions.append(action)
+
+    def detachAction(self, action):
+        """ Remove action-node assignment """
+        if action.id in self.actions:
+            del self.actions[action.id]
+        if action in self.runningActions:
+            self.runningActions.remove(action)
+            action.stop()
 
     def onTouchDown(self, event):
         # A finger or mouse touched on the node
@@ -277,18 +345,26 @@ cdef class Node(object):
 
     def loadDefaults(self, data = {}):
         """ Load a dict of default values IF THEY DONT ALREADY EXIST """
-        for k,v in data.items():
+        for k,v in data.iteritems():
             if k not in self.__dict__:
                 self.__dict__[k] = v
 
     def __getstate__(self):
         odict = self.__dict__.copy()
+        # These dont exist in self.__dict__ as they come from Cython (some weird voodoo, right?)...so, we add them by hand
         odict['id'] = self.id
         odict['parent'] = self.parent
         odict['children'] = self.children
         odict['actions'] = self.actions
+        odict['runningActions'] = self.runningActions
+        odict['_stateKeys'] = self._stateKeys
+        odict['_state'] = self._state
+        odict['_states'] = self._states
+        odict['onEntryStartActions'] = self.onEntryStartActions
+        odict['onEntryStopActions'] = self.onEntryStopActions
+        odict['onExitStartActions'] = self.onExitStartActions
+        odict['onExitStopActions'] = self.onExitStopActions
         return odict
-
 
     def __reduce__(self):
         return type(self), (self.parent,), self.__getstate__()
@@ -297,6 +373,72 @@ cdef class Node(object):
         for k,v in data.iteritems():
             setattr(self, k, v)
 
-
     def __str__(self):
         return "Gilbert node of type %s" % (self.__class__.__name__,)
+
+    def _parseActions(self, data):
+        """ Actions have the format:
+        {
+        'id': { duration=0.0, relative=False, increase='linear', loop=1, runNext: {another action}, runWith: {another action} }
+        }
+        """
+        for action_id, action_data in data.iteritems():
+            action = self._parseAction(action_data)
+            action.id = action_id
+            self.actions[action_id] = action
+
+    def _parseAction(self, action_data):
+        """ Parse a single action """
+        data = deepcopy(action_data)
+
+        if 'runWith' in data:
+            runWith = data['runWith']
+            del data['runWith']
+        else:
+            runWith = None
+
+        if 'runNext' in data:
+            runNext = data['runNext']
+            del data['runNext']
+        else:
+            runNext = None
+
+        action = Action(**data)
+
+        if runWith != None:
+            action = action | self._parseAction(runWith)
+
+        if runNext != None:
+            action = action + self._parseAction(runNext)
+
+        return action
+
+    def _enterState(self):
+        """ Start and stop actions for the new state """
+        for action_id in self.onEntryStartActions:
+            if action_id in self.actions:
+                action = self.actions[action_id]
+                if not action.isRunning:
+                    self.do(action)
+
+        for action_id in self.onEntryStopActions:
+            if action_id in self.actions:
+                action = self.actions[action_id]
+                if action.isRunning and action.target == self:
+                    action.stop()
+
+
+    def _exitState(self):
+        """ Start and stop actions for the old state """
+        for action_id in self.onExitStartActions:
+            if action_id in self.actions:
+                action = self.actions[action_id]
+                if not action.isRunning:
+                    self.do(action)
+
+        for action_id in self.onExitStopActions:
+            if action_id in self.actions:
+                action = self.actions[action_id]
+                if action.isRunning and action.target == self:
+                    action.stop()
+

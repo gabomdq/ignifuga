@@ -44,7 +44,6 @@ from Sprite import Sprite
 from ignifuga.Gilbert import REQUESTS
 from ignifuga.Task import *
 from ignifuga.Gilbert import Gilbert
-from Action import Action
 import sys
 
 class SpriteNode(GraphicNode):
@@ -70,21 +69,21 @@ class SpriteNode(GraphicNode):
             '_atlas': None,
             'sprite': None,
         })
-        
+
         super(SpriteNode, self).__init__(parent, **kwargs)
         # Initialize fields at default if not provided via kwargs
         #self.dontsave += ['_dirty', 'canvas', '_atlas', 'sprite', 'position', 'x', 'y', '_spriteData' ]
         
-        if self.id == 'ponjas':
-            #a = ((Action(duration=5.0, relative=True, x=40, angle=180 ) * 2 | Action(duration=5.0, relative=True, y=100 )) + Action(duration=5.0, relative=True, x=-80, y=-100, angle=-360 ) ) * -1
-            a = (Action(duration=5.0, relative=True,angle=360, alpha=-0.5, red=-0.5, blue=-0.5 ) + Action(duration=5.0, relative=True, angle=-360, alpha=0.5, red=0.5, blue=0.5 ))  * -1
-            #print a
-            #self.center = (0,0)
-            self.fliph=True
-            self.alpha = 0.5
-            self.red = 0.5
-            self.green = 0.5
-            self.do(a)
+#        if self.id == 'ponjas':
+#            #a = ((Action(duration=5.0, relative=True, x=40, angle=180 ) * 2 | Action(duration=5.0, relative=True, y=100 )) + Action(duration=5.0, relative=True, x=-80, y=-100, angle=-360 ) ) * -1
+#            a = (Action(duration=5.0, relative=True,angle=360, alpha=-0.5, red=-0.5, blue=-0.5 ) + Action(duration=5.0, relative=True, angle=-360, alpha=0.5, red=0.5, blue=0.5 ))  * -1
+#            #print a
+#            #self.center = (0,0)
+#            self.fliph=True
+#            self.alpha = 0.5
+#            self.red = 0.5
+#            self.green = 0.5
+#            self.do(a)
 
     def init(self, data):
         """ Initialize the required external data """
@@ -189,14 +188,19 @@ class SpriteNode(GraphicNode):
         
     def hits(self, x, y):
         # Check if x,y hits the node
+        # TODO: account for sprite rotation!
+
         if x>=self._x and x <= self._x+self.width and y >= self._y and y <= self._y + self.height:
             # Check if the point on the sprite is visible
             x -= self._x
             y -= self._y
-            self.state='hover'
             if self.sprite != None:
-                return self.sprite.hits(x,y)
+                hits = self.sprite.hits(x,y)
+                self.state = SpriteNode.STATE_HOVER if hits else SpriteNode.STATE_DEFAULT
+                return hits
+            self.state = SpriteNode.STATE_HOVER
             return True
+        self.state = SpriteNode.STATE_DEFAULT
         return False
 
 

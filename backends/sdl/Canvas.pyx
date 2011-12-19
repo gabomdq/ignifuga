@@ -267,4 +267,11 @@ cdef class Canvas (CanvasBase):
         SDL_FreeSurface(ss)
         self.mod(self._r, self._g, self._b, self._a)
 
-                
+
+    def __deepcopy__(self, memo):
+        """ Don't allow deepcopying of the Canvas"""
+        return self
+
+    def __copy__(self):
+        """ Don't allow copying of the Canvas"""
+        return self

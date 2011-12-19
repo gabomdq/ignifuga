@@ -254,7 +254,7 @@ class Gilbert:
         # Engine is exiting from here onwards
 
         debug('Saving state')
-        #self.saveState()
+        self.saveState()
 
         # Release all data
         if self.backend == BACKENDS.sdl:
@@ -484,9 +484,9 @@ class Gilbert:
             # Scroll is in scene coordinates
             scroll_x, scroll_y = self.renderer.scroll
             
-            x = int(event.x/scale_x) + scroll_x
-            y = int(event.y/scale_y) + scroll_y
-            
+            x = int((event.x+ scroll_x)/scale_x)
+            y = int((event.y+ scroll_y)/scale_y)
+
             if not self._touchCaptured:
                 zindexs = self.nodesZ.keys()
                 if len(zindexs) >0:
@@ -620,20 +620,19 @@ class Gilbert:
 
 
         f = open('ignifuga.state', 'w')
-        state = GilbertPickler(f, -1).dump(self.nodesType)
+        state = GilbertPickler(f, -1).dump(self.nodes)
         f.close()
 
     def loadState(self):
         try:
             if os.path.isfile('ignifuga.state'):
                 f = open('ignifuga.state', 'r')
-                nodesType = pickle.load(f)
+                self.nodes = pickle.load(f)
                 f.close()
 
-                for nodeType, nodes in nodesType.iteritems():
-                    for node in nodes:
-                        task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
-                        self.loading.append((task, None, None))
+                for node in self.nodes:
+                    task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
+                    self.loading.append((task, None, None))
 
                 return True
             else:

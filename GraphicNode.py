@@ -75,6 +75,8 @@ class GraphicNode(Node):
         })
 
         super(GraphicNode, self).__init__(parent, **kwargs)
+        # State Keys should be set after parent init
+        self._stateKeys += ['x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'hidden', 'dirty', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue']
 
         # Some additional adjustments
         self._z += parent.z if parent.z is not None else 0

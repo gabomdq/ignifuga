@@ -64,3 +64,4 @@ cdef class CanvasBase (object):
 
     cpdef text(self, text, color, fontName, fontSize):
         raise Exception('method not implemented')
+
