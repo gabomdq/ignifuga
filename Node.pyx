@@ -174,6 +174,7 @@ cdef class Node(object):
         self._states = {}
         self.actions = {}
         self.runningActions = []
+        self.persistentActions = {}
         self._released = True
 
     def getType(self):
