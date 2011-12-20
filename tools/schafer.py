@@ -216,7 +216,8 @@ def check_mingw32tools():
 def install_host_tools():
     """ Install all the required host tools.
     Platforms supported:
-    * Ubuntu 64 Natty
+    * Ubuntu 64 Natty 11.04
+    * Ubuntu 64 Oneiric 11.10
     """
     log ('Installing development packages')
     cmd = 'sudo apt-get -y install rsync python-dev mingw32 mingw32-binutils mingw32-runtime make gcc-4.5 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
@@ -333,7 +334,7 @@ def check_host_tools():
     if system == 'Linux':
         if arch == '64bit':
             if distro_name == 'Ubuntu':
-                if distro_id in ['natty', 'oeniric']:
+                if distro_id in ['natty', 'oneiric']:
                     supported_platform = True
 
     if not supported_platform:

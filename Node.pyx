@@ -38,6 +38,13 @@
 # Base Node class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# NOTES:
+# Node actions exist "per state", so even if two actions of the same id exist in different states, they act independently
+# Once a state is switched, actions on that state are automatically paused, and actions on the new state automatically resumed.
+# The only exception to this are actions marked as "persistent", which can trascend state switches.
+# Actions can be defined per state. If you don't define actions for a given state, they have access to *CLONES* of the
+# default state actions.
+
 from ignifuga.Gilbert import createNode, Event, Gilbert
 from ignifuga.Task import *
 from pickle import dumps
@@ -73,6 +80,7 @@ cdef class Node(object):
         self.children = {}
         self.parent = parent
         self.actions = {}
+        self.persistentActions = {}
         self.runningActions = []
         self.onEntryStartActions = []
         self.onEntryStopActions = []
@@ -103,7 +111,10 @@ cdef class Node(object):
 
         # Parse actions
         if 'actions' in data:
-            self._parseActions(data['actions'])
+            self.actions = self._parseActions(data['actions'])
+            for action in self.actions.itervalues():
+                if action.persistent:
+                    self.persistentActions[action.id] = action
             del data['actions']
 
         # Load all the initial information
@@ -127,6 +138,9 @@ cdef class Node(object):
             self._states[state].update(values)
             if 'actions' in values:
                 self._states[state]['actions'] = self._parseActions(values['actions'])
+                for action in self._states[state]['actions'].itervalues():
+                    if action.persistent:
+                        self.persistentActions[action.id] = action
 
         self.state = Node.STATE_DEFAULT
 
@@ -244,9 +258,13 @@ cdef class Node(object):
         def __set__(self,value):
             if self._state != value and value != None:
                 # Pre and post states
+                persistentActions = []
                 if self._state != None:
                     fpreexit = getattr(self, 'preExitState_'+self._state, None)
                     fpostexit = getattr(self, 'postExitState_'+self._state, None)
+                    for action in self.runningActions:
+                        if action.persistent:
+                            persistentActions.append(action)
                 else:
                     fpreexit = fpostexit = None
 
@@ -281,10 +299,16 @@ cdef class Node(object):
 
                 self._state = value
 
+                # Restore persistent actions
+                for action in persistentActions:
+                    if action not in self.runningActions:
+                        self.runningActions.append(action)
+
                 # Force a fix in the timing in all running actions to prevent abrupt
                 # jumps due to the action being paused. Similar to what it's done when unserializing actions
                 for action in self.runningActions:
-                    action.unfreeze()
+                    if not action.persistent:
+                        action.unfreeze()
 
                 self._enterState()
                 if fpostenter != None:
@@ -351,11 +375,13 @@ cdef class Node(object):
 
     def __getstate__(self):
         odict = self.__dict__.copy()
-        # These dont exist in self.__dict__ as they come from Cython (some weird voodoo, right?)...so, we add them by hand
+        # These dont exist in self.__dict__ as they come from Cython (some weird voodoo, right?)...
+        # So, we have to add them by hand for them to be pickled correctly
         odict['id'] = self.id
         odict['parent'] = self.parent
         odict['children'] = self.children
         odict['actions'] = self.actions
+        odict['persistentActions'] = self.persistentActions
         odict['runningActions'] = self.runningActions
         odict['_stateKeys'] = self._stateKeys
         odict['_state'] = self._state
@@ -382,10 +408,12 @@ cdef class Node(object):
         'id': { duration=0.0, relative=False, increase='linear', loop=1, runNext: {another action}, runWith: {another action} }
         }
         """
+        actions = {}
         for action_id, action_data in data.iteritems():
             action = self._parseAction(action_data)
             action.id = action_id
-            self.actions[action_id] = action
+            actions[action_id] = action
+        return actions
 
     def _parseAction(self, action_data):
         """ Parse a single action """
@@ -420,10 +448,18 @@ cdef class Node(object):
                 action = self.actions[action_id]
                 if not action.isRunning:
                     self.do(action)
+            elif action_id in self.persistentActions:
+                action = self.persistentActions[action_id]
+                if not action.isRunning:
+                    self.do(action)
 
         for action_id in self.onEntryStopActions:
             if action_id in self.actions:
                 action = self.actions[action_id]
+                if action.isRunning and action.target == self:
+                    action.stop()
+            elif action_id in self.persistentActions:
+                action = self.persistentActions[action_id]
                 if action.isRunning and action.target == self:
                     action.stop()
 
@@ -435,10 +471,18 @@ cdef class Node(object):
                 action = self.actions[action_id]
                 if not action.isRunning:
                     self.do(action)
+            elif action_id in self.persistentActions:
+                action = self.persistentActions[action_id]
+                if not action.isRunning:
+                    self.do(action)
 
         for action_id in self.onExitStopActions:
             if action_id in self.actions:
                 action = self.actions[action_id]
+                if action.isRunning and action.target == self:
+                    action.stop()
+            elif action_id in self.persistentActions:
+                action = self.persistentActions[action_id]
                 if action.isRunning and action.target == self:
                     action.stop()
 
