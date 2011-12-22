@@ -245,6 +245,7 @@ class Gilbert:
             self.dataManager.loadScene(scene)
         self.startLoop()
         # Nothing after this will get executed until the engine exits
+        debug('Ignifuga Game Engine Exits...')
 
     def startLoop(self):
         """Set up the game loop"""
@@ -265,24 +266,25 @@ class Gilbert:
         objs = gc.get_objects()
         for n in objs:
             if isinstance(n, Node):
-                print 'NODE: ', n
+                debug ('NODE: %s' % n)
                 for ref in gc.get_referrers(n):
                     if ref != objs:
-                        print '    REFERRER: ', ref.__class__, id(ref)
+                        debug(str('    REFERRER: ', ref.__class__, id(ref)))
                         if isinstance(ref, dict):
-                            print "    DICT: ", ref.keys()
+                            debug(str("    DICT: ", ref.keys()))
                         elif isinstance(ref, list):
-                            print "    LIST: ", len(ref), " items"
+                            debug(str("    LIST: ", len(ref), " items"))
                         elif isinstance(ref, tuple):
-                            print "    TUPLE: ", ref
+                            debug(str("    TUPLE: ", ref))
                         else:
-                            print "    INSTANCEMETHOD: ", ref.__name__
+                            debug(str("    OTHER: ", ref))
         self.dataManager.cleanup(True)
         # Break any remaining cycles that prevent garbage collection
         del self.dataManager
         del self.renderer
         debug('Terminating backend %s' % (self.backend,))
         terminateBackend()
+
 
         
     def endLoop(self):
@@ -315,7 +317,7 @@ class Gilbert:
                 if not self.nodesType.has_key(nodetype):
                     self.nodesType[nodetype] = weakref.WeakSet()
                 self.nodesType[nodetype].add(node)
-                #print node.save()
+                #debug(str(node.save()))
                 # Add it to the by z ordering index
                 zindex = node.z
                 if zindex != None:
@@ -619,9 +621,9 @@ class Gilbert:
                 tries = 0
 
 
-        f = open('ignifuga.state', 'w')
-        state = GilbertPickler(f, -1).dump(self.nodes)
-        f.close()
+        #f = open('ignifuga.state', 'w')
+        #state = GilbertPickler(f, -1).dump(self.nodes)
+        #f.close()
 
     def loadState(self):
         try:

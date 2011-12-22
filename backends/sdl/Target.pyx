@@ -56,7 +56,7 @@ cdef class Target (TargetBase):
             
         SDL_GetDesktopDisplayMode(display, &dm)
 
-        print "Desktop mode is %dx%d" % (dm.w, dm.h)
+        debug("Desktop mode is %dx%d" % (dm.w, dm.h))
         
         if sys.platform in ['win32',]:
             if fullscreen:
@@ -82,7 +82,13 @@ cdef class Target (TargetBase):
             self.window = SDL_CreateWindow("Ignifuga",
                             SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
                             width, height, SDL_WINDOW_FULLSCREEN)
-            
+
+        if self.window == NULL:
+            error("COULD NOT CREATE SDL WINDOW")
+            error(SDL_GetError())
+            sys.exit(1)
+            return
+
         #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
         self.renderer = SDL_CreateRenderer(self.window, -1, 0)
         self.updateSize()
@@ -113,8 +119,10 @@ cdef class Target (TargetBase):
 
     def __dealloc__(self):
         debug('Releasing SDL main render target')
-        SDL_DestroyRenderer(self.renderer)
-        SDL_DestroyWindow(self.window)
+        if self.renderer != NULL:
+            SDL_DestroyRenderer(self.renderer)
+        if self.window != NULL:
+            SDL_DestroyWindow(self.window)
     
     @property
     def width(self):
@@ -133,7 +141,7 @@ cdef class Target (TargetBase):
     cpdef updateSize(self):
         SDL_GetWindowSize(self.window, &self._width, &self._height)
         SDL_RenderSetViewport(self.renderer, NULL)
-        debug('Window size is %d x %d' % (self._width, self._height))
+        debug('updateSize: new window size is %d x %d' % (self._width, self._height))
 
     cpdef clear(self, x, y, w, h):
         self.ctx.clearRect(x,y,w,h);

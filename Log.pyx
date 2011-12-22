@@ -75,8 +75,7 @@ class Log:
 
     def log(self, level, msg):
         if level>=self.logLevel:
-            print msg
-            sys.stdout.flush()
+            native_log(level, msg)
             return True
         return False
     

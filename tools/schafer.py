@@ -423,7 +423,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
             if platform == 'linux64':
-                ignifuga_module = "\nignifuga %s -lSDL_ttf -lSDL_image -lSDL %s %s\n" % (' '.join(ignifuga_src),sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -lSDL_ttf -lSDL_image -lSDL %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
 
             elif platform== 'android':
                 # Hardcoded for now
@@ -432,7 +432,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                ignifuga_module = "\nignifuga %s -L%s %s\n" % (' '.join(ignifuga_src), join(SDL_BUILD, 'libs', 'armeabi'), sdlflags)
+                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(SDL_BUILD, 'libs', 'armeabi'), sdlflags)
 
             elif platform == 'mingw32':
                 # Remove some perjudicial flags
@@ -449,7 +449,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 shutil.copy(join(PYTHON_BUILD, 'PC', 'getpathp.c'), join(PYTHON_BUILD, 'Python', 'getpathp.c'))
                 shutil.copy(join(PYTHON_BUILD, 'PC', 'errmap.h'), join(PYTHON_BUILD, 'Objects', 'errmap.h'))
 
-                ignifuga_module = "\nignifuga %s -I%s -lSDL_ttf -lSDL_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src),join(PYTHON_BUILD, 'Include'), sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL_ttf -lSDL_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(PYTHON_BUILD, 'Include'), sdlflags, freetypeflags)
 
             
             f = open(setupfile, 'at')
@@ -669,7 +669,7 @@ compileall.compile_dir("%s")
 
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
     Popen(shlex.split(cmd), cwd = IGNIFUGA_SRC).communicate()
 
 def make_glue(package, glue_h, glue_c):
@@ -1291,6 +1291,13 @@ def build_project_generic(options, platform, env=None):
 
         cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (DIST_DIR, android_project)
         Popen(shlex.split(cmd), cwd = DIST_DIR).communicate()
+
+
+        if options.wallpaper:
+            # Wallpapers use a slightly different manifest
+            if isfile(join(android_project, 'AndroidManifest.wallpaper.xml')):
+                shutil.move(join(android_project, 'AndroidManifest.wallpaper.xml'), join(android_project, 'AndroidManifest.xml'))
+
         # Modify the glue code to suit the project
         cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
@@ -1309,7 +1316,11 @@ def build_project_generic(options, platform, env=None):
         sdlActivityDir = join(android_project, 'src', options.project.replace('.', os.sep))
         if not isdir(sdlActivityDir):
             os.makedirs(sdlActivityDir)
-        shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
+        if options.wallpaper:
+            # Wallpapers use a slightly different activity
+            shutil.move(join(android_project, 'src', 'SDLActivity.wallpaper.java'), join(sdlActivityDir, 'SDLActivity.java'))
+        else:
+            shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
 
         # Copy cythonized sources
         cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (cython_src, jni_src)
@@ -1510,10 +1521,13 @@ if __name__ == '__main__':
                   help="Main Python File (required to compile a project)")
     parser.add_option("-p", "--project", dest="project", default="com.mdqinc.test",
                   help="Project Name (default: com.mdqinc.ignifuga)")
-    parser.add_option("-a", "--asset", dest="assets", default=None, action="append",
+    parser.add_option("-a", "--asset", dest="assets", default=[], action="append",
                   help="Asset location")
     parser.add_option("-D", "--dependencies", dest="dependencies", default=False, action="store_true",
                   help="Install required dependencies and exit")
+    parser.add_option("-w", "--wallpaper",
+        action="store_true", dest="wallpaper", default=False,
+        help="Build a Live Wallpaper (only valid for Android)")
     (options, args) = parser.parse_args()
 
 

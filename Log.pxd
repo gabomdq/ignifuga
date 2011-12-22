@@ -34,6 +34,7 @@
 #(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#cdef extern from "android/log.h":
-#    cdef int __android_log_print(int prio, char *tag, char *fmt, ...)
+cdef extern from "native_log.h":
+    cdef int native_log(int level, char *str)
+    cdef int __android_log_print(int prio, char *tag, char *fmt, ...)
     
