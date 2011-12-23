@@ -312,6 +312,7 @@ public class SDLActivity extends WallpaperService {
         private EGLSurface  mEGLSurface;
         private EGLDisplay  mEGLDisplay;
         private EGLConfig   mEGLConfig;
+        private int mGLMajor, mGLMinor;
 
         // Sensors
         //private static SensorManager mSensorManager;
@@ -484,18 +485,10 @@ public class SDLActivity extends WallpaperService {
                         return false;
                     }
                     EGLConfig config = configs[0];
-
-                    int EGL_CONTEXT_CLIENT_VERSION=0x3098;
-                    int contextAttrs[] = new int[] { EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL10.EGL_NONE };
-                    EGLContext ctx = egl.eglCreateContext(dpy, config, EGL10.EGL_NO_CONTEXT, contextAttrs);
-
-                    if (ctx == EGL10.EGL_NO_CONTEXT) {
-                        Log.e("SDL", "Couldn't create context");
-                        return false;
-                    }
-                    mEGLContext = ctx;
                     mEGLDisplay = dpy;
                     mEGLConfig = config;
+                    mGLMajor = majorVersion;
+                    mGLMinor = minorVersion;
 
                     createEGLSurface();
                 } catch(Exception e) {
@@ -510,8 +503,22 @@ public class SDLActivity extends WallpaperService {
             return true;
         }
 
+        public boolean createEGLContext() {
+            EGL10 egl = (EGL10)EGLContext.getEGL();
+            int EGL_CONTEXT_CLIENT_VERSION=0x3098;
+            int contextAttrs[] = new int[] { EGL_CONTEXT_CLIENT_VERSION, mGLMajor, EGL10.EGL_NONE };
+            EGLContext ctx = egl.eglCreateContext(mEGLDisplay, mEGLConfig, EGL10.EGL_NO_CONTEXT, contextAttrs);
+
+            if (ctx == EGL10.EGL_NO_CONTEXT) {
+                Log.e("SDL", "Couldn't create context");
+                return false;
+            }
+            mEGLContext = ctx;
+            return true;
+        }
+
         public boolean createEGLSurface() {
-            if (mEGLDisplay != null && mEGLConfig != null && mHolder != null && mEGLContext != null) {
+            if (mEGLDisplay != null && mEGLConfig != null && mHolder != null) {
                 EGL10 egl = (EGL10)EGLContext.getEGL();
                 EGLSurface surface = egl.eglCreateWindowSurface(mEGLDisplay, mEGLConfig, mHolder, null);
                 if (surface == EGL10.EGL_NO_SURFACE) {
@@ -519,9 +526,14 @@ public class SDLActivity extends WallpaperService {
                     return false;
                 }
 
+                if (mEGLContext == null) createEGLContext();
+
                 if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
                     Log.e("SDL", "Couldn't make context current");
-                    return false;
+                    createEGLContext();
+                    if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
+                        return false;
+                    }
                 }
                 mEGLSurface = surface;
                 return true;

@@ -251,9 +251,7 @@ class Gilbert:
 
     def startLoop(self):
         """Set up the game loop"""
-        debug('Starting Game Loop1')
         self.gameLoop = GameLoop()
-        debug('Starting Game Loop2')
         self.gameLoop.run()
 
         # Engine is exiting from here onwards
