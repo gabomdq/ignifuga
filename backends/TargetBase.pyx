@@ -65,3 +65,10 @@ cdef class TargetBase (object):
 
     cpdef flip(self):
         raise Exception('method not implemented')
+
+    cpdef isVisible(self):
+        raise Exception('method not implemented')
+
+    property visible:
+        def __get__(self):
+            return self.isVisible()

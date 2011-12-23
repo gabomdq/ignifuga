@@ -123,20 +123,18 @@ cdef class Target (TargetBase):
             SDL_DestroyRenderer(self.renderer)
         if self.window != NULL:
             SDL_DestroyWindow(self.window)
-    
-    @property
-    def width(self):
-        # Update size as it can change!
-        return self._width
-    
-    @property
-    def height(self):
-        # Update size as it can change!  
-        return self._height
 
-    @property
-    def isDoubleBuffered(self):
-        return self._doublebuffered
+    property width:
+        def __get__(self):
+            return self._width
+
+    property height:
+        def __get__(self):
+            return self._height
+
+    property isDoubleBuffered:
+        def __get__(self):
+            return self._doublebuffered
 
     cpdef updateSize(self):
         SDL_GetWindowSize(self.window, &self._width, &self._height)
@@ -196,3 +194,10 @@ cdef class Target (TargetBase):
         if self._doublebuffered:
             SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
             SDL_RenderClear(self.renderer);
+
+
+    cpdef isVisible(self):
+        if self.window != NULL:
+            return SDL_GetWindowFlags(self.window) & SDL_WINDOW_SHOWN != 0
+
+        return False

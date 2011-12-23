@@ -95,17 +95,53 @@ public class SDLActivity extends WallpaperService {
 
     @Override
     public void onDestroy() {
-        Log.v("SDL", "onDestroy()");
         super.onDestroy();
+        //Log.v("SDL", "onDestroy()");
+
+        // Send a quit message to the application
+
+        SDLActivity.nativeQuit();
+        //Log.v("SDL", "Waiting for SDL thread");
+        // Now wait for the SDL thread to quit
+        if (mEngine.mSDLThread != null) {
+            try {
+                mEngine.mSDLThread.join();
+            } catch(Exception e) {
+                //Log.v("SDL", "Problem stopping thread: " + e);
+            }
+            mEngine.mSDLThread = null;
+
+            //Log.v("SDL", "Finished waiting for SDL thread");
+        }
+
+    }
+
+    protected void onPause(){
+        //Log.v("SDL", "SDLActivity onPause");
+        SDLActivity.nativePause();
+    }
+
+    protected void onResume(){
+        //Log.v("SDL", "SDLActivity onResume");
+        SDLActivity.nativeResume();
     }
 
     @Override
     public Engine onCreateEngine() {
-        Log.v("SDL", "onCreateEngine()");
+        //Log.v("SDL", "onCreateEngine()");
         if (mEngine != null){
-            mEngine.terminate();
+            //Log.v("SDL", "Waiting for SDL thread");
+            if (mEngine.mSDLThread != null) {
+                SDLActivity.nativeQuit();
+                try {
+                    mEngine.mSDLThread.join();
+                } catch(Exception e) {
+                    //Log.v("SDL", "Problem stopping thread: " + e);
+                }
+            }
+            //Log.v("SDL", "SDL thread finished");
         }
-        Log.v("SDL", "Creating SDL Engine");
+        //Log.v("SDL", "Creating SDL Engine");
         mEngine = new SDLEngine();
         return mEngine;
     }
@@ -133,6 +169,8 @@ public class SDLActivity extends WallpaperService {
     // C functions we call
     public static native void nativeInit();
     public static native void nativeQuit();
+    public static native void nativePause();
+    public static native void nativeResume();
     public static native void onNativeResize(int x, int y, int format);
     public static native void onNativeKeyDown(int keycode);
     public static native void onNativeKeyUp(int keycode);
@@ -170,7 +208,7 @@ public class SDLActivity extends WallpaperService {
         int audioFormat = is16Bit ? AudioFormat.ENCODING_PCM_16BIT : AudioFormat.ENCODING_PCM_8BIT;
         int frameSize = (isStereo ? 2 : 1) * (is16Bit ? 2 : 1);
         
-        Log.v("SDL", "SDL audio: wanted " + (isStereo ? "stereo" : "mono") + " " + (is16Bit ? "16-bit" : "8-bit") + " " + ((float)sampleRate / 1000f) + "kHz, " + desiredFrames + " frames buffer");
+        //Log.v("SDL", "SDL audio: wanted " + (isStereo ? "stereo" : "mono") + " " + (is16Bit ? "16-bit" : "8-bit") + " " + ((float)sampleRate / 1000f) + "kHz, " + desiredFrames + " frames buffer");
         
         // Let the user pick a larger buffer if they really want -- but ye
         // gods they probably shouldn't, the minimums are horrifyingly high
@@ -182,7 +220,7 @@ public class SDLActivity extends WallpaperService {
         
         audioStartThread();
         
-        Log.v("SDL", "SDL audio: got " + ((mAudioTrack.getChannelCount() >= 2) ? "stereo" : "mono") + " " + ((mAudioTrack.getAudioFormat() == AudioFormat.ENCODING_PCM_16BIT) ? "16-bit" : "8-bit") + " " + ((float)mAudioTrack.getSampleRate() / 1000f) + "kHz, " + desiredFrames + " frames buffer");
+        //Log.v("SDL", "SDL audio: got " + ((mAudioTrack.getChannelCount() >= 2) ? "stereo" : "mono") + " " + ((mAudioTrack.getAudioFormat() == AudioFormat.ENCODING_PCM_16BIT) ? "16-bit" : "8-bit") + " " + ((float)mAudioTrack.getSampleRate() / 1000f) + "kHz, " + desiredFrames + " frames buffer");
         
         if (is16Bit) {
             buf = new short[desiredFrames * (isStereo ? 2 : 1)];
@@ -217,7 +255,7 @@ public class SDLActivity extends WallpaperService {
                     // Nom nom
                 }
             } else {
-                Log.w("SDL", "SDL audio: error return from write(short)");
+                //Log.w("SDL", "SDL audio: error return from write(short)");
                 return;
             }
         }
@@ -235,7 +273,7 @@ public class SDLActivity extends WallpaperService {
                     // Nom nom
                 }
             } else {
-                Log.w("SDL", "SDL audio: error return from write(short)");
+                //Log.w("SDL", "SDL audio: error return from write(short)");
                 return;
             }
         }
@@ -246,7 +284,7 @@ public class SDLActivity extends WallpaperService {
             try {
                 mAudioThread.join();
             } catch(Exception e) {
-                Log.v("SDL", "Problem stopping audio thread: " + e);
+                //Log.v("SDL", "Problem stopping audio thread: " + e);
             }
             mAudioThread = null;
 
@@ -266,13 +304,14 @@ public class SDLActivity extends WallpaperService {
     class SDLEngine extends Engine {//SurfaceView implements SurfaceHolder.Callback, View.OnKeyListener, View.OnTouchListener, SensorEventListener
 
         // This is what SDL runs in. It invokes SDL_main(), eventually
-        private Thread mSDLThread;
+        public Thread mSDLThread;
         private SurfaceHolder mHolder;
 
         // EGL private objects
         private EGLContext  mEGLContext;
         private EGLSurface  mEGLSurface;
         private EGLDisplay  mEGLDisplay;
+        private EGLConfig   mEGLConfig;
 
         // Sensors
         //private static SensorManager mSensorManager;
@@ -291,13 +330,42 @@ public class SDLActivity extends WallpaperService {
             //mSensorManager = (SensorManager)context.getSystemService("sensor");
         }
 
+        /*@Override
+        public void onResume() {
+            super.onResume();
+            //Log.v("SDL", "SDLEngine onResume");
+        }
+
+        @Override
+        public void onPause() {
+            super.onPause();
+            //Log.v("SDL", "SDLEngine onPause");
+        }
+
+        @Override
+        public void onDestroy() {
+            super.onDestroy();
+            //Log.v("SDL", "SDLEngine onDestroy");
+        }*/
+
+        @Override
+        public void onVisibilityChanged(boolean visible) {
+            //Log.v("SDL", "onVisibilityChanged " + visible);
+            if (visible) {
+                SDLActivity.nativeResume();
+            } else {
+                SDLActivity.nativePause();
+            }
+        }
+
         // Called when we have a valid drawing surface
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
             mHolder = holder;
-            Log.v("SDL", "surfaceCreated()");
+            //Log.v("SDL", "surfaceCreated() " + holder);
             mHolder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
+            createEGLSurface();
 
             enableSensor(Sensor.TYPE_ACCELEROMETER, true);
         }
@@ -305,39 +373,12 @@ public class SDLActivity extends WallpaperService {
         // Called when we lose the surface
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
-            super.onSurfaceDestroyed(holder);
-            Log.v("SDL", "surfaceDestroyed()");
-            terminate();
-        }
-
-        public void terminate() {
-            // Send a quit message to the application
-            SDLActivity.nativeQuit();
-            Log.v("SDL", "Waiting for SDL thread");
-
-            try {
-                // Now wait for the SDL thread to quit
-                if (mSDLThread != null) {
-                    try {
-                        mSDLThread.join();
-                    } catch(Exception e) {
-                        Log.v("SDL", "Problem stopping thread: " + e);
-                    }
-                    mSDLThread = null;
-
-                    Log.v("SDL", "Finished waiting for SDL thread");
-                }
-            } catch(Exception e) {
-                 Log.v("SDL", "onSurfaceDestroyed: " + e);
-                 for (StackTraceElement s : e.getStackTrace()) {
-                     Log.v("SDL", s.toString());
-                 }
+            if (holder == SDLActivity.mEngine.mHolder) {
+                super.onSurfaceDestroyed(holder);
+                //Log.v("SDL", "surfaceDestroyed() " + holder + " " + mHolder);
+                SDLActivity.nativePause();
+                enableSensor(Sensor.TYPE_ACCELEROMETER, false);
             }
-
-            Log.v("SDL", "SURFACE DESTROYED!!!");
-
-            enableSensor(Sensor.TYPE_ACCELEROMETER, false);
-
         }
 
         // Called when the surface is resized
@@ -345,62 +386,65 @@ public class SDLActivity extends WallpaperService {
         public void onSurfaceChanged(SurfaceHolder holder,
                                    int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
-            Log.v("SDL", "surfaceChanged()");
+            //Log.v("SDL", "surfaceChanged()" + holder);
 
             int sdlFormat = 0x85151002; // SDL_PIXELFORMAT_RGB565 by default
             switch (format) {
             case PixelFormat.A_8:
-                Log.v("SDL", "pixel format A_8");
+                //Log.v("SDL", "pixel format A_8");
                 break;
             case PixelFormat.LA_88:
-                Log.v("SDL", "pixel format LA_88");
+                //Log.v("SDL", "pixel format LA_88");
                 break;
             case PixelFormat.L_8:
-                Log.v("SDL", "pixel format L_8");
+                //Log.v("SDL", "pixel format L_8");
                 break;
             case PixelFormat.RGBA_4444:
-                Log.v("SDL", "pixel format RGBA_4444");
+                //Log.v("SDL", "pixel format RGBA_4444");
                 sdlFormat = 0x85421002; // SDL_PIXELFORMAT_RGBA4444
                 break;
             case PixelFormat.RGBA_5551:
-                Log.v("SDL", "pixel format RGBA_5551");
+                //Log.v("SDL", "pixel format RGBA_5551");
                 sdlFormat = 0x85441002; // SDL_PIXELFORMAT_RGBA5551
                 break;
             case PixelFormat.RGBA_8888:
-                Log.v("SDL", "pixel format RGBA_8888");
+                //Log.v("SDL", "pixel format RGBA_8888");
                 sdlFormat = 0x86462004; // SDL_PIXELFORMAT_RGBA8888
                 break;
             case PixelFormat.RGBX_8888:
-                Log.v("SDL", "pixel format RGBX_8888");
+                //Log.v("SDL", "pixel format RGBX_8888");
                 sdlFormat = 0x86262004; // SDL_PIXELFORMAT_RGBX8888
                 break;
             case PixelFormat.RGB_332:
-                Log.v("SDL", "pixel format RGB_332");
+                //Log.v("SDL", "pixel format RGB_332");
                 sdlFormat = 0x84110801; // SDL_PIXELFORMAT_RGB332
                 break;
             case PixelFormat.RGB_565:
-                Log.v("SDL", "pixel format RGB_565");
+                //Log.v("SDL", "pixel format RGB_565");
                 sdlFormat = 0x85151002; // SDL_PIXELFORMAT_RGB565
                 break;
             case PixelFormat.RGB_888:
-                Log.v("SDL", "pixel format RGB_888");
+                //Log.v("SDL", "pixel format RGB_888");
                 // Not sure this is right, maybe SDL_PIXELFORMAT_RGB24 instead?
                 sdlFormat = 0x86161804; // SDL_PIXELFORMAT_RGB888
                 break;
             default:
-                Log.v("SDL", "pixel format unknown " + format);
+                //Log.v("SDL", "pixel format unknown " + format);
                 break;
             }
             SDLActivity.onNativeResize(width, height, sdlFormat);
-            Log.v("SDL", "Window size:" + width + "x"+height);
+            //Log.v("SDL", "Window size:" + width + "x"+height);
 
             // Now start up the C app thread
             if (mSDLThread == null) {
-                Log.v("SDL", "Starting SDLThread");
+                //Log.v("SDL", "Starting SDLThread");
                 mSDLThread = new Thread(new SDLMain(), "SDLThread");
                 mSDLThread.start();
             }
-            else Log.v("SDL", "SDLThread already exists");
+            else {
+                //Log.v("SDL", "SDLThread already exists");
+                SDLActivity.nativeResume();
+            }
         }
 
         // unused
@@ -409,73 +453,80 @@ public class SDLActivity extends WallpaperService {
 
         // EGL functions
         public boolean initEGL(int majorVersion, int minorVersion) {
-            // Temporarily disable OpenGL ES 2 as the SDL backend is buggy
-            //if (majorVersion != 1) return false;
+            if (mEGLContext == null) {
+                //Log.v("SDL", "Starting up OpenGL ES " + majorVersion + "." + minorVersion);
 
+                try {
+                    EGL10 egl = (EGL10)EGLContext.getEGL();
 
-            Log.v("SDL", "Starting up OpenGL ES " + majorVersion + "." + minorVersion);
+                    EGLDisplay dpy = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
 
-            try {
+                    int[] version = new int[2];
+                    egl.eglInitialize(dpy, version);
+
+                    int EGL_OPENGL_ES_BIT = 1;
+                    int EGL_OPENGL_ES2_BIT = 4;
+                    int renderableType = 0;
+                    if (majorVersion == 2) {
+                        renderableType = EGL_OPENGL_ES2_BIT;
+                    } else if (majorVersion == 1) {
+                        renderableType = EGL_OPENGL_ES_BIT;
+                    }
+                    int[] configSpec = {
+                        //EGL10.EGL_DEPTH_SIZE,   16,
+                        EGL10.EGL_RENDERABLE_TYPE, renderableType,
+                        EGL10.EGL_NONE
+                    };
+                    EGLConfig[] configs = new EGLConfig[1];
+                    int[] num_config = new int[1];
+                    if (!egl.eglChooseConfig(dpy, configSpec, configs, 1, num_config) || num_config[0] == 0) {
+                        Log.e("SDL", "No EGL config available");
+                        return false;
+                    }
+                    EGLConfig config = configs[0];
+
+                    int EGL_CONTEXT_CLIENT_VERSION=0x3098;
+                    int contextAttrs[] = new int[] { EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL10.EGL_NONE };
+                    EGLContext ctx = egl.eglCreateContext(dpy, config, EGL10.EGL_NO_CONTEXT, contextAttrs);
+
+                    if (ctx == EGL10.EGL_NO_CONTEXT) {
+                        Log.e("SDL", "Couldn't create context");
+                        return false;
+                    }
+                    mEGLContext = ctx;
+                    mEGLDisplay = dpy;
+                    mEGLConfig = config;
+
+                    createEGLSurface();
+                } catch(Exception e) {
+                    Log.v("SDL", e + "");
+                    for (StackTraceElement s : e.getStackTrace()) {
+                        Log.v("SDL", s.toString());
+                    }
+                }
+            }
+            else createEGLSurface();
+
+            return true;
+        }
+
+        public boolean createEGLSurface() {
+            if (mEGLDisplay != null && mEGLConfig != null && mHolder != null && mEGLContext != null) {
                 EGL10 egl = (EGL10)EGLContext.getEGL();
-
-                EGLDisplay dpy = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
-
-                int[] version = new int[2];
-                egl.eglInitialize(dpy, version);
-
-                int EGL_OPENGL_ES_BIT = 1;
-                int EGL_OPENGL_ES2_BIT = 4;
-                int renderableType = 0;
-                if (majorVersion == 2) {
-                    renderableType = EGL_OPENGL_ES2_BIT;
-                } else if (majorVersion == 1) {
-                    renderableType = EGL_OPENGL_ES_BIT;
-                }
-                int[] configSpec = {
-                    //EGL10.EGL_DEPTH_SIZE,   16,
-                    EGL10.EGL_RENDERABLE_TYPE, renderableType,
-                    EGL10.EGL_NONE
-                };
-                EGLConfig[] configs = new EGLConfig[1];
-                int[] num_config = new int[1];
-                if (!egl.eglChooseConfig(dpy, configSpec, configs, 1, num_config) || num_config[0] == 0) {
-                    Log.e("SDL", "No EGL config available");
-                    return false;
-                }
-                EGLConfig config = configs[0];
-
-                int EGL_CONTEXT_CLIENT_VERSION=0x3098;
-                int contextAttrs[] = new int[] { EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL10.EGL_NONE };
-                EGLContext ctx = egl.eglCreateContext(dpy, config, EGL10.EGL_NO_CONTEXT, contextAttrs);
-
-                if (ctx == EGL10.EGL_NO_CONTEXT) {
-                    Log.e("SDL", "Couldn't create context");
-                    return false;
-                }
-
-                EGLSurface surface = egl.eglCreateWindowSurface(dpy, config, mHolder, null);
+                EGLSurface surface = egl.eglCreateWindowSurface(mEGLDisplay, mEGLConfig, mHolder, null);
                 if (surface == EGL10.EGL_NO_SURFACE) {
                     Log.e("SDL", "Couldn't create surface");
                     return false;
                 }
 
-                if (!egl.eglMakeCurrent(dpy, surface, surface, ctx)) {
+                if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
                     Log.e("SDL", "Couldn't make context current");
                     return false;
                 }
-
-                mEGLContext = ctx;
-                mEGLDisplay = dpy;
                 mEGLSurface = surface;
-
-            } catch(Exception e) {
-                Log.v("SDL", e + "");
-                for (StackTraceElement s : e.getStackTrace()) {
-                    Log.v("SDL", s.toString());
-                }
+                return true;
             }
-
-            return true;
+            return false;
         }
 
         // EGL buffer flip
@@ -583,9 +634,10 @@ public class SDLActivity extends WallpaperService {
 class SDLMain implements Runnable {
     public void run() {
         // Runs SDL_main()
+        //Log.v("SDL", "SDL runnable starts: " + this);
         SDLActivity.nativeInit();
 
-        Log.v("SDL", "SDL thread terminated");
+        //Log.v("SDL", "SDL runnable terminated " + this );
     }
 }
 

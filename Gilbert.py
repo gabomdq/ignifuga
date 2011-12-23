@@ -243,13 +243,17 @@ class Gilbert:
         if not self.loadState():
             debug('Failed loading previous state')
             self.dataManager.loadScene(scene)
+
+        debug('Starting Game Loop')
         self.startLoop()
         # Nothing after this will get executed until the engine exits
         debug('Ignifuga Game Engine Exits...')
 
     def startLoop(self):
         """Set up the game loop"""
+        debug('Starting Game Loop1')
         self.gameLoop = GameLoop()
+        debug('Starting Game Loop2')
         self.gameLoop.run()
 
         # Engine is exiting from here onwards
@@ -298,7 +302,7 @@ class Gilbert:
         """
         # Call the pre update so we can tally how long the whole frame processing took (logic+render)
         self.renderer.preUpdate(now)
-        
+
         # Initialize objects
         loading_count = len(self.loading)
         lc = 0

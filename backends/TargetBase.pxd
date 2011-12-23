@@ -48,3 +48,4 @@ cdef class TargetBase (object):
     cpdef clearRect(self, rect)
     cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, double angle=*, bool offCenter=*, int centerx=*, int centery=*, int flip=*)
     cpdef flip(self)
+    cpdef isVisible(self)

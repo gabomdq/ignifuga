@@ -40,7 +40,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.Gilbert import BACKENDS, Gilbert
-from ignifuga.Log import Log
+from ignifuga.Log import Log, debug
 
 from ignifuga.Singleton import Singleton
 from ignifuga.Rect cimport Rect
@@ -308,7 +308,10 @@ cdef class Renderer:
     property screenSize:
         def __get__(self):
             """ Return the width,height of the screen """
-            return self.target.width, self.target.height
+            if self._target != None:
+                return self._target.width, self._target.height
+            else:
+                return 0,0
             
     property sceneSize:
         def __get__(self):

@@ -204,6 +204,21 @@ cdef extern from "SDL.h":
         SDL_FLIP_HORIZONTAL = 0x00000001
         SDL_FLIP_VERTICAL = 0x00000002
 
+    ctypedef enum SDL_WindowFlags:
+        SDL_WINDOW_FULLSCREEN = 0x00000001      #,         /**< fullscreen window */
+        SDL_WINDOW_OPENGL = 0x00000002          #,             /**< window usable with OpenGL context */
+        SDL_WINDOW_SHOWN = 0x00000004           #,              /**< window is visible */
+        SDL_WINDOW_HIDDEN = 0x00000008          #,             /**< window is not visible */
+        SDL_WINDOW_BORDERLESS = 0x00000010      #,         /**< no window decoration */
+        SDL_WINDOW_RESIZABLE = 0x00000020       #,          /**< window can be resized */
+        SDL_WINDOW_MINIMIZED = 0x00000040       #,          /**< window is minimized */
+        SDL_WINDOW_MAXIMIZED = 0x00000080       #,          /**< window is maximized */
+        SDL_WINDOW_INPUT_GRABBED = 0x00000100   #,      /**< window has grabbed input focus */
+        SDL_WINDOW_INPUT_FOCUS = 0x00000200     #,        /**< window has input focus */
+        SDL_WINDOW_MOUSE_FOCUS = 0x00000400     #,        /**< window has mouse focus */
+        SDL_WINDOW_FOREIGN = 0x00000800         #            /**< window not created by SDL */
+
+
     cdef struct SDL_MouseMotionEvent:
         Uint32 type
         Uint32 windowID
@@ -354,6 +369,7 @@ cdef extern from "SDL.h":
     cdef int SDL_LockTexture(SDL_Texture * texture, SDL_Rect * rect, void **pixels, int *pitch)
     cdef void SDL_UnlockTexture(SDL_Texture * texture)
     cdef void SDL_GetWindowSize(SDL_Window * window, int *w, int *h)
+    cdef Uint32 SDL_GetWindowFlags(SDL_Window * window)
     cdef SDL_Window * SDL_CreateWindow(char *title, int x, int y, int w, int h, Uint32 flags)
     cdef void SDL_DestroyWindow (SDL_Window * window)
     cdef int SDL_SetRenderDrawColor(SDL_Renderer * renderer, Uint8 r, Uint8 g, Uint8 b, Uint8 a)

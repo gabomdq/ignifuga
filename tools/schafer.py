@@ -1305,6 +1305,8 @@ def build_project_generic(options, platform, env=None):
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
         cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.wallpaper.java'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
         cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'build.xml'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
         cmd = "sed -i 's|\[\[SDK_LOCATION\]\]|%s|g' %s" % (ANDROID_SDK, join(android_project, 'local.properties'))
@@ -1319,8 +1321,10 @@ def build_project_generic(options, platform, env=None):
         if options.wallpaper:
             # Wallpapers use a slightly different activity
             shutil.move(join(android_project, 'src', 'SDLActivity.wallpaper.java'), join(sdlActivityDir, 'SDLActivity.java'))
+            os.unlink(join(android_project, 'src', 'SDLActivity.java'))
         else:
             shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
+            os.unlink(join(android_project, 'src', 'SDLActivity.wallpaper.java'))
 
         # Copy cythonized sources
         cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (cython_src, jni_src)

@@ -39,6 +39,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <jni.h>
 #include "SDL_config.h"
 #include "SDL_stdinc.h"
+/* Include the SDL main definition header */
+#include "SDL_main.h"
 //#include "core/android/SDL_android.h"
 //#include "video/android/SDL_androidvideo.h"
 //#include "video/android/SDL_androidkeyboard.h"
@@ -67,6 +69,10 @@ extern "C" {
     void Java_org_libsdl_app_SDLActivity_nativeRunAudioThread(
                                     JNIEnv* env, jclass cls);
     void Java_org_libsdl_app_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj);
+    void Java_org_libsdl_app_SDLActivity_nativePause(JNIEnv* env, jclass cls, jobject obj);
+    void Java_org_libsdl_app_SDLActivity_nativeResume(JNIEnv* env, jclass cls, jobject obj);
+    jint JNI_OnLoad(JavaVM* vm, void* reserved);
+    void SDL_Android_Init(JNIEnv* env, jclass cls);
 };
 
 // Resize
@@ -122,5 +128,24 @@ extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeRunAudioThread(
 }
 
 extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj) {
-    Java_org_libsdl_app_SDLActivity_nativeInit(env, cls, obj);
+    //Java_org_libsdl_app_SDLActivity_nativeInit(env, cls, obj);
+     /* This interface could expand with ABI negotiation, calbacks, etc. */
+    SDL_Android_Init(env, cls);
+
+    /* Run the application code! */
+    int status;
+    char *argv[2];
+    argv[0] = strdup("SDL_app");
+    argv[1] = NULL;
+    status = SDL_main(1, argv);
+
+    // Don't issue exit!
+}
+
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativePause(JNIEnv* env, jclass cls, jobject obj) {
+    Java_org_libsdl_app_SDLActivity_nativePause(env, cls, obj);
+}
+
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeResume(JNIEnv* env, jclass cls, jobject obj) {
+    Java_org_libsdl_app_SDLActivity_nativeResume(env, cls, obj);
 }

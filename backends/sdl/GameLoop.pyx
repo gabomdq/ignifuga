@@ -39,24 +39,26 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.Gilbert import Gilbert, Event
+from ignifuga.Log import debug
 import time, sys
 
 cdef class GameLoop(GameLoopBase):
     def __init__(self, fps = 30.0):
         super(GameLoop, self).__init__(fps)
         self._screen_w, self._screen_h = Gilbert().renderer.screenSize
-        
+
     cpdef run(self):
         cdef SDL_Event ev
         cdef Uint32 now
 
         overlord = Gilbert()
+        target = overlord.renderer.target
         #self._interval=1000
-        
         while not self.quit:
             now = SDL_GetTicks()
             overlord.update(now/1000.0)
-            overlord.renderScene()
+            if target.visible:
+                overlord.renderScene()
 
             while SDL_PollEvent(&ev):
                 self.handleSDLEvent(&ev)
@@ -65,7 +67,7 @@ cdef class GameLoop(GameLoopBase):
             remainingTime = self._interval  - (SDL_GetTicks()-now)
             if remainingTime > 0:
                 SDL_Delay( <Uint32>(remainingTime+0.5) )
-        
+
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev
         cdef SDL_MouseButtonEvent *mbev
