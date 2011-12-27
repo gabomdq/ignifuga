@@ -71,6 +71,8 @@ extern "C" {
     void Java_org_libsdl_app_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj);
     void Java_org_libsdl_app_SDLActivity_nativePause(JNIEnv* env, jclass cls, jobject obj);
     void Java_org_libsdl_app_SDLActivity_nativeResume(JNIEnv* env, jclass cls, jobject obj);
+    void Java_org_libsdl_app_SDLActivity_onNativeOffsetsChanged(
+                                        JNIEnv* env, jclass cls, jfloat x, jfloat y);
     jint JNI_OnLoad(JavaVM* vm, void* reserved);
     void SDL_Android_Init(JNIEnv* env, jclass cls);
 };
@@ -148,4 +150,8 @@ extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativePause(JNIEnv* env, jclas
 
 extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeResume(JNIEnv* env, jclass cls, jobject obj) {
     Java_org_libsdl_app_SDLActivity_nativeResume(env, cls, obj);
+}
+
+extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_onNativeOffsetsChanged(JNIEnv* env, jclass cls, jfloat x, jfloat y) {
+    Java_org_libsdl_app_SDLActivity_onNativeOffsetsChanged(env, cls, x, y);
 }

@@ -178,6 +178,7 @@ public class SDLActivity extends WallpaperService {
                                             int action, float x, 
                                             float y, float p);
     public static native void onNativeAccel(float x, float y, float z);
+    public static native void onNativeOffsetsChanged(float x, float y);
     public static native void nativeRunAudioThread();
 
 
@@ -580,35 +581,38 @@ public class SDLActivity extends WallpaperService {
             return false;
         }
 
-        // Touch events
-        public boolean onTouch(View v, MotionEvent event) {
-            {
-                 final int touchDevId = event.getDeviceId();
-                 final int pointerCount = event.getPointerCount();
-                 // touchId, pointerId, action, x, y, pressure
-                 int actionPointerIndex = event.getActionIndex();
-                 int pointerFingerId = event.getPointerId(actionPointerIndex);
-                 int action = event.getActionMasked();
+        @Override
+        public void onOffsetsChanged(float xOffset, float yOffset, float xStep, float yStep, int xPixels, int yPixels) {
+            //Log.v("SDL", "offsetsChanged " + xOffset + " " + yOffset + " " + xStep + " " + yStep + " " + xPixels + " " + yPixels);
+            SDLActivity.onNativeOffsetsChanged(xOffset, yOffset);
+        }
 
-                 float x = event.getX(actionPointerIndex);
-                 float y = event.getY(actionPointerIndex);
-                 float p = event.getPressure(actionPointerIndex);
+        @Override
+        public void onTouchEvent(MotionEvent event) {
+             final int touchDevId = event.getDeviceId();
+             final int pointerCount = event.getPointerCount();
+             // touchId, pointerId, action, x, y, pressure
+             int actionPointerIndex = event.getActionIndex();
+             int pointerFingerId = event.getPointerId(actionPointerIndex);
+             int action = event.getActionMasked();
 
-                 if (action == MotionEvent.ACTION_MOVE && pointerCount > 1) {
-                    // TODO send motion to every pointer if its position has
-                    // changed since prev event.
-                    for (int i = 0; i < pointerCount; i++) {
-                        pointerFingerId = event.getPointerId(i);
-                        x = event.getX(i);
-                        y = event.getY(i);
-                        p = event.getPressure(i);
-                        SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
-                    }
-                 } else {
+             float x = event.getX(actionPointerIndex);
+             float y = event.getY(actionPointerIndex);
+             float p = event.getPressure(actionPointerIndex);
+
+             if (action == MotionEvent.ACTION_MOVE && pointerCount > 1) {
+                // TODO send motion to every pointer if its position has
+                // changed since prev event.
+                for (int i = 0; i < pointerCount; i++) {
+                    pointerFingerId = event.getPointerId(i);
+                    x = event.getX(i);
+                    y = event.getY(i);
+                    p = event.getPressure(i);
                     SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
-                 }
-            }
-          return true;
+                }
+             } else {
+                SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
+             }
        }
 
         // Sensor events

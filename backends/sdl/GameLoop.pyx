@@ -117,6 +117,8 @@ cdef class GameLoop(GameLoopBase):
             if winev.event == SDL_WINDOWEVENT_SIZE_CHANGED or winev.event==SDL_WINDOWEVENT_RESIZED:
                 Gilbert().renderer.windowResized()
                 self._screen_w, self._screen_h = Gilbert().renderer.screenSize
+            elif winev.event == SDL_WINDOWEVENT_MOVED:
+                debug('Window moved to %s, %s' % (winev.data1, winev.data2))
             
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):
         """ Normalize the finger event coordinates from 0->32768 to the screen resolution """
