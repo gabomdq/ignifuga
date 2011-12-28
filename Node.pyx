@@ -372,7 +372,8 @@ cdef class Node(object):
         """ Load a dict of default values IF THEY DONT ALREADY EXIST """
         for k,v in data.iteritems():
             if k not in self.__dict__:
-                self.__dict__[k] = v
+                #self.__dict__[k] = v
+                setattr(self, k, v)
 
     def __getstate__(self):
         odict = self.__dict__.copy()

@@ -80,6 +80,6 @@ def SCENE_SIZE(w, h):
     return g.parent.switch((REQUESTS.sceneSize, (w, h)))
 
     
-def DIRTY_RECTS (rects):
-    g = greenlet.getcurrent()
-    return g.parent.switch((REQUESTS.dirtyRects, rects))
+#def DIRTY_RECTS (rects):
+#    g = greenlet.getcurrent()
+#    return g.parent.switch((REQUESTS.dirtyRects, rects))

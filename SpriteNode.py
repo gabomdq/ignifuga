@@ -71,72 +71,65 @@ class SpriteNode(GraphicNode):
         })
 
         super(SpriteNode, self).__init__(parent, **kwargs)
-        # Initialize fields at default if not provided via kwargs
-        #self.dontsave += ['_dirty', 'canvas', '_atlas', 'sprite', 'position', 'x', 'y', '_spriteData' ]
-        
-#        if self.id == 'ponjas':
-#            #a = ((Action(duration=5.0, relative=True, x=40, angle=180 ) * 2 | Action(duration=5.0, relative=True, y=100 )) + Action(duration=5.0, relative=True, x=-80, y=-100, angle=-360 ) ) * -1
-#            a = (Action(duration=5.0, relative=True,angle=360, alpha=-0.5, red=-0.5, blue=-0.5 ) + Action(duration=5.0, relative=True, angle=-360, alpha=0.5, red=0.5, blue=0.5 ))  * -1
-#            #print a
-#            #self.center = (0,0)
-#            self.fliph=True
-#            self.alpha = 0.5
-#            self.red = 0.5
-#            self.green = 0.5
-#            self.do(a)
+
 
     def init(self, data):
         """ Initialize the required external data """
         super(SpriteNode, self).init(data)
         
         # Do our initialization
-        self._atlas = LOAD_IMAGE(self._atlasURL)
-        self._spriteData = LOAD_SPRITE(self._spriteURL)
+        if self._atlasURL != None:
+            self._atlas = LOAD_IMAGE(self._atlasURL)
+        if self._spriteURL != None:
+            self._spriteData = LOAD_SPRITE(self._spriteURL)
+
         if self._spriteData != None:
             self.sprite = Sprite(self._spriteData, self._atlas, self._rate)
             self.sprite.setColorMod(self._red, self._green, self._blue, self._alpha)
         else:
             self.sprite = None
-            
+
+        print self.id, (self.width, self.height), (self._width, self._height)
         self._updateSize()
-        self._dirty = [ [0, 0, self.width, self.height], ]
-        
+        print self.id, (self.width, self.height), (self._width, self._height)
+        #self._dirty = [ [0, 0, self.width, self.height], ]
         return self
     
     def update(self, data):
         """ Initialize the required external data """
         super(SpriteNode, self).update(data)
-        DIRTY_RECTS(self._dirty)
+        #DIRTY_RECTS(self._dirty)
         if self.sprite != None:
-            self._dirty = self.sprite.nextFrame()
-        else:
-            self._dirty = None
+            #self._dirty = self.sprite.nextFrame()
+            self.sprite.nextFrame()
+        #else:
+        #    self._dirty = None
         
         return self
         
     def _updateSize(self):
         # Update our "public" width,height
         if self._width != None:
-            self.width = self._width
+            self._width_pre = self._width
         elif self._spriteData != None:
-            self.width = self.sprite.width
+            self._width_pre = self.sprite.width
         elif self._atlas != None:
-            self.width = self._atlas.width
+            self._width_pre = self._atlas.width
         else:
-            self.width = 0
+            self._width_pre = 0
         
         if self._height != None:
-            self.height = self._height
+            self._height_pre = self._height
         elif self._spriteData != None:
-            self.height = self.sprite.height
+            self._height_pre = self.sprite.height
         elif self._atlas != None:
-            self.height = self._atlas.height
+            self._height_pre = self._atlas.height
         else:
-            self.height = 0
+            self._height_pre = 0
         
         if self._zscale != None:
-            self.width = self.width * (1.0 + self._z*self._zscale)
-            self.height = self.height * (1.0 + self._z*self._zscale)
+            self._width_pre = self.width * (1.0 + self._z*self._zscale)
+            self._height_pre = self.height * (1.0 + self._z*self._zscale)
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
@@ -184,7 +177,7 @@ class SpriteNode(GraphicNode):
             return self.sprite.getFrameAreas()
         else:
             # Return a single frame area
-            return [ [0,0,self._x, self._y, self.width, self.height], ]
+            return [ [0,0,0,0, self.width, self.height], ]
         
     def hits(self, x, y):
         # Check if x,y hits the node

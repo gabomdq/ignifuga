@@ -43,6 +43,7 @@ from ignifuga.backends.CanvasBase cimport CanvasBase
 cdef class TargetBase (object):    
     cdef int _width, _height
     cdef bool _fullscreen
+    cdef str platform
 
     cpdef clear(self, x, y, w, h)
     cpdef clearRect(self, rect)

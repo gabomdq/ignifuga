@@ -41,5 +41,6 @@
 from cpython cimport bool
 
 cdef class GameLoopBase(object):
-    cdef public bool quit
+    cdef public bool quit, paused
     cdef public double _fps, _interval
+    cdef str platform

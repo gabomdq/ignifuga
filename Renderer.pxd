@@ -50,7 +50,7 @@ cdef class Renderer:
     # Scale factor = screen/scene
     cdef double _scale_x, _scale_y
     cdef TargetBase _target
-    cdef list dirtyRects
+    #cdef list dirtyRects
     # Native scene resolution
     cdef double _native_res_w, _native_res_h
     # Native scene size
@@ -60,7 +60,7 @@ cdef class Renderer:
     cdef int _scroll_x, _scroll_y
 
     cpdef update(self)
-    cpdef dirty(self, int x, int y, int w, int h)
+    #cpdef dirty(self, int x, int y, int w, int h)
     cpdef setNativeResolution(self, double w=*, double h=*, bool keep_aspect=*)
     cpdef setSceneSize(self, int w, int h)
     cpdef _calculateScale(self, double scene_w, double scene_h, int screen_w, int screen_h, bool keep_aspect=*)

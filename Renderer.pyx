@@ -39,7 +39,7 @@
 # Backends available: SDL
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import BACKENDS, Gilbert
+from ignifuga.Gilbert import BACKENDS, Gilbert, Event
 from ignifuga.Log import Log, debug
 
 from ignifuga.Singleton import Singleton
@@ -59,131 +59,12 @@ cdef class Renderer:
         self._scroll_x = 0
         self._scroll_y = 0
         
-        self.reset()
         self._target = target
-        self.dirtyAll()
 
-    #cpdef update(self):
-        #""" Update the screen by rendering the nodes that intersect the dirty rectangles """
-        #cdef Rect nr, ir, r
-        #cdef int z
-        
-        #if self.frameTimestamp == 0.0:
-            #raise Exception ('You have to call preUpdate before calling update')
-
-        #if self._target.isDoubleBuffered:
-            ## Double buffered systems force us to draw all the screen in every frame as there's no delta updating possible.
-            #self.dirtyAll()
-
-        ## In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
-        ## Scene coordinates are the logical node coordinates, which relate to the screen via scale and scroll modifiers.
-        ## What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
-        
-        ## Let's start building a rectangle that holds the part of the scene we want to show
-        ## screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
-        #screen_w = self.target.width
-        #screen_h = self.target.height
-        #screen = Rect((self._scroll_x, self._scroll_y, screen_w, screen_h))
-        
-        #rects = []
-        
-        ## Apply the overall scale setting if needed.
-        #if self._scale_x != 1.0 or self._scale_y != 1.0:
-            #doScale = True
-            ## Convert screen coordinates to unscaled absolute coordinates
-            #screen.scale(1.0/self._scale_x, 1.0/self._scale_y)
-        #else:
-            #doScale = False
-            
-        ## At this point, screen contains the rectangle in scene coordinates that we will show, everything that falls inside it gets on the screen.
-        ## Now we get all the dirty rectangles reported by the nodes, and we determine which ones intersect with the screen, discarding everything else.
-        #if self.dirtyRects != None:
-            #for dr in self.dirtyRects:
-                ## dr is in scene coordinates
-                ## Intersect the rect with the screen rectangle in scene coordinates
-                #ir = screen.intersection(Rect(dr))
-                #if ir != None:
-                    ## There's some intersection, append it to the list of rectangles to be rendered.
-                    #rects.append(ir)
-        #else:
-            ## Set all the screen as dirty
-            #rects.append(screen)
-        
-        #gilbert = Gilbert()
-        ## Get a list of the z index of the nodes in the scenes, we will traverse it in increasing order
-        #zindexs = gilbert.nodesZ.keys()
-        #if len(zindexs) >0:
-            #zindexs.sort()
-
-        ## Iterate over the dirty rects that fall on the viewable area and draw them
-        #for r in rects:
-            ##print "DIRTY RECTANGLE:", r
-            ## r is in scene coordinates, already intersected with the scaled & scrolled screen rectangle
-            #for z in zindexs:
-                #for node in gilbert.nodesZ[z]:
-                    ## Intersect the node rectangle with the dirty rectangle
-                    ## nr is in scene coordinates
-                    #nr = Rect(node.getRect())
-                    ##print node.id, 'nr: ', nr, 'r:', r
-                    ## ir is the intersection, in scene coordinates
-                    #ir = r.intersection(nr)
-                    ##print "Intersect r ", r, " with nr ", nr, " results in ", ir
-                    #if ir != None:
-                        ## There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
-                        ## This areas is what we end up rendering.
-                        #nx, ny = node.position
-                        #for a in node.getFrameAreas():
-                            ## a is a frame area, it's format is [sx, sy, dx, dy, w, h]
-                            ## sx,sy -> coordinates in the atlas
-                            ## dx,dy -> node coordinates where to put this
-                            ## w,h -> size of the rectangle to blit
-                            #sx,sy,dx,dy,w,h = a
-                            
-                            
-                            ## Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
-                            #nr = Rect((dx+nx, dy+ny, w, h))
-                            
-                            ##print node.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
-                            
-                            #ir = r.intersection(nr)
-                            #if ir != None:
-                                ## ir is now the intersection of the frame area (moved to the proper location in the scene) with the dirty rectangle, in scene coordinates
-                                #src_r = ir.copy()
-                                #dst_r = ir.copy()
-                                
-                                ## src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
-                                ## We need to move it to the proper position on the source canvas
-                                ## We adjust it to node coordinates by substracting the node position
-                                ## Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
-                                ## Finally we add sx,sy to put the rectangle in the correct position in the canvas
-                                ## This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
-                                #src_r.move(sx-nx-dx, sy-ny-dy)
-                                
-                                ## dst_r is in scene coordinates, we will adjust it to screen coordinates
-                                ## Now we apply the scale factor
-                                #if doScale:
-                                    ##Scale the dst_r values
-                                    #dst_r.scale(self._scale_x, self._scale_y)
-
-                                ## Apply scrolling
-                                #dst_r.move(-self._scroll_x, -self._scroll_y)
-                                
-                                ## Perform the blitting if the src and dst rectangles have w,h > 0
-                                #if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
-                                    #if node.center == None:
-                                        #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
-                                    #else:
-                                        #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
-                                    ##raw_input("Press Enter to continue...")
-        #self._target.flip()
-        #self.dirtyNone()
-        ## Calculate how long it's been since the pre update until now.
-        #self.frameLapse = getTime() - self.frameTimestamp
-        #self.frameTimestamp = 0.0
 
 
     cpdef update(self):
-        """ Renders the whole screen in every frame, ignores dirty rects completely (easier for handling rotations, etc) """
+        """ Renders the whole screen in every frame, ignores dirty rectangle markings completely (easier for handling rotations, etc) """
         cdef Rect nr, ir, screen
         cdef int z
         cdef double extra
@@ -218,10 +99,9 @@ cdef class Renderer:
 
         for z in zindexs:
             for node in gilbert.nodesZ[z]:
-                # Intersect the node rectangle with the dirty rectangle
+                # Intersect the node rectangle with the screen rectangle
                 # nr is in scene coordinates
                 nr = Rect(node.getRect())
-                #print node.id, 'nr: ', nr, 'r:', r
                 # ir is the intersection, in scene coordinates
                 if node.angle != 0:
                     # Expand the node rect with some generous dimensions (to avoid having to calculate exactly how bigger it is)
@@ -232,7 +112,6 @@ cdef class Renderer:
                     nr.width += extra
 
                 ir = screen.intersection(nr)
-                #print "Intersect r ", r, " with nr ", nr, " results in ", ir
                 if ir != None:
                     # There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
                     # This areas is what we end up rendering.
@@ -247,18 +126,17 @@ cdef class Renderer:
                         # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
                         nr = Rect((dx+nx, dy+ny, w, h))
 
-                        #print node.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
                         if node.angle == 0 and node.flipv == False and node.fliph == False:
                             ir = screen.intersection(nr)
                         else:
                             ir = nr
                         
                         if ir != None:
-                            # ir is now the intersection of the frame area (moved to the proper location in the scene) with the dirty rectangle, in scene coordinates
+                            # ir is now the intersection of the frame area (moved to the proper location in the scene) with the screen rectangle, in scene coordinates
                             src_r = ir.copy()
                             dst_r = ir.copy()
 
-                            # src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
+                            # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
                             # We need to move it to the proper position on the source canvas
                             # We adjust it to node coordinates by substracting the node position
                             # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
@@ -283,7 +161,6 @@ cdef class Renderer:
                                     self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
                                 #raw_input("Press Enter to continue...")
         self._target.flip()
-        self.dirtyNone()
         # Calculate how long it's been since the pre update until now.
         self.frameLapse = getTime() - self.frameTimestamp
         self.frameTimestamp = 0.0
@@ -299,11 +176,6 @@ cdef class Renderer:
         def __set__(self, TargetBase new_target):
             """ Set the rendering target """
             self._target = new_target
-
-    property needsRects:
-        def __get__(self):
-            """ Answer whether dirty rectangles are needed or discarded (due to double buffering for example) """
-            return not self._target.isDoubleBuffered
 
     property screenSize:
         def __get__(self):
@@ -329,23 +201,6 @@ cdef class Renderer:
         def __get__(self):
             """ Return the scaling factor of the scene """
             return self._scale_x, self._scale_y
-        
-    def reset(self):
-        """ Reset the renderer, mark everything as clean """
-        self.dirtyNone()
-        
-    cpdef dirty(self, int x, int y, int w, int h):
-        """ Mark the area that starts at x,y with size w,h as dirty """
-        if self.dirtyRects != None:
-            self.dirtyRects.append((x,y,w,h))
-        
-    def dirtyAll(self):
-        """ Dirty up all the screen """
-        self.dirtyRects = None
-        
-    def dirtyNone(self):
-        """ Remove all dirty rectangles """
-        self.dirtyRects = []
 
     def getTimestamp(self):
         """ Return the current frame timestamp in ms """
@@ -395,6 +250,7 @@ cdef class Renderer:
         # TODO: handle switching of scrolling properly
         self._scroll_x = 0
         self._scroll_y = 0
+        Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
 
         # Adjust scaling
         screen_w = self.target.width
@@ -424,7 +280,7 @@ cdef class Renderer:
 
         self._scroll_x = sx
         self._scroll_y = sy
-        self.dirtyAll()
+        Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
 
     cpdef scrollTo(self, int x, int y):
         #STUB
@@ -456,7 +312,149 @@ cdef class Renderer:
 
         self._scale_x = scale_x
         self._scale_y = scale_y
-        self.dirtyAll()
 
         # Adjust scrolling if needed
         self.scrollBy(0,0)
+
+
+
+# OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?
+
+    #cpdef update(self):
+    #""" Update the screen by rendering the nodes that intersect the dirty rectangles """
+    #cdef Rect nr, ir, r
+    #cdef int z
+
+    #if self.frameTimestamp == 0.0:
+    #raise Exception ('You have to call preUpdate before calling update')
+
+    #if self._target.isDoubleBuffered:
+    ## Double buffered systems force us to draw all the screen in every frame as there's no delta updating possible.
+    #self.dirtyAll()
+
+    ## In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
+    ## Scene coordinates are the logical node coordinates, which relate to the screen via scale and scroll modifiers.
+    ## What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
+
+    ## Let's start building a rectangle that holds the part of the scene we want to show
+    ## screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
+    #screen_w = self.target.width
+    #screen_h = self.target.height
+    #screen = Rect((self._scroll_x, self._scroll_y, screen_w, screen_h))
+
+    #rects = []
+
+    ## Apply the overall scale setting if needed.
+    #if self._scale_x != 1.0 or self._scale_y != 1.0:
+    #doScale = True
+    ## Convert screen coordinates to unscaled absolute coordinates
+    #screen.scale(1.0/self._scale_x, 1.0/self._scale_y)
+    #else:
+    #doScale = False
+
+    ## At this point, screen contains the rectangle in scene coordinates that we will show, everything that falls inside it gets on the screen.
+    ## Now we get all the dirty rectangles reported by the nodes, and we determine which ones intersect with the screen, discarding everything else.
+    #if self.dirtyRects != None:
+    #for dr in self.dirtyRects:
+    ## dr is in scene coordinates
+    ## Intersect the rect with the screen rectangle in scene coordinates
+    #ir = screen.intersection(Rect(dr))
+    #if ir != None:
+    ## There's some intersection, append it to the list of rectangles to be rendered.
+    #rects.append(ir)
+    #else:
+    ## Set all the screen as dirty
+    #rects.append(screen)
+
+    #gilbert = Gilbert()
+    ## Get a list of the z index of the nodes in the scenes, we will traverse it in increasing order
+    #zindexs = gilbert.nodesZ.keys()
+    #if len(zindexs) >0:
+    #zindexs.sort()
+
+    ## Iterate over the dirty rects that fall on the viewable area and draw them
+    #for r in rects:
+    ##print "DIRTY RECTANGLE:", r
+    ## r is in scene coordinates, already intersected with the scaled & scrolled screen rectangle
+    #for z in zindexs:
+    #for node in gilbert.nodesZ[z]:
+    ## Intersect the node rectangle with the dirty rectangle
+    ## nr is in scene coordinates
+    #nr = Rect(node.getRect())
+    ##print node.id, 'nr: ', nr, 'r:', r
+    ## ir is the intersection, in scene coordinates
+    #ir = r.intersection(nr)
+    ##print "Intersect r ", r, " with nr ", nr, " results in ", ir
+    #if ir != None:
+    ## There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
+    ## This areas is what we end up rendering.
+    #nx, ny = node.position
+    #for a in node.getFrameAreas():
+    ## a is a frame area, it's format is [sx, sy, dx, dy, w, h]
+    ## sx,sy -> coordinates in the atlas
+    ## dx,dy -> node coordinates where to put this
+    ## w,h -> size of the rectangle to blit
+    #sx,sy,dx,dy,w,h = a
+
+
+    ## Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
+    #nr = Rect((dx+nx, dy+ny, w, h))
+
+    ##print node.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
+
+    #ir = r.intersection(nr)
+    #if ir != None:
+    ## ir is now the intersection of the frame area (moved to the proper location in the scene) with the dirty rectangle, in scene coordinates
+    #src_r = ir.copy()
+    #dst_r = ir.copy()
+
+    ## src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
+    ## We need to move it to the proper position on the source canvas
+    ## We adjust it to node coordinates by substracting the node position
+    ## Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
+    ## Finally we add sx,sy to put the rectangle in the correct position in the canvas
+    ## This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
+    #src_r.move(sx-nx-dx, sy-ny-dy)
+
+    ## dst_r is in scene coordinates, we will adjust it to screen coordinates
+    ## Now we apply the scale factor
+    #if doScale:
+    ##Scale the dst_r values
+    #dst_r.scale(self._scale_x, self._scale_y)
+
+    ## Apply scrolling
+    #dst_r.move(-self._scroll_x, -self._scroll_y)
+
+    ## Perform the blitting if the src and dst rectangles have w,h > 0
+    #if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
+    #if node.center == None:
+    #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
+    #else:
+    #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
+    ##raw_input("Press Enter to continue...")
+    #self._target.flip()
+    #self.dirtyNone()
+    ## Calculate how long it's been since the pre update until now.
+    #self.frameLapse = getTime() - self.frameTimestamp
+    #self.frameTimestamp = 0.0
+
+#   def reset(self):
+#            """ Reset the renderer, mark everything as clean """
+#        self.dirtyNone()
+#
+#   cpdef dirty(self, int x, int y, int w, int h):
+#        """ Mark the area that starts at x,y with size w,h as dirty """
+#        if self.dirtyRects != None:
+#            self.dirtyRects.append((x,y,w,h))
+#
+#   def dirtyAll(self):
+#        """ Dirty up all the screen """
+#        self.dirtyRects = None
+#
+#   def dirtyNone(self):
+#        """ Remove all dirty rectangles """
+#        self.dirtyRects = []
+#    property needsRects:
+#        def __get__(self):
+#            """ Answer whether dirty rectangles are needed or discarded (due to double buffering for example) """
+#            return not self._target.isDoubleBuffered

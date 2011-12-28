@@ -46,6 +46,7 @@ cdef class GameLoop(GameLoopBase):
     def __init__(self, fps = 30.0):
         super(GameLoop, self).__init__(fps)
         self._screen_w, self._screen_h = Gilbert().renderer.screenSize
+        self.paused = False
 
     cpdef run(self):
         cdef SDL_Event ev
@@ -53,20 +54,39 @@ cdef class GameLoop(GameLoopBase):
 
         overlord = Gilbert()
         target = overlord.renderer.target
-        #self._interval=1000
-        while not self.quit:
-            now = SDL_GetTicks()
-            overlord.update(now/1000.0)
-            if target.visible:
+        if overlord.platform in ['android', 'iphone']:
+            # Special loop for single app mobile platforms that slows down when not active
+            while not self.quit:
+                now = SDL_GetTicks()
+                overlord.update(now/1000.0)
+                if not self.paused:
+                    overlord.renderScene()
+
+                while SDL_PollEvent(&ev):
+                    self.handleSDLEvent(&ev)
+
+                if self.paused and not overlord.loading:
+                    # Slow down the update rhythm to 1 frame every 2 seconds
+                    SDL_Delay( <Uint32> 2000 )
+                else:
+                    # Sleep for the remainder of the alloted frame time, if there's time left
+                    remainingTime = self._interval  - (SDL_GetTicks()-now)
+                    if remainingTime > 0:
+                        SDL_Delay( <Uint32>(remainingTime+0.5) )
+        else:
+            # Regular loop, draws all the time independently of shown/hidden status
+            while not self.quit:
+                now = SDL_GetTicks()
+                overlord.update(now/1000.0)
                 overlord.renderScene()
 
-            while SDL_PollEvent(&ev):
-                self.handleSDLEvent(&ev)
+                while SDL_PollEvent(&ev):
+                    self.handleSDLEvent(&ev)
 
-            # Sleep for the remainder of the alloted frame time, if there's time left
-            remainingTime = self._interval  - (SDL_GetTicks()-now)
-            if remainingTime > 0:
-                SDL_Delay( <Uint32>(remainingTime+0.5) )
+                # Sleep for the remainder of the alloted frame time, if there's time left
+                remainingTime = self._interval  - (SDL_GetTicks()-now)
+                if remainingTime > 0:
+                    SDL_Delay( <Uint32>(remainingTime+0.5) )
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev
@@ -119,6 +139,11 @@ cdef class GameLoop(GameLoopBase):
                 self._screen_w, self._screen_h = Gilbert().renderer.screenSize
             elif winev.event == SDL_WINDOWEVENT_MOVED:
                 debug('Window moved to %s, %s' % (winev.data1, winev.data2))
+            elif winev.event == SDL_WINDOWEVENT_SHOWN:
+                self.paused = False
+            elif winev.event == SDL_WINDOWEVENT_HIDDEN:
+                self.paused = True
+
             
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):
         """ Normalize the finger event coordinates from 0->32768 to the screen resolution """

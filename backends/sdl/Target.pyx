@@ -40,7 +40,7 @@
 
 from ignifuga.Log import debug, info, error
 from ignifuga.Gilbert import Gilbert, Event
-import sys
+import sys, platform
 
 SDL_WINDOWPOS_CENTERED_MASK = 0x2FFF0000
 SDL_WINDOWPOS_UNDEFINED_MASK = 0x1FFF0000
@@ -57,30 +57,33 @@ cdef class Target (TargetBase):
         SDL_GetDesktopDisplayMode(display, &dm)
 
         debug("Desktop mode is %dx%d" % (dm.w, dm.h))
+        self.platform = Gilbert().platform
         
-        if sys.platform in ['win32',]:
+        if self.platform in ['win32',]:
             if fullscreen:
                 self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display, #
+                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display,
                             dm.w, dm.h, SDL_WINDOW_FULLSCREEN)
             else:
                 self.window = SDL_CreateWindow("Ignifuga",
                             SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
                             width, height, SDL_WINDOW_RESIZABLE)
-        elif sys.platform in ['linux',]:
-            # Dance around Xinerama et al
+        elif self.platform in ['linux',]:
             if fullscreen:
+#                self.window = SDL_CreateWindow("Ignifuga",
+#                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display,
+#                            dm.w, dm.h, SDL_WINDOW_FULLSCREEN)
                 self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display, #
-                            dm.w, dm.h, SDL_WINDOW_FULLSCREEN)
+                    SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
+                    width, height, SDL_WINDOW_FULLSCREEN)
             else:
                 self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
+                            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
                             width, height, SDL_WINDOW_RESIZABLE)
         else:
             # Android doesn't care what we tell it to do, it creates a full screen window anyway
             self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
+                            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
                             width, height, SDL_WINDOW_FULLSCREEN)
 
         if self.window == NULL:
@@ -111,7 +114,7 @@ cdef class Target (TargetBase):
         # Test: Render it all as if doublebuffered
         self._doublebuffered = True
         debug('SDL backend is %s' % bytes(self.render_info.name))
-        
+
         # Start with a black window
         SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
         SDL_RenderClear(self.renderer);

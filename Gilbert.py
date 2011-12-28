@@ -41,7 +41,7 @@
 from ignifuga.Rect import Rect
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
-import sys, pickle, os, weakref, gc
+import sys, pickle, os, weakref, gc, platform
 
 class BACKENDS:
     sdl = 'sdl'
@@ -49,7 +49,7 @@ class BACKENDS:
 class REQUESTS:
     loadImage = 'loadImage'
     loadSprite = 'loadSprite'
-    dirtyRects = 'dirtyRects'
+    #dirtyRects = 'dirtyRects'
     done = 'done'
     skip = 'skip'
     stop = 'stop'
@@ -88,8 +88,9 @@ class Event:
         blur = 'blur'
         zoomin = 'zoomin'
         zoomout = 'zoomout'
+        scroll = 'scroll'
         
-    ETHEREALS = [TYPE.accelerometer, TYPE.compass, TYPE.focus, TYPE.blur, TYPE.zoomin, TYPE.zoomout]
+    ETHEREALS = [TYPE.accelerometer, TYPE.compass, TYPE.focus, TYPE.blur, TYPE.zoomin, TYPE.zoomout, TYPE.scroll]
         
     class MODIFIERS:
         ctrl = 'ctrl'
@@ -205,6 +206,18 @@ class Gilbert:
         global DataManager
         global _Canvas
         global Target
+
+        self.platform = sys.platform
+        if self.platform.startswith('linux'):
+            self.platform = 'linux'
+            self.distro_name, self.distro_version, self.distro_id = platform.linux_distribution()
+            if self.distro_name.lower() == 'android':
+                self.platform = 'android'
+
+        debug('Platform: %s' % self.platform)
+        debug('Distro: %s' % self.distro_name)
+        debug('Distro Ver: %s ID: %s' % (self.distro_version, self.distro_id) )
+
         if self.backend == BACKENDS.sdl:
             debug('Initializing backend %s' % (backend,))
             from backends.sdl import initializeBackend
@@ -398,15 +411,15 @@ class Gilbert:
             elif req == REQUESTS.stop:
                 # Stop node from updating
                 del self.running[node]
-            elif req == REQUESTS.dirtyRects:
-                if data != None:
-                    # data is a ((x,y,w,h),(x,y,w,h), ...) list of rects in node coordinates
-                    # Translate the dirty rectangle to scene coords position
-                    if self.renderer.needsRects:
-                        pos = node.position
-                        for box in data:
-                            self.renderer.dirty(box[0]+pos[0], box[1]+pos[1], box[2], box[3])
-                self.running[node] = (task, None, None)
+#            elif req == REQUESTS.dirtyRects:
+#                if data != None:
+#                    # data is a ((x,y,w,h),(x,y,w,h), ...) list of rects in node coordinates
+#                    # Translate the dirty rectangle to scene coords position
+#                    if self.renderer.needsRects:
+#                        pos = node.position
+#                        for box in data:
+#                            self.renderer.dirty(box[0]+pos[0], box[1]+pos[1], box[2], box[3])
+#                self.running[node] = (task, None, None)
 
     def renderScene(self):
         # Render a new scene

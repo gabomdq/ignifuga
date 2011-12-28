@@ -627,9 +627,9 @@ if __name__ == '__main__':
     parser.add_option("-q", "--quiet",
                   action="store_false", dest="verbose", default=True,
                   help="don't print status messages to stdout")
-    parser.add_option("--deltak",
-                  action="store_true", dest="deltak", default=False,
-                  help="Use difference against previous keyframe compression")
+#    parser.add_option("--deltak",
+#                  action="store_true", dest="deltak", default=False,
+#                  help="Use difference against previous keyframe compression")
     parser.add_option("--deltap",
                   action="store_true", dest="deltap", default=False,
                   help="Use difference against previous frame compression")

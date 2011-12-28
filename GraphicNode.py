@@ -40,7 +40,7 @@
 
 from Node import Node
 from Sprite import Sprite
-from ignifuga.Gilbert import REQUESTS, Gilbert
+from ignifuga.Gilbert import REQUESTS, Gilbert, Event
 from ignifuga.Task import *
 
 from Action import Action
@@ -60,31 +60,36 @@ class GraphicNode(Node):
             '_angle': 0,
             '_center': None,
             '_zscale': None,
-            '_width': None,
-            '_height': None,
-            'width': 0,
-            'height': 0,
+            '_width': None,     # The width set from configuration data
+            '_height': None,    # The height set from configuration data
+            '_width_pre': 0,       # The computed width from configuration data, sprite or canvas information
+            '_height_pre': 0,      # The computed height from configuration data, sprite or canvas information
             '_hidden': False,
-            '_dirty': None,
+            #'_dirty': None,
             '_flipv' : False,
             '_fliph' : False,
             '_alpha': 1.0,
             '_red': 1.0,
             '_green': 1.0,
-            '_blue': 1.0
+            '_blue': 1.0,
+            '_parallax_x': 0.0,
+            '_parallax_y': 0.0
         })
 
         super(GraphicNode, self).__init__(parent, **kwargs)
         # State Keys should be set after parent init
-        self._stateKeys += ['x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'hidden', 'dirty', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue']
+        self._stateKeys += ['x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'hidden', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax' ]
 
         # Some additional adjustments
         self._z += parent.z if parent.z is not None else 0
-    
+
+        # Keep track of the renderer scroll for parallax functionality
+        self._scrollx = self._scrolly = 0
+
     def init(self, data):
         """ Initialize the required external data """
         super(GraphicNode, self).init(data)
-        self._dirty = [ [0, 0, self.width, self.height], ]
+        #self._dirty = [ [0, 0, self.width, self.height], ]
         return self
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
@@ -92,16 +97,16 @@ class GraphicNode(Node):
     def canvas(self):
         return None
     
-    def getDirty(self):
-        return self._dirty
-       
-    def resetDirty(self):
-        self._dirty = None
-        return True
+#    def getDirty(self):
+#        return self._dirty
+#
+#    def resetDirty(self):
+#        self._dirty = None
+#        return True
     
     @property
     def position(self):
-        return (self._x, self._y)
+        return (self.x, self.y)
         
     @position.setter
     def position(self, xy):
@@ -117,14 +122,41 @@ class GraphicNode(Node):
         
         if diffx != 0 or diffy != 0:
             for child in self.children.items():
-                x,y = child.position
+                x = child._x
+                y = child._y
                 child.position = (x+diffx, y+diffy)
                 
             self._x = new_x
             self._y = new_y
+
+
+    @property
+    def parallax(self):
+        return (self._parallax_x, self._parallax_y)
+
+    @parallax.setter
+    def parallax(self, xy):
+        self._parallax_x, self._parallax_y = xy
+
+    @property
+    def parallax_x(self):
+        return self._parallax_x
+
+    @parallax_x.setter
+    def parallax_x(self, value):
+        self._parallax_x = value
+
+    @property
+    def parallax_y(self):
+        return self._parallax_x
+
+    @parallax_y.setter
+    def parallax_y(self, value):
+        self._parallax_y = value
+
     @property
     def x(self):
-        return self._x
+        return self._x + self._scrollx * self._parallax_x
     
     @x.setter
     def x(self, new_x):
@@ -141,7 +173,7 @@ class GraphicNode(Node):
             
     @property
     def y(self):
-        return self._y
+        return self._y + self._scrolly * self._parallax_y
     
     @y.setter
     def y(self, new_y):
@@ -286,11 +318,10 @@ class GraphicNode(Node):
     
     def getRect(self):
         """ Get the x,y,w,h rectangle the node occupies in scene coordinates """
-        return (self._x, self._y, self.width, self.height)
+        return (self.x, self.y, self.width, self.height)
         
     def getFrameAreas(self):
-        
-        return [ [0,0,self._x, self._y, self.width, self.height], ]
+        return [ [0,0,self.x, self.y, self.width, self.height], ]
         
     def hits(self, x, y):
         return False
@@ -298,5 +329,36 @@ class GraphicNode(Node):
 
     def __getstate__(self):
         odict = super(GraphicNode, self).__getstate__()
-        odict['_dirty'] = None
+        #odict['_dirty'] = None
         return odict
+
+    def event(self, event):
+        if event.type == Event.TYPE.scroll:
+            self._scrollx = event.x
+            self._scrolly = event.y
+
+        return super(GraphicNode, self).event(event)
+
+    @property
+    def width(self):
+        return self._width_pre
+
+    @width.setter
+    def width(self, value):
+        # Set the internal width, the precomputed _width_pre is updated with _updateSize
+        self._width = value
+        self._updateSize()
+
+    @property
+    def height(self):
+        return self._height_pre
+
+    @height.setter
+    def height(self, value):
+        # Set the internal height, the precomputed _height_pre is updated with _updateSize
+        self._height = value
+        self._updateSize()
+
+    def _updateSize(self):
+        self._width_pre = self._width if self._width != None else 0
+        self._height_pre = self._height if self._height != None else 0
