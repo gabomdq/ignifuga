@@ -60,10 +60,12 @@ class GraphicNode(Node):
             '_angle': 0,
             '_center': None,
             '_zscale': None,
-            '_width': None,     # The width set from configuration data
-            '_height': None,    # The height set from configuration data
-            '_width_pre': 0,       # The computed width from configuration data, sprite or canvas information
-            '_height_pre': 0,      # The computed height from configuration data, sprite or canvas information
+            '_width': None,     # The width,height set from configuration data
+            '_height': None,
+            '_width_pre': 0,    # The computed width,height from configuration data, sprite or canvas information
+            '_height_pre': 0,
+            '_width_src': 0,    # The source material/original (from canvas, sprite) width, height
+            '_height_src': 0,
             '_hidden': False,
             #'_dirty': None,
             '_flipv' : False,
@@ -320,8 +322,11 @@ class GraphicNode(Node):
         """ Get the x,y,w,h rectangle the node occupies in scene coordinates """
         return (self.x, self.y, self.width, self.height)
         
-    def getFrameAreas(self):
-        return [ [0,0,self.x, self.y, self.width, self.height], ]
+#    def getFrameAreas(self):
+#        return [ [0,0,self.x, self.y, self.width, self.height], ]
+
+    def getRenderArea(self):
+        return [0, 0, self.width, self.height, self.x, self.y, self.width, self.height]
         
     def hits(self, x, y):
         return False
@@ -360,5 +365,5 @@ class GraphicNode(Node):
         self._updateSize()
 
     def _updateSize(self):
-        self._width_pre = self._width if self._width != None else 0
-        self._height_pre = self._height if self._height != None else 0
+        self._width_src = self._width_pre = self._width if self._width != None else 0
+        self._height_src = self._height_pre = self._height if self._height != None else 0

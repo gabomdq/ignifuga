@@ -59,7 +59,7 @@ class Sprite:
         {
             type: atlas -> Each frame is a full frame (1 box per frame, all boxes are of the size of the first frame, every frame is a keyframe)
                   deltap -> First frame is full, the rest are the difference boxes with the prior frame (it can include one or more keyframes)
-                  deltak -> First frame is full, and every frame mentioned in "keyframes" is a full frame as well. The rest are difference boxes against the last keyframe.
+                  NO LONGER SUPPORTED: deltak -> First frame is full, and every frame mentioned in "keyframes" is a full frame as well. The rest are difference boxes against the last keyframe.
              
             keyframes: [0, ...] -> Keyframes (if type=atlas every frame is a keyframe)
             frames:
@@ -117,43 +117,27 @@ class Sprite:
         self._height = h
         
         # Create the sprite canvas
-        if self._type == 'deltap':
-            # We need two canvas, the source canvas and the "presentation" canvas
-            self._canvas = Canvas()(w,h, isRenderTarget = True)
-            self._srcCanvas = srcCanvas
-            sx,sy,dx,dy,w,h = self._frames[0][0]
-            self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
-        else:
-            self._canvas = srcCanvas
-        
+        # We need two canvas, the source canvas and the "presentation" canvas
+        self._canvas = Canvas()(w,h, isRenderTarget = True)
+        self._srcCanvas = srcCanvas
+        sx,sy,dx,dy,w,h = self._frames[0][0]
+        self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
         self._precomputeFrameAreas()
     
     def nextFrame(self):
-        """ Forward to next frame or restart loop, return the rectangles that have changed in a x,y,w,h format in node coordinates
-        rects = [
-            [x,y,w,h], 
-            [x,y,w,h]
-        ]
-        
-        Right now we are returning the whole sprite size as dirty to speed up the process
-        
-        """
-        rects = []
+        """ Forward to next frame or restart loop"""
         if self.renderer.checkLapse(self._lastUpdate, self._lapse):
             self._lastUpdate = self.renderer.getTimestamp()
             self._frame+=1
             if self._frame >= self._frameCount:
                 self._frame=0
                 
-            if self._type == 'deltap':
-                # Consolidate the new sprite frame from _srcCanvas into _canvas
-                for a in self._frames[self._frame]:
-                    sx,sy,dx,dy,w,h = a
-                    self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
-            
-            rects = [ [0, 0, self._width, self._height], ]
-        return rects
-    
+
+            # Consolidate the new sprite frame from _srcCanvas into _canvas
+            for a in self._frames[self._frame]:
+                sx,sy,dx,dy,w,h = a
+                self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
+
     def getFrameAreas(self):
         """ Return a set of areas from the Atlas that need to be renderer to conform the current sprite frame.
         This stuff is precomputed in _precomputeFrameAreas
@@ -182,39 +166,25 @@ class Sprite:
                 # We consolidate the frame ourselves in each nextFrame()
                 # So we report to the renderer *as if* every frame was a keyframe identical to the first frame
                 self._areas[frame] = [self._frames[0][0],]
-                
-                
-                # DISCARDED STUFF!!! - Useful if SDL doesnt allow texture to texture blitting
-                ## Until we can handle an intermediary canvas, we have to pass every single box since the last keyframe.
-                #if frame in self._keyframes:
-                #    # We are on a keyframe, we only need to pass this box
-                #    self._areas[frame] = [self._frames[frame][0],]
-                #    lastKeyframe = frame                                                                                
-                #else:
-                #    # We have to pass all boxes since the last keyframe
-                #    self._areas[frame] = []
-                #    for f in range(lastKeyframe, frame):
-                #        for diffbox in self._frames[f]:
-                #            self._areas[frame].append(diffbox)
-                
+
             elif self._type == 'deltak':
                 if frame in self._keyframes:
                     # We are on a keyframe, we only need to pass this box
                     self._areas[frame] = [self._frames[frame][0],]
-                    lastKeyframe = frame                                                                                
+                    lastKeyframe = frame
                 else:
                     # We have to pass the last keyframe box and the current one in a non overlapping way
                     keyframeareas = []
                     areas = []
-                    
+
                     # Append the keyframe areas
                     for diffbox in self._frames[lastKeyframe]:
                         keyframeareas.append(diffbox)
-                        
+
                     for diffbox in self._frames[frame]:
                         # Cut out the previous areas
                         dsx,dsy,ddx,ddy,dw,dh = diffbox
-                        
+
                         newareas = []
                         for a in keyframeareas:
                             sx,sy,dx,dy,w,h = a
@@ -223,12 +193,12 @@ class Sprite:
                             #print "intersecting ", r, " with ", dr, " results in ", r.cutout(dr)
                             for cr in r.cutout(dr):
                                 newareas.append((cr.left-dx+sx, cr.top-dy+sy, cr.left, cr.top, cr.width, cr.height))
-                        
+
                         areas.append(diffbox)
-                        
+
                         keyframeareas = newareas
-                    
-                    #print 'frame: ', frame   
+
+                    #print 'frame: ', frame
                     #print 'kf ', keyframeareas
                     #print 'a ', areas
 

@@ -465,6 +465,8 @@ def prepare_python(platform, ignifuga_src, python_build):
         # Append the bitarray module
         shutil.copy(join(BITARRAY_SRC, '_bitarray.c'), join(python_build, 'Modules'))
 
+
+
 def make_python(platform, ignifuga_src, env=os.environ):
     # Modules required by Python itself
     freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8']
@@ -489,6 +491,10 @@ def make_python(platform, ignifuga_src, env=os.environ):
         make_python_freeze(freeze_modules)
         if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
+
+        # Remove setup.py as its of no use here and it tries to compile a lot of extensions that don't work in static mode
+        if isfile(join(PYTHON_BUILD,'setup.py')):
+            os.unlink(join(PYTHON_BUILD,'setup.py'))
             
         cmd = 'make install -k -j4'
         # Rebuild Python including the frozen modules!

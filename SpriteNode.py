@@ -89,22 +89,16 @@ class SpriteNode(GraphicNode):
         else:
             self.sprite = None
 
-        print self.id, (self.width, self.height), (self._width, self._height)
         self._updateSize()
-        print self.id, (self.width, self.height), (self._width, self._height)
         #self._dirty = [ [0, 0, self.width, self.height], ]
         return self
     
     def update(self, data):
         """ Initialize the required external data """
         super(SpriteNode, self).update(data)
-        #DIRTY_RECTS(self._dirty)
         if self.sprite != None:
-            #self._dirty = self.sprite.nextFrame()
             self.sprite.nextFrame()
-        #else:
-        #    self._dirty = None
-        
+
         return self
         
     def _updateSize(self):
@@ -130,6 +124,16 @@ class SpriteNode(GraphicNode):
         if self._zscale != None:
             self._width_pre = self.width * (1.0 + self._z*self._zscale)
             self._height_pre = self.height * (1.0 + self._z*self._zscale)
+
+        if self._spriteData != None:
+            self._width_src = self.sprite.width
+        elif self._atlas != None:
+            self._width_src = self._atlas.width
+
+        if self._spriteData != None:
+            self._height_src = self.sprite.height
+        elif self._atlas != None:
+            self._height_src = self._atlas.height
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
@@ -172,13 +176,16 @@ class SpriteNode(GraphicNode):
         if self.sprite != None:
             self.sprite.setColorMod(self._red, self._green, self._blue, self._alpha)
         
-    def getFrameAreas(self):
-        if self.sprite != None:
-            return self.sprite.getFrameAreas()
-        else:
-            # Return a single frame area
-            return [ [0,0,0,0, self.width, self.height], ]
-        
+#    def getFrameAreas(self):
+#        if self.sprite != None:
+#            return self.sprite.getFrameAreas()
+#        else:
+#            # Return a single frame area
+#            return [ [0,0,0,0, self.width, self.height], ]
+
+    def getRenderArea(self):
+        return [0, 0, self._width_src, self._height_src, self.x, self.y, self.width, self.height]
+
     def hits(self, x, y):
         # Check if x,y hits the node
         # TODO: account for sprite rotation!

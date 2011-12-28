@@ -66,8 +66,8 @@ cdef class Renderer:
     cpdef update(self):
         """ Renders the whole screen in every frame, ignores dirty rectangle markings completely (easier for handling rotations, etc) """
         cdef Rect nr, ir, screen
-        cdef int z
-        cdef double extra
+        cdef int z,
+        cdef double extra, sx,sy,sw,sh,dx,dy,dw,dh
         cdef CanvasBase canvas
 
         if self.frameTimestamp == 0.0:
@@ -115,51 +115,71 @@ cdef class Renderer:
                 if ir != None:
                     # There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
                     # This areas is what we end up rendering.
-                    nx, ny = node.position
-                    for a in node.getFrameAreas():
-                        # a is a frame area, it's format is [sx, sy, dx, dy, w, h]
-                        # sx,sy -> coordinates in the atlas
-                        # dx,dy -> node coordinates where to put this
-                        # w,h -> size of the rectangle to blit
-                        sx,sy,dx,dy,w,h = a
+                    #nx, ny = node.position
 
-                        # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
-                        nr = Rect((dx+nx, dy+ny, w, h))
 
-                        if node.angle == 0 and node.flipv == False and node.fliph == False:
-                            ir = screen.intersection(nr)
-                        else:
-                            ir = nr
-                        
-                        if ir != None:
-                            # ir is now the intersection of the frame area (moved to the proper location in the scene) with the screen rectangle, in scene coordinates
-                            src_r = ir.copy()
-                            dst_r = ir.copy()
+                    # NO LONGER USED, KEPT HERE FOR A WHILE AS REFERENCE
+                    # THIS BIT OF CODE WAS CREATED WHEN WE SUPPORTED "deltak" bitmaps, now its all deltap or whole keyframe
+                    # =======================================================
+                    #for a in node.getFrameAreas():
+                    # a is a frame area, it's format is [sx, sy, dx, dy, w, h]
+                    # sx,sy -> coordinates in the atlas
+                    # dx,dy -> node coordinates where to put this
+                    # w,h -> size of the rectangle to blit
+                    # =======================================================
 
-                            # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
-                            # We need to move it to the proper position on the source canvas
-                            # We adjust it to node coordinates by substracting the node position
-                            # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
-                            # Finally we add sx,sy to put the rectangle in the correct position in the canvas
-                            # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
-                            src_r.move(sx-nx-dx, sy-ny-dy)
+                    sx,sy,sw,sh,dx,dy,dw,dh = node.getRenderArea()
+                    #print node.id, sx,sy,sw,sh,dx,dy,dw,dh
+                    # sx,sy  -> are the source coordinates in the sprite (0,0 as the sprite will always handle its own compositing)
+                    # sw,sh  -> are the dimensions of the source material/sprite
+                    # dx,dy  -> node coordinates where to render
+                    # dw,dh  -> node dimensions in scene coordinates
 
-                            # dst_r is in scene coordinates, we will adjust it to screen coordinates
-                            # Now we apply the scale factor
-                            if doScale:
-                                #Scale the dst_r values
-                                dst_r.scale(self._scale_x, self._scale_y)
 
-                            # Apply scrolling
-                            dst_r.move(-self._scroll_x, -self._scroll_y)
+                    # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
+                    nr = Rect((dx, dy, dw, dh))
 
-                            # Perform the blitting if the src and dst rectangles have w,h > 0
-                            if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
-                                if node.center == None:
-                                    self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
-                                else:
-                                    self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
-                                #raw_input("Press Enter to continue...")
+                    if node.angle == 0 and node.flipv == False and node.fliph == False:
+                        ir = screen.intersection(nr)
+                    else:
+                        ir = nr
+
+                    if ir != None:
+                        # ir is now the intersection of the frame area (moved to the proper location in the scene) with the screen rectangle, in scene coordinates
+                        src_r = ir.copy()
+                        dst_r = ir.copy()
+
+                        # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
+                        # We need to move it to the proper position on the source canvas
+                        # We adjust it to node coordinates by substracting the node position
+                        # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
+                        # Finally we add sx,sy to put the rectangle in the correct position in the canvas
+                        # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
+                        src_r.move(sx-dx, sy-dy)
+
+                        # Apply reverse scaling to the source rectangle
+                        #print 'pre', src_r, dst_r
+                        if dw != sw or dh != sh:
+                            src_r.scale(sw/dw, sh/dh)
+
+                        # dst_r is in scene coordinates, we will adjust it to screen coordinates
+                        # Now we apply the scale factor
+                        if doScale:
+                            #Scale the dst_r values
+                            dst_r.scale(self._scale_x, self._scale_y)
+
+                        # Apply scrolling
+                        dst_r.move(-self._scroll_x, -self._scroll_y)
+
+                        #print src_r, dst_r
+
+                        # Perform the blitting if the src and dst rectangles have w,h > 0
+                        if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
+                            if node.center == None:
+                                self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
+                            else:
+                                self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
+                            #raw_input("Press Enter to continue...")
         self._target.flip()
         # Calculate how long it's been since the pre update until now.
         self.frameLapse = getTime() - self.frameTimestamp
