@@ -936,7 +936,7 @@ def make_sdl(platform, env=None):
         if not isfile(join(SDL_BUILD, 'Makefile')):
             cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make '
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
@@ -1101,6 +1101,15 @@ def make_sdl(platform, env=None):
         if not isfile(join(SDL_BUILD, 'Makefile')):
             cmd = './configure LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
+
+            # HACK FIX for SDL problem, this can be removed once SDL fixes this error
+            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_XAUDIO2.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
+            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
+            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_DSOUND.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
+            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
+
+
+
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
         cmd = 'make install'
@@ -1465,7 +1474,10 @@ def prepare_mingw32_env():
     #env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "win32"
     #env['CFLAGS'] ="-I %s" % (join(PYTHON_BUILD, 'PC'),)
-    env['CFLAGS'] = ""
+    # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
+    # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
+    # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should
+    env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
     env['CXXFLAGS'] = env['CFLAGS']
     env['CC'] = 'i586-mingw32msvc-gcc %s' % (env['CFLAGS'],)
     env['CXX'] = 'i586-mingw32msvc-g++ %s' % (env['CXXFLAGS'],)

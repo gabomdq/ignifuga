@@ -213,6 +213,8 @@ class Gilbert:
             self.distro_name, self.distro_version, self.distro_id = platform.linux_distribution()
             if self.distro_name.lower() == 'android':
                 self.platform = 'android'
+        elif self.platform.startswith('win32'):
+            self.distro_name, self.distro_version, self.distro_id, self.multi_cpu = platform.win32_ver()
 
         debug('Platform: %s' % self.platform)
         debug('Distro: %s' % self.distro_name)
