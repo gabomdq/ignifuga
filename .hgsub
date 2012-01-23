@@ -1,2 +1,3 @@
 external/SDL = https://bitbucket.org/gabomdq/sdl-1.3-experimental/
 external/SDL_ttf = https://bitbucket.org/gabomdq/sdl_ttf
+external/SDL_image = https://bitbucket.org/gabomdq/sdl_image
