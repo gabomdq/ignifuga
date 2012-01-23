@@ -74,11 +74,11 @@ public class SDLActivity extends WallpaperService {
 
     // Load the .so
     static {
-        System.loadLibrary("SDL");
-        System.loadLibrary("SDL_image");
-        System.loadLibrary("SDL_ttf");
+        System.loadLibrary("SDL2");
+        System.loadLibrary("SDL2_image");
+        System.loadLibrary("SDL2_ttf");
         //System.loadLibrary("mikmod");
-        //System.loadLibrary("SDL_mixer");
+        //System.loadLibrary("SDL2_mixer");
         System.loadLibrary("python2.7");
         System.loadLibrary("main");
     }

@@ -42,7 +42,7 @@ cpdef initializeSDL():
     #print "SDL INIT"
     SDL_Init(SDL_INIT_EVERYTHING)
     #print "SDL INITED"
-    SDL_EnableUNICODE(1)
+    #SDL_EnableUNICODE(1) -- skip this as its not currently available 2012-01-23
     TTF_Init()
 
 cpdef terminateSDL():

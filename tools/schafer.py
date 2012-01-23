@@ -371,8 +371,8 @@ def check_ignifuga_libraries(platform):
     elif platform == 'android':
         if isfile(join(DIST_DIR, 'jni', 'python', 'libpython2.7.so')) and \
         isfile(join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL_image', 'libSDL_image.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL_ttf.so')):
+        isfile(join(DIST_DIR, 'jni', 'SDL_image', 'libSDL2_image.so')) and \
+        isfile(join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL2_ttf.so')):
             return True
 
     return False
@@ -413,9 +413,9 @@ def prepare_python(platform, ignifuga_src, python_build):
         if ignifuga_src != None:
             if platform in ['linux64', 'mingw32']:
                 # Get some required flags
-                cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --cflags'
+                cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
                 sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --static-libs'
+                cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
                 sdlflags = sdlflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
                 cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
                 freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
@@ -423,11 +423,11 @@ def prepare_python(platform, ignifuga_src, python_build):
                 freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
             if platform == 'linux64':
-                ignifuga_module = "\nignifuga %s -I%s -lSDL_ttf -lSDL_image -lSDL %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
 
             elif platform== 'android':
                 # Hardcoded for now
-                sdlflags = '-I%s -I%s -I%s -lSDL_ttf -lSDL_image -lSDL -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(SDL_BUILD, 'jni', 'SDL', 'include'), join(SDL_BUILD, 'jni', 'SDL_image'), join(SDL_BUILD, 'jni', 'SDL_ttf'))
+                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(SDL_BUILD, 'jni', 'SDL', 'include'), join(SDL_BUILD, 'jni', 'SDL_image'), join(SDL_BUILD, 'jni', 'SDL_ttf'))
 
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
@@ -449,7 +449,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 shutil.copy(join(PYTHON_BUILD, 'PC', 'getpathp.c'), join(PYTHON_BUILD, 'Python', 'getpathp.c'))
                 shutil.copy(join(PYTHON_BUILD, 'PC', 'errmap.h'), join(PYTHON_BUILD, 'Objects', 'errmap.h'))
 
-                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL_ttf -lSDL_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(PYTHON_BUILD, 'Include'), sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(PYTHON_BUILD, 'Include'), sdlflags, freetypeflags)
 
             
             f = open(setupfile, 'at')
@@ -476,9 +476,9 @@ def make_python(platform, ignifuga_src, env=os.environ):
     if platform == 'linux64':
         if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
             # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-            cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --static-libs'
+            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
             sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-            cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --cflags'
+            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
             # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
             #cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
@@ -532,9 +532,9 @@ def make_python(platform, ignifuga_src, env=os.environ):
     elif platform == 'mingw32':
         if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
             # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-            cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --static-libs'
+            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
             sdlldflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-            cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --cflags'
+            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
             extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
             cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s" CFLAGS="-DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i586-mingw32msvc --build=i686-pc-linux-gnu  --prefix="%s"'% (sdlldflags, extralibs, sdlcflags, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
@@ -948,8 +948,8 @@ def make_sdl(platform, env=None):
             exit()
 
         # Build SDL_Image
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_image.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL_image.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
             
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
             cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR)
@@ -958,7 +958,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_image.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
             log('SDL Image built successfully')
         else:
             error('Problem building SDL Image')
@@ -982,8 +982,8 @@ def make_sdl(platform, env=None):
             exit()
 
         # Build SDL_ttf
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_ttf.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL_ttf.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
             
         if not isfile(join(SDL_TTF_BUILD, 'configure')):
             cmd = './autogen.sh'
@@ -996,7 +996,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_ttf.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
             log('SDL TTF built successfully')
         else:
             error('Problem building SDL TTF')
@@ -1031,8 +1031,8 @@ def make_sdl(platform, env=None):
             shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'include'), join(DIST_DIR, 'jni', 'SDL', 'include'))
             shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'src'), join(DIST_DIR, 'jni', 'SDL', 'src'))
             shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2.so'), join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL_image.so'), join(DIST_DIR, 'jni', 'SDL_image', 'libSDL_image.so'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL_ttf.so'), join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL_ttf.so'))
+            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2_image.so'), join(DIST_DIR, 'jni', 'SDL_image', 'libSDL2_image.so'))
+            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2_ttf.so'), join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL2_ttf.so'))
             shutil.copy(join(SDL_BUILD, 'jni', 'SDL_image', 'SDL_image.h'), join(DIST_DIR, 'jni', 'SDL_image', 'SDL_image.h'))
             shutil.copy(join(SDL_BUILD, 'jni', 'SDL_ttf', 'SDL_ttf.h'), join(DIST_DIR, 'jni', 'SDL_ttf', 'SDL_ttf.h'))
             log('SDL built successfully')
@@ -1103,10 +1103,10 @@ def make_sdl(platform, env=None):
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
 
             # HACK FIX for SDL problem, this can be removed once SDL fixes this error
-            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_XAUDIO2.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
-            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_DSOUND.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
-            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
+#            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_XAUDIO2.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
+#            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
+#            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_DSOUND.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
+#            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
 
 
 
@@ -1120,8 +1120,8 @@ def make_sdl(platform, env=None):
             error('Problem building SDL')
             exit()
 
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_image.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL_image.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
             cmd = './configure LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
@@ -1129,7 +1129,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_image.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
             log('SDL Image built successfully')
         else:
             error('Problem building SDL Image')
@@ -1153,8 +1153,8 @@ def make_sdl(platform, env=None):
             exit()
 
         # Build SDL_ttf
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_ttf.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL_ttf.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
         if not isfile(join(SDL_TTF_BUILD, 'configure')):
             cmd = './autogen.sh'
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
@@ -1164,11 +1164,11 @@ def make_sdl(platform, env=None):
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make install-libSDL_ttfincludeHEADERS'
+        cmd = 'make install-libSDL2_ttfincludeHEADERS'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         cmd = 'make install-libLTLIBRARIES'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL_ttf.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
             log('SDL TTF built successfully')
         else:
             error('Problem building SDL TTF')
@@ -1273,16 +1273,16 @@ def build_project_generic(options, platform, env=None):
 
     if platform in ['linux64', 'mingw32']:
         # Get some required flags
-        cmd = join(DIST_DIR, 'bin', 'sdl-config' ) + ' --cflags'
+        cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
         sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
         freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         if platform == 'linux64':
-            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL_ttf -lSDL_image -lSDL -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
+            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image -lSDL2 -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
             Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
         elif platform == 'mingw32':
             extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
-            cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL_ttf -lSDL_image -lSDLmain -lSDL -lpng -ljpeg -lfreetype -lz %s %s %s -o %s' % (env['CC'], sources, join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, extralibs, options.project)
+            cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz %s %s %s -o %s' % (env['CC'], sources, join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, extralibs, options.project)
             print cmd
             Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
 
@@ -1477,7 +1477,8 @@ def prepare_mingw32_env():
     # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
     # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
     # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should
-    env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
+    #env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
+    env['CFLAGS'] = ""
     env['CXXFLAGS'] = env['CFLAGS']
     env['CC'] = 'i586-mingw32msvc-gcc %s' % (env['CFLAGS'],)
     env['CXX'] = 'i586-mingw32msvc-g++ %s' % (env['CXXFLAGS'],)
