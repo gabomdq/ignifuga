@@ -201,9 +201,9 @@ cdef class Canvas (CanvasBase):
             SDL_GetTextureBlendMode(canvas._surfacehw, &prevbmode)
             SDL_SetTextureBlendMode(canvas._surfacehw, <SDL_BlendMode>blend)
             
-        SDL_SetTargetTexture(self._sdlRenderer, self._surfacehw)
+        SDL_SetRenderTarget(self._sdlRenderer, self._surfacehw)
         SDL_RenderCopy(self._sdlRenderer, canvas._surfacehw, &srcRect, &dstRect)
-        SDL_SetTargetTexture(self._sdlRenderer, NULL)
+        SDL_SetRenderTarget(self._sdlRenderer, NULL)
         
         if blend != -1:
             SDL_SetTextureBlendMode(canvas._surfacehw, prevbmode)

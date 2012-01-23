@@ -370,7 +370,7 @@ def check_ignifuga_libraries(platform):
             return True
     elif platform == 'android':
         if isfile(join(DIST_DIR, 'jni', 'python', 'libpython2.7.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL', 'libSDL.so')) and \
+        isfile(join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so')) and \
         isfile(join(DIST_DIR, 'jni', 'SDL_image', 'libSDL_image.so')) and \
         isfile(join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL_ttf.so')):
             return True
@@ -930,8 +930,8 @@ def make_sdl(platform, env=None):
         
 
         # Build SDL
-        if isfile(join(DIST_DIR, 'lib', 'libSDL.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
             
         if not isfile(join(SDL_BUILD, 'Makefile')):
             cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
@@ -941,7 +941,7 @@ def make_sdl(platform, env=None):
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
 
-        if isfile(join(DIST_DIR, 'lib', 'libSDL.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
             log('SDL built successfully')
         else:
             error('Problem building SDL')
@@ -1030,7 +1030,7 @@ def make_sdl(platform, env=None):
         try:
             shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'include'), join(DIST_DIR, 'jni', 'SDL', 'include'))
             shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'src'), join(DIST_DIR, 'jni', 'SDL', 'src'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL.so'), join(DIST_DIR, 'jni', 'SDL', 'libSDL.so'))
+            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2.so'), join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so'))
             shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL_image.so'), join(DIST_DIR, 'jni', 'SDL_image', 'libSDL_image.so'))
             shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL_ttf.so'), join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL_ttf.so'))
             shutil.copy(join(SDL_BUILD, 'jni', 'SDL_image', 'SDL_image.h'), join(DIST_DIR, 'jni', 'SDL_image', 'SDL_image.h'))
@@ -1096,8 +1096,8 @@ def make_sdl(platform, env=None):
             error('Problem building libjpeg')
             exit()
 
-        if isfile(join(DIST_DIR, 'lib', 'libSDL.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL.a'))
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
+            os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
         if not isfile(join(SDL_BUILD, 'Makefile')):
             cmd = './configure LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
@@ -1114,7 +1114,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
             log('SDL built successfully')
         else:
             error('Problem building SDL')
