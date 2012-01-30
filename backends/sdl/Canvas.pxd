@@ -53,6 +53,7 @@ cdef class Canvas (CanvasBase):
     cdef readonly int _width, _height, _fontSize
     cdef Font _font
     cdef float _r,_g,_b,_a
+    cdef readonly object spriteData
     
     cpdef blitCanvas(self, CanvasBase canvas, int dx=*, int dy=*, int dw=*, int dh=*, int sx=*, int sy=*, int sw=*, int sh=*, int blend=*)
     cdef blitCanvasHW(self, Canvas canvas, int dx, int dy, int dw, int dh, int sx, int sy, int sw, int sh, int blend)

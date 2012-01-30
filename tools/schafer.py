@@ -675,7 +675,7 @@ compileall.compile_dir("%s")
 
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
     Popen(shlex.split(cmd), cwd = IGNIFUGA_SRC).communicate()
 
 def make_glue(package, glue_h, glue_c):
@@ -805,18 +805,28 @@ def cythonize(build_dir, package_name, skip=[]):
             Popen(shlex.split(cmd), cwd = cython_src).communicate()
 
         if module != '__init__':
-            glue_h += "extern void init%s_%s();\n" % (package.replace('.', '_'),module)
+            glue_h += "extern void init%s_%s(void);\n" % (package.replace('.', '_'),module)
             glue_c += '    PyImport_AppendInittab("%s.%s", init%s_%s);\n' % (package, module, package.replace('.', '_'),module)
         else:
-            glue_h += "extern void init%s();\n" % (package.replace('.', '_'))
+            glue_h += "extern void init%s(void);\n" % (package.replace('.', '_'))
             glue_c += '    PyImport_AppendInittab("%s", init%s);\n' % (package, package.replace('.', '_'))
 
     # Make package xxx_glue.c with no frozen modules
     glue = make_glue(package_name, glue_h, glue_c)
-    f = open(join(build_dir, 'cython_src', package_name+'_glue.c'), 'w')
+    f = open(join(cython_src, package_name+'_glue.c'), 'w')
     f.write(glue)
     f.close()
-    cfiles.append(join(build_dir, 'cython_src', package_name+'_glue.c'))
+    cfiles.append(join(cython_src, package_name+'_glue.c'))
+
+    for f in locate('*.c', build_dir):
+        if f not in cfiles:
+            cfile_dir = dirname(f)
+            if cfile_dir.split(os.sep)[-1] != 'cython_src':
+                d = f[len(build_dir)+1:].replace(os.sep, '+')
+                cfile = join(cython_src, d)
+                cmd = 'cp -u %s %s' % (f, cfile)
+                Popen(shlex.split(cmd), cwd = build_dir).communicate()
+                cfiles.append(cfile)
     
     return cfiles, glue_h, glue_c
     

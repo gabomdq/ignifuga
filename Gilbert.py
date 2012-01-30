@@ -48,7 +48,7 @@ class BACKENDS:
     
 class REQUESTS:
     loadImage = 'loadImage'
-    loadSprite = 'loadSprite'
+#    loadSprite = 'loadSprite'
     #dirtyRects = 'dirtyRects'
     done = 'done'
     skip = 'skip'
@@ -364,19 +364,19 @@ class Gilbert:
                 else:
                     # URL is invalid, just keep going
                     self.loading.append((task, None, None))
-            elif req == REQUESTS.loadSprite:
-                # Load a sprite definition
-                if data.has_key('url') and data['url'] != None:
-                    # Try to load a sprite
-                    sprite = self.dataManager.getSprite(data['url'])
-                    if sprite == None:
-                        self.loading.append((task, req, data))
-                    else:
-                        req, data = task.wakeup(sprite)
-                        self.loading.append((task, req, data))
-                else:
-                    # URL is invalid, just keep going
-                    self.loading.append((task, None, None))
+#            elif req == REQUESTS.loadSprite:
+#                # Load a sprite definition
+#                if data.has_key('url') and data['url'] != None:
+#                    # Try to load a sprite
+#                    sprite = self.dataManager.getSprite(data['url'])
+#                    if sprite == None:
+#                        self.loading.append((task, req, data))
+#                    else:
+#                        req, data = task.wakeup(sprite)
+#                        self.loading.append((task, req, data))
+#                else:
+#                    # URL is invalid, just keep going
+#                    self.loading.append((task, None, None))
             elif req == REQUESTS.nativeResolution:
                 # Set the native resolution of the scene for scaling purpouses
                 w,h, ar = data

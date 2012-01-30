@@ -46,18 +46,9 @@ from ignifuga.backends.DataManagerBase import *
 from Canvas import Canvas
 from Font import Font
 
-
 class DataManager(DataManagerBase):
     def loadScene(self, name):
             return createNode(None, json.loads(readFile('data/scenes/'+name+'.json')))
-        
-    def getSprite(self, url):
-        if url not in self.cache:
-            d = WRDict()
-            d.update(json.loads(readFile(str(url))))
-            self.cache[url] = d
-        return self.cache[url]
-
     def getImage(self, url):
         if url not in self.cache:
             self.cache[url] = Canvas(srcURL=url)

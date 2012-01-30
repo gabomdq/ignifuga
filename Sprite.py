@@ -48,7 +48,7 @@ except:
     from bitarray import bitarray
     
 from base64 import b64decode
-from zlib import decompress
+#from zlib import decompress
 from ignifuga.Rect import Rect
 import sys
 
@@ -99,7 +99,8 @@ class Sprite:
             self._hitmap = []
             for frameHitmap in data['hitmap']:
                 hitmap = bitarray()
-                hitmap.fromstring(decompress(b64decode(frameHitmap)))
+                #hitmap.fromstring(decompress(b64decode(frameHitmap)))
+                hitmap.fromstring(b64decode(frameHitmap))
                 self._hitmap.append(hitmap)
         else:
             self._hitmap = None

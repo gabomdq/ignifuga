@@ -80,10 +80,8 @@ class SpriteNode(GraphicNode):
         # Do our initialization
         if self._atlasURL != None:
             self._atlas = LOAD_IMAGE(self._atlasURL)
-        if self._spriteURL != None:
-            self._spriteData = LOAD_SPRITE(self._spriteURL)
-
-        if self._spriteData != None:
+        if self._atlas.spriteData != None:
+            self._spriteData = self._atlas.spriteData
             self.sprite = Sprite(self._spriteData, self._atlas, self._rate)
             self.sprite.setColorMod(self._red, self._green, self._blue, self._alpha)
         else:

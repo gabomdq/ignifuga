@@ -45,7 +45,7 @@ from ignifuga.backends.sdl.Target cimport Target
 from ignifuga.Log import *
 from sys import exit
 from SDL cimport *
-import platform, os.path
+import platform, os.path, json
 
 cdef class Canvas (CanvasBase):
     BLENDMODE_BLEND = SDL_BLENDMODE_BLEND
@@ -67,18 +67,21 @@ cdef class Canvas (CanvasBase):
         self._fontSize = 0
         self._font = None
         self._r = self._g = self_b = self._a = 1.0
+        self.spriteData = None
         
         if srcURL != None:
             # Initialize a software surface with contents loaded from the image
             ss = IMG_Load(srcURL)
-            
-            # Create texture from image
-            self._surfacehw = SDL_CreateTextureFromSurface(self._sdlRenderer, ss)
-                
-            self._hw = True
-            self._width = ss.w
-            self._height = ss.h
-            SDL_FreeSurface(ss)
+            if ss != NULL:
+                # Create texture from image
+                self._surfacehw = SDL_CreateTextureFromSurface(self._sdlRenderer, ss)
+                if ss.userdata != NULL:
+                    self.spriteData = json.loads(<char*>ss.userdata)
+                    
+                self._hw = True
+                self._width = ss.w
+                self._height = ss.h
+                SDL_FreeSurface(ss)
         else:
             self._hw = hw
             

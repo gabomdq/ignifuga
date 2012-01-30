@@ -43,6 +43,7 @@
 
 
 import Image, ImageColor, ImageChops, ImageDraw
+from PIL import PngImagePlugin
 import os, fnmatch, json, math
 from optparse import OptionParser
 import numpy as np
@@ -322,13 +323,19 @@ class Grossman:
                         offset_x = 0
                         offset_y += box[3]
                 frames.append(boxes)
-            
-        target.save(self.output, "PNG")
-        #target.convert('RGB').save(self.output+'.rgb.png', "PNG")
-        fp = open(self.output + '.sprite', 'w')
+
+
         jsondata = { 'type': self.compress if self.compress != None else 'atlas', 'frames': frames, 'hitmap': hitmaps, 'keyframes': keyframes }
-        json.dump(jsondata, fp, indent=2)
-        fp.close()
+        #json.dump(jsondata, fp, indent=2)
+
+        #target.convert('RGB').save(self.output+'.rgb.png', "PNG")
+#        fp = open(self.output + '.sprite', 'w')
+#        fp.close()
+
+        # Add the sprite data as a zTXT chunk
+        meta = PngImagePlugin.PngInfo()
+        meta.add_text("SPRITE", json.dumps(jsondata), 1)
+        target.save(self.output, "PNG", pnginfo=meta)
     
     def createHitmap (self, im):
         r,g,b,a = im.split()
@@ -343,7 +350,8 @@ class Grossman:
                 hitmap[k] = 1
                 
                 
-        return base64.b64encode(zlib.compress(hitmap.tostring()))
+        #return base64.b64encode(zlib.compress(hitmap.tostring()))
+        return base64.b64encode(hitmap.tostring())
         
     def getOptimalSize(self, iw, ih, num):
         """ Get the optimal texture size for a num of iw x ih sprites"""

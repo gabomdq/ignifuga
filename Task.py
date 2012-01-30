@@ -66,9 +66,9 @@ def LOAD_IMAGE(url):
     g = greenlet.getcurrent()
     return g.parent.switch((REQUESTS.loadImage, {'url': url}))
     
-def LOAD_SPRITE(url):
-    g = greenlet.getcurrent()
-    return g.parent.switch((REQUESTS.loadSprite, {'url': url}))
+#def LOAD_SPRITE(url):
+#    g = greenlet.getcurrent()
+#    return g.parent.switch((REQUESTS.loadSprite, {'url': url}))
     
     
 def NATIVE_RESOLUTION(w, h, keep_aspect):
