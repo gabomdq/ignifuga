@@ -302,12 +302,18 @@ def clean_modules(platforms, modules, everything=False):
             if isdir(DIST_DIR):
                 shutil.rmtree(DIST_DIR)
 
-def locate(pattern, root=os.curdir):
+def locate(pattern, root=os.curdir, skip = []):
     '''Locate all files matching supplied filename pattern in and below
     supplied root directory.'''
     for path, dirs, files in os.walk(os.path.abspath(root)):
         for filename in fnmatch.filter(files, pattern):
-            yield os.path.join(path, filename)
+            yieldit = True
+            for s in skip:
+                if path.startswith(s):
+                    yieldit = False
+                    break
+            if yieldit:
+                yield os.path.join(path, filename)
 
 def save_platform(platform):
     f = open(PLATFORM_FILE, 'w')
@@ -818,15 +824,13 @@ def cythonize(build_dir, package_name, skip=[]):
     f.close()
     cfiles.append(join(cython_src, package_name+'_glue.c'))
 
-    for f in locate('*.c', build_dir):
+    for f in locate('*.c', build_dir, [cython_src, join(build_dir, 'android_project')]):
         if f not in cfiles:
-            cfile_dir = dirname(f)
-            if cfile_dir.split(os.sep)[-1] != 'cython_src':
-                d = f[len(build_dir)+1:].replace(os.sep, '+')
-                cfile = join(cython_src, d)
-                cmd = 'cp -u %s %s' % (f, cfile)
-                Popen(shlex.split(cmd), cwd = build_dir).communicate()
-                cfiles.append(cfile)
+            d = f[len(build_dir)+1:].replace(os.sep, '+')
+            cfile = join(cython_src, d)
+            cmd = 'cp -u %s %s' % (f, cfile)
+            Popen(shlex.split(cmd), cwd = build_dir).communicate()
+            cfiles.append(cfile)
     
     return cfiles, glue_h, glue_c
     
