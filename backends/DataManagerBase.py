@@ -123,10 +123,7 @@ class DataManagerBase(object):
                 error('Error: Releasing data for %s with ref count: %d' % (url, refCnt))
             del self.cache[url]
 
-    def loadScene(self, name):
-        raise Exception('method not implemented')
-        
-    def getSprite(self, url):
+    def loadJsonFile(self, name):
         raise Exception('method not implemented')
 
     def getImage(self, url):

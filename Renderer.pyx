@@ -58,7 +58,6 @@ cdef class Renderer:
         self._target = None
         self._scroll_x = 0
         self._scroll_y = 0
-        
         self._target = target
 
 
@@ -74,7 +73,7 @@ cdef class Renderer:
             raise Exception ('You have to call preUpdate before calling update')
 
         # In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
-        # Scene coordinates are the logical node coordinates, which relate to the screen via scale and scroll modifiers.
+        # Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
         # What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
 
         # Let's start building a rectangle that holds the part of the scene we want to show
@@ -92,19 +91,20 @@ cdef class Renderer:
             doScale = False
 
         gilbert = Gilbert()
-        # Get a list of the z index of the nodes in the scenes, we will traverse it in increasing order
-        zindexs = gilbert.nodesZ.keys()
+        # Get a list of the z index of the entities in the scenes, we will traverse it in increasing order
+        zindexs = gilbert.entitiesByZ.keys()
         if len(zindexs) >0:
             zindexs.sort()
 
         for z in zindexs:
-            for node in gilbert.nodesZ[z]:
-                # Intersect the node rectangle with the screen rectangle
+            for entity in gilbert.entitiesByZ[z]:
+
+                # Intersect the entity rectangle with the screen rectangle
                 # nr is in scene coordinates
-                nr = Rect(node.getRect())
+                nr = Rect(entity.getRect())
                 # ir is the intersection, in scene coordinates
-                if node.angle != 0:
-                    # Expand the node rect with some generous dimensions (to avoid having to calculate exactly how bigger it is)
+                if entity.angle != 0:
+                    # Expand the entity rect with some generous dimensions (to avoid having to calculate exactly how bigger it is)
                     extra = nr.width if nr.width > nr.height else nr.height
                     nr.left -= extra
                     nr.top -= extra
@@ -113,33 +113,33 @@ cdef class Renderer:
 
                 ir = screen.intersection(nr)
                 if ir != None:
-                    # There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
+                    # There's an intersection, go over the entity areas, and see what parts of those fall inside the intersected rect.
                     # This areas is what we end up rendering.
-                    #nx, ny = node.position
+                    #nx, ny = entity.position
 
 
                     # NO LONGER USED, KEPT HERE FOR A WHILE AS REFERENCE
                     # THIS BIT OF CODE WAS CREATED WHEN WE SUPPORTED "deltak" bitmaps, now its all deltap or whole keyframe
                     # =======================================================
-                    #for a in node.getFrameAreas():
+                    #for a in entity.getFrameAreas():
                     # a is a frame area, it's format is [sx, sy, dx, dy, w, h]
                     # sx,sy -> coordinates in the atlas
-                    # dx,dy -> node coordinates where to put this
+                    # dx,dy -> entity coordinates where to put this
                     # w,h -> size of the rectangle to blit
                     # =======================================================
 
-                    sx,sy,sw,sh,dx,dy,dw,dh = node.getRenderArea()
-                    #print node.id, sx,sy,sw,sh,dx,dy,dw,dh
+                    sx,sy,sw,sh,dx,dy,dw,dh = entity.getRenderArea()
+                    #print entity.id, sx,sy,sw,sh,dx,dy,dw,dh
                     # sx,sy  -> are the source coordinates in the sprite (0,0 as the sprite will always handle its own compositing)
                     # sw,sh  -> are the dimensions of the source material/sprite
-                    # dx,dy  -> node coordinates where to render
-                    # dw,dh  -> node dimensions in scene coordinates
+                    # dx,dy  -> entity coordinates where to render
+                    # dw,dh  -> entity dimensions in scene coordinates
 
 
-                    # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
+                    # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = entity coords+entity position)
                     nr = Rect((dx, dy, dw, dh))
 
-                    if node.angle == 0 and node.flipv == False and node.fliph == False:
+                    if entity.angle == 0 and entity.flipv == False and entity.fliph == False:
                         ir = screen.intersection(nr)
                     else:
                         ir = nr
@@ -151,7 +151,7 @@ cdef class Renderer:
 
                         # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
                         # We need to move it to the proper position on the source canvas
-                        # We adjust it to node coordinates by substracting the node position
+                        # We adjust it to entity coordinates by substracting the entity position
                         # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
                         # Finally we add sx,sy to put the rectangle in the correct position in the canvas
                         # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
@@ -175,10 +175,10 @@ cdef class Renderer:
 
                         # Perform the blitting if the src and dst rectangles have w,h > 0
                         if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
-                            if node.center == None:
-                                self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
+                            if entity.center == None:
+                                self.target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, False, 0, 0, (1 if entity.fliph else 0) + (2 if entity.flipv else 0) )
                             else:
-                                self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
+                                self.target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, True, entity.center[0], entity.center[1], (1 if entity.fliph else 0) + (2 if entity.flipv else 0))
                             #raw_input("Press Enter to continue...")
         self._target.flip()
         # Calculate how long it's been since the pre update until now.
@@ -341,7 +341,7 @@ cdef class Renderer:
 # OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?
 
     #cpdef update(self):
-    #""" Update the screen by rendering the nodes that intersect the dirty rectangles """
+    #""" Update the screen by rendering the entities that intersect the dirty rectangles """
     #cdef Rect nr, ir, r
     #cdef int z
 
@@ -353,7 +353,7 @@ cdef class Renderer:
     #self.dirtyAll()
 
     ## In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
-    ## Scene coordinates are the logical node coordinates, which relate to the screen via scale and scroll modifiers.
+    ## Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
     ## What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
 
     ## Let's start building a rectangle that holds the part of the scene we want to show
@@ -373,7 +373,7 @@ cdef class Renderer:
     #doScale = False
 
     ## At this point, screen contains the rectangle in scene coordinates that we will show, everything that falls inside it gets on the screen.
-    ## Now we get all the dirty rectangles reported by the nodes, and we determine which ones intersect with the screen, discarding everything else.
+    ## Now we get all the dirty rectangles reported by the entities, and we determine which ones intersect with the screen, discarding everything else.
     #if self.dirtyRects != None:
     #for dr in self.dirtyRects:
     ## dr is in scene coordinates
@@ -387,8 +387,8 @@ cdef class Renderer:
     #rects.append(screen)
 
     #gilbert = Gilbert()
-    ## Get a list of the z index of the nodes in the scenes, we will traverse it in increasing order
-    #zindexs = gilbert.nodesZ.keys()
+    ## Get a list of the z index of the entities in the scenes, we will traverse it in increasing order
+    #zindexs = gilbert.entitiesByZ.keys()
     #if len(zindexs) >0:
     #zindexs.sort()
 
@@ -397,30 +397,30 @@ cdef class Renderer:
     ##print "DIRTY RECTANGLE:", r
     ## r is in scene coordinates, already intersected with the scaled & scrolled screen rectangle
     #for z in zindexs:
-    #for node in gilbert.nodesZ[z]:
-    ## Intersect the node rectangle with the dirty rectangle
+    #for entity in gilbert.entitiesByZ[z]:
+    ## Intersect the entity rectangle with the dirty rectangle
     ## nr is in scene coordinates
-    #nr = Rect(node.getRect())
-    ##print node.id, 'nr: ', nr, 'r:', r
+    #nr = Rect(entity.getRect())
+    ##print entity.id, 'nr: ', nr, 'r:', r
     ## ir is the intersection, in scene coordinates
     #ir = r.intersection(nr)
     ##print "Intersect r ", r, " with nr ", nr, " results in ", ir
     #if ir != None:
-    ## There's an intersection, go over the node areas, and see what parts of those fall inside the intersected rect.
+    ## There's an intersection, go over the entity areas, and see what parts of those fall inside the intersected rect.
     ## This areas is what we end up rendering.
-    #nx, ny = node.position
-    #for a in node.getFrameAreas():
+    #nx, ny = entity.position
+    #for a in entity.getFrameAreas():
     ## a is a frame area, it's format is [sx, sy, dx, dy, w, h]
     ## sx,sy -> coordinates in the atlas
-    ## dx,dy -> node coordinates where to put this
+    ## dx,dy -> entity coordinates where to put this
     ## w,h -> size of the rectangle to blit
     #sx,sy,dx,dy,w,h = a
 
 
-    ## Create nr, a rectangle with the destination location in scene coordinates  (scene coords = node coords+node position)
+    ## Create nr, a rectangle with the destination location in scene coordinates  (scene coords = entity coords+entity position)
     #nr = Rect((dx+nx, dy+ny, w, h))
 
-    ##print node.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
+    ##print entity.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
 
     #ir = r.intersection(nr)
     #if ir != None:
@@ -430,7 +430,7 @@ cdef class Renderer:
 
     ## src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
     ## We need to move it to the proper position on the source canvas
-    ## We adjust it to node coordinates by substracting the node position
+    ## We adjust it to entity coordinates by substracting the entity position
     ## Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
     ## Finally we add sx,sy to put the rectangle in the correct position in the canvas
     ## This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
@@ -447,10 +447,10 @@ cdef class Renderer:
 
     ## Perform the blitting if the src and dst rectangles have w,h > 0
     #if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
-    #if node.center == None:
-    #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, False, 0, 0, (1 if node.fliph else 0) + (2 if node.flipv else 0) )
+    #if entity.center == None:
+    #self.target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, False, 0, 0, (1 if entity.fliph else 0) + (2 if entity.flipv else 0) )
     #else:
-    #self.target.blitCanvas(node.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, node.angle, True, node.center[0], node.center[1], (1 if node.fliph else 0) + (2 if node.flipv else 0))
+    #self.target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, True, entity.center[0], entity.center[1], (1 if entity.fliph else 0) + (2 if entity.flipv else 0))
     ##raw_input("Press Enter to continue...")
     #self._target.flip()
     #self.dirtyNone()

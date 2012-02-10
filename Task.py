@@ -42,9 +42,10 @@ import greenlet
 from ignifuga.Gilbert import REQUESTS
 
 class Task(greenlet.greenlet):
-    def __init__(self, node_wr, run=None, parent=None):
-        # A ref or weakref to the associated node
-        self.node = node_wr
+    def __init__(self, entity_wr, run=None, parent=None):
+        # A ref or weakref to the associated entity
+        self.entity = entity_wr
+        self.runnable = run
         super(Task, self).__init__(run,parent)
 
     def wakeup(self, data=None):
@@ -58,7 +59,7 @@ class Task(greenlet.greenlet):
         return req,data
         
 
-def DONE(node):
+def DONE(entity):
     g = greenlet.getcurrent()
     return g.parent.switch((REQUESTS.done, None))
     
@@ -71,13 +72,13 @@ def LOAD_IMAGE(url):
 #    return g.parent.switch((REQUESTS.loadSprite, {'url': url}))
     
     
-def NATIVE_RESOLUTION(w, h, keep_aspect):
-    g = greenlet.getcurrent()
-    return g.parent.switch((REQUESTS.nativeResolution, (w, h, keep_aspect)))
-
-def SCENE_SIZE(w, h):
-    g = greenlet.getcurrent()
-    return g.parent.switch((REQUESTS.sceneSize, (w, h)))
+#def NATIVE_RESOLUTION(w, h, keep_aspect):
+#    g = greenlet.getcurrent()
+#    return g.parent.switch((REQUESTS.nativeResolution, (w, h, keep_aspect)))
+#
+#def SCENE_SIZE(w, h):
+#    g = greenlet.getcurrent()
+#    return g.parent.switch((REQUESTS.sceneSize, (w, h)))
 
     
 #def DIRTY_RECTS (rects):

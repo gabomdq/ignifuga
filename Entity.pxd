@@ -38,3 +38,28 @@
 # Base Entity class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+#from cpython cimport bool
+#
+#cdef class Entity(object):
+#    cdef object __weakref__
+#    cdef readonly unicode id
+#    cdef readonly list tags
+#    cdef bool released
+#    cdef dict components, componentsBySignal, componentsByTag, properties
+#    cdef list signalQueue
+#
+#    cpdef Entity init(self, dict data)
+#    cpdef load(self, dict data)
+#    cpdef __free__(self)
+#    cpdef event(self, event)
+#    cpdef add(self, component)
+#    cpdef remove(self, component)
+#    cpdef getComponent(self, str id)
+#    cpdef update(self, data)
+#    cpdef _update(self, data)
+#    cpdef addtag(self, tags)
+#    cpdef removetag(self, tags)
+#    cpdef suscribe(self, component, signal)
+#    cpdef unsuscribe(self, component, signal)
+#    cpdef signal(self, signal_name, target=*, tags=*, **data)
+#    cpdef directSignal(self, signal_name, target=*, tags = *, **data)

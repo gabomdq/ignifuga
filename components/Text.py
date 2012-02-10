@@ -4,21 +4,21 @@
 #Redistribution and use in source and binary forms, with or without
 #modification, are permitted provided that the following conditions are met:
 
-    #* Redistributions of source code must retain the above copyright
-      #notice, this list of conditions and the following disclaimer.
-    #* Redistributions in binary form must reproduce the above copyright
-      #notice, this list of conditions and the following disclaimer in the
-      #documentation and/or other materials provided with the distribution.
-    #* Altered source versions must be plainly marked as such, and must not be
-      #misrepresented as being the original software.
-    #* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-      #nor the names of its contributors may be used to endorse or promote
-      #products derived from this software without specific prior written permission.
-    #* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      #the duration, code functionality and graphic or audio material related to
-      #the "splash screen", which should always be the first screen shown by the
-      #derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      #original author's URL and company logo.
+#* Redistributions of source code must retain the above copyright
+#notice, this list of conditions and the following disclaimer.
+#* Redistributions in binary form must reproduce the above copyright
+#notice, this list of conditions and the following disclaimer in the
+#documentation and/or other materials provided with the distribution.
+#* Altered source versions must be plainly marked as such, and must not be
+#misrepresented as being the original software.
+#* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
+#nor the names of its contributors may be used to endorse or promote
+#products derived from this software without specific prior written permission.
+#* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
+#the duration, code functionality and graphic or audio material related to
+#the "splash screen", which should always be the first screen shown by the
+#derived work and which should ALWAYS state the Ignifuga Game Engine name,
+#original author's URL and company logo.
 
 #THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
 #TERMS AND CONDITIONS
@@ -35,52 +35,48 @@
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Ignifuga Game Engine
-# Text node
+# Text component
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from Node import Node
-from GraphicNode import GraphicNode
-from Sprite import Sprite
-from ignifuga.Gilbert import REQUESTS
+from Viewable import Viewable
+from ignifuga.Gilbert import Gilbert, REQUESTS, Canvas
 from ignifuga.Task import *
-from Action import Action
 import sys
-from Gilbert import Canvas, DataManager
 
-class TextNode(GraphicNode):
-    """ Sprite Node class, viewable node, potentially animated
+class Text(Viewable):
+    """ Text component class, viewable
     """
     ALIGN_CENTER = 'center'
     ALIGN_LEFT = 'left'
     ALIGN_RIGHT = 'right'
-    
-    def __init__(self, parent, **kwargs):
-        if 'htmlColor' in kwargs:
-            self.htmlColor = kwargs['htmlColor']
-            del kwargs['htmlColor']
+
+    def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
+        if 'htmlColor' in data:
+            self.htmlColor = data['htmlColor']
+            del data['htmlColor']
 
         # Default values
-        self.loadDefaults({
+        self._loadDefaults({
             '_text': '',
             '_font': None,
             '_size': 16,
-            '_align': TextNode.ALIGN_CENTER,
+            '_align': Text.ALIGN_CENTER,
             '_color': (0,0,0),
             '_canvas': None
         })
 
-        super(TextNode, self).__init__(parent, **kwargs)
+        super(Text, self).__init__(id, entity, active, frequency, **data)
 
     def init(self, data):
         """ Initialize the required external data """
-        super(TextNode, self).init(data)
+
         self._canvas = Canvas()(width=1, height=1)
         self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-        
+
         if self._text != '' and self._font != None:
             self._updateCanvas()
 
-        return self
+        super(Text, self).init(data)
 
     @property
     def canvas(self):
@@ -142,7 +138,7 @@ class TextNode(GraphicNode):
 
     @align.setter
     def align(self, value):
-        if value in [TextNode.ALIGN_LEFT, TextNode.ALIGN_CENTER, TextNode.ALIGN_RIGHT]:
+        if value in [Text.ALIGN_LEFT, Text.ALIGN_CENTER, Text.ALIGN_RIGHT]:
             self._align = value
 
     def _updateCanvas(self):
@@ -155,40 +151,39 @@ class TextNode(GraphicNode):
                 self.width = self._canvas.width
                 self.height = self._canvas.height
 
-    @GraphicNode.red.setter
+    @Viewable.red.setter
     def red(self, value):
-        GraphicNode.red.fset(self,value)
+        Viewable.red.fset(self,value)
         if self._canvas != None:
             self._canvas.mod(self._red, self._green, self._blue, self._alpha)
 
-    @GraphicNode.green.setter
+    @Viewable.green.setter
     def green(self, value):
-        GraphicNode.green.fset(self,value)
+        Viewable.green.fset(self,value)
         if self._canvas != None:
             self._canvas.mod(self._red, self._green, self._blue, self._alpha)
 
-    @GraphicNode.blue.setter
+    @Viewable.blue.setter
     def blue(self, value):
-        GraphicNode.blue.fset(self,value)
+        Viewable.blue.fset(self,value)
         if self._canvas != None:
             self._canvas.mod(self._red, self._green, self._blue, self._alpha)
 
-    @GraphicNode.alpha.setter
+    @Viewable.alpha.setter
     def alpha(self, value):
-        GraphicNode.alpha.fset(self,value)
+        Viewable.alpha.fset(self,value)
         if self._canvas != None:
             self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-        
+
     def hits(self, x, y):
-        # Check if x,y hits the node
+        # Check if x,y hits the component
         if x>=self._x and x <= self._x+self.width and y >= self._y and y <= self._y + self.height:
             # Check if the point on the sprite is visible
             return True
         return False
 
-
     def __getstate__(self):
-        odict = super(TextNode, self).__getstate__()
+        odict = super(Text, self).__getstate__()
         # Remove non pickable elements
         del odict['_canvas']
         return odict

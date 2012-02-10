@@ -732,7 +732,11 @@ def cythonize(build_dir, package_name, skip=[]):
                 if not isfile(ccf) or getctime(ccf) < mf:
                     log('Cythonizing %s' % basename(f))
                     cmd = 'cython "%s"' % f
-                    Popen(shlex.split(cmd), cwd = build_dir).communicate()
+                    p = Popen(shlex.split(cmd), cwd = build_dir)
+                    p.communicate()
+                    if p.returncode != 0:
+                        error("Problem cythonizing file")
+                        exit()
                     updatedfiles.append(cf)
             else:
                 log('Skipping Cython for %s' % basename(f))

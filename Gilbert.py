@@ -41,7 +41,7 @@
 from ignifuga.Rect import Rect
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
-import sys, pickle, os, weakref, gc, platform
+import sys, pickle, os, weakref, gc, platform, copy
 
 class BACKENDS:
     sdl = 'sdl'
@@ -125,60 +125,50 @@ DataManager = None
 _Canvas = None
 Target = None
 
-def sanitizeData (k,v, p=True):
-    key = str(k)
-    if isinstance(v, dict):
-        value = {}
-        for k1, v1 in v.items():
-            key1, value1 = sanitizeData(k1,v1)
-            value[key1] = value1
-    else:
-        value = v
+#
 
-    return key, value
-
-def createNode(parent, data, restore = None):
-    """ Create node dynamically from given data
-    
-    data may be:
-        {'type': nodetype, 'id': nodeid, 'position': 1.0, etc, etc} or
-        { 'nodeid': {'type':nodetype, position: 1.0, etc,etc} }
-    
-    """
-    if data.has_key('type'):
-        type = data['type']
-    elif len(data.keys())==1:
-        id = data.keys()[0]
-        data = data[id]
-        data['id'] = id
-        if data.has_key('type'):
-            type = data['type']
-        else:
-            return None
-    else:
-        return None
-
-    # Sanitize data, convert all the keys to strings
-    nodeData = {}
-    for k,v in data.items():
-        key, value = sanitizeData(k,v)
-        nodeData[key] = value
-        
-
-    node = None
-    if type == 'Background':
-        node = Background(parent, **nodeData)
-    elif type == 'Scene':
-        node = Scene(parent, **nodeData)
-    elif type == 'SpriteNode':
-        node = SpriteNode(parent, **nodeData)
-    elif type == 'TextNode':
-        node = TextNode(parent, **nodeData)
-        
-    if node != None:
-        Gilbert().registerNode(node)
-
-    return node
+#def createNode(parent, data, restore = None):
+#    """ Create node dynamically from given data
+#
+#    data may be:
+#        {'type': entity_type, 'id': nodeid, 'position': 1.0, etc, etc} or
+#        { 'nodeid': {'type':entity_type, position: 1.0, etc,etc} }
+#
+#    """
+#    if data.has_key('type'):
+#        type = data['type']
+#    elif len(data.keys())==1:
+#        id = data.keys()[0]
+#        data = data[id]
+#        data['id'] = id
+#        if data.has_key('type'):
+#            type = data['type']
+#        else:
+#            return None
+#    else:
+#        return None
+#
+#    # Sanitize data, convert all the keys to strings
+#    nodeData = {}
+#    for k,v in data.items():
+#        key, value = sanitizeData(k,v)
+#        nodeData[key] = value
+#
+#
+#    node = None
+#    if type == 'Background':
+#        node = Background(parent, **nodeData)
+#    elif type == 'Scene':
+#        node = Scene(parent, **nodeData)
+#    elif type == 'SpriteNode':
+#        node = SpriteNode(parent, **nodeData)
+#    elif type == 'TextNode':
+#        node = TextNode(parent, **nodeData)
+#
+#    if node != None:
+#        Gilbert().registerNode(node)
+#
+#    return node
 
 class GilbertPickler(pickle.Pickler):
     def memoize(self, obj):
@@ -197,7 +187,7 @@ class Gilbert:
     def __init__(self):
         pass
     
-    def init(self, backend, scene):
+    def init(self, backend, scenesFile, firstScene):
         self.backend = backend
         debug ('Initializing Gilbert Overlord')
         
@@ -237,14 +227,18 @@ class Gilbert:
             error('Unknown backend %s. Aborting' % (backend,))
             exit()
 
-        # The only dictionary that keeps strong references to the nodes
-        self.nodes = []
-        # These dictionaries keep weakrefs via WeakSet
-        self.nodesType = {}
-        self.nodesZ = {}
+        # The only dictionaries that keeps strong references to the entities
+        self.scenes = {}
+        # A pointer to the current scene stored in self.scenes
+        self.scene = {}
+        # A pointer to the current scene entities
+        self.entities = {}
+        # These dictionaries keep weakrefs via WeakSet, contain the current scene entities
+        self.entitiesByTag = {}
+        self.entitiesByZ = {}
 
-        # These keep weakrefs via Task
-        self.loading = []
+        # These keep weakrefs in the key and via Task
+        self.loading = {}
         self.running = {}
 
         self._touches = {}
@@ -254,10 +248,14 @@ class Gilbert:
         
         self.renderer = _Renderer(Target())
         self.dataManager = DataManager()
-        self.resetScene()
+
         if not self.loadState():
             debug('Failed loading previous state')
-            self.dataManager.loadScene(scene)
+            scenes = self.dataManager.loadJsonFile(scenesFile)
+            self.loadScenes(scenes)
+            if not self.startScene(firstScene):
+                error('Could not load first scene')
+                return
 
         debug('Starting Game Loop')
         self.startLoop()
@@ -278,23 +276,24 @@ class Gilbert:
         if self.backend == BACKENDS.sdl:
             from backends.sdl import terminateBackend
 
-        self.resetScene()
+        self.resetScenes()
         # DEBUG - See what's holding on to what
         objs = gc.get_objects()
         for n in objs:
-            if isinstance(n, Node):
-                debug ('NODE: %s' % n)
+            if isinstance(n, Entity) or isinstance(n,Component):
+                debug ('%s: %s' % (n.__class__.__name__, n))
+                print dir(n)
                 for ref in gc.get_referrers(n):
                     if ref != objs:
-                        debug(str('    REFERRER: ', ref.__class__, id(ref)))
+                        debug('    REFERRER: %s %s'  % (ref.__class__, id(ref)))
                         if isinstance(ref, dict):
-                            debug(str("    DICT: ", ref.keys()))
+                            debug("    DICT: %s" % ref.keys())
                         elif isinstance(ref, list):
-                            debug(str("    LIST: ", len(ref), " items"))
+                            debug("    LIST: %s" % len(ref), " items")
                         elif isinstance(ref, tuple):
-                            debug(str("    TUPLE: ", ref))
+                            debug("    TUPLE: %s" % ref)
                         else:
-                            debug(str("    OTHER: ", ref))
+                            debug("    OTHER: %s" % ref)
         self.dataManager.cleanup(True)
         # Break any remaining cycles that prevent garbage collection
         del self.dataManager
@@ -311,174 +310,154 @@ class Gilbert:
     def update(self, now=0, wrapup=False):
         """ Update everything, then render the scene
         now is the current time, specified in seconds
-        wrapup = True forces the update loop to be broken, all running nodes eventually stop running
+        wrapup = True forces the update loop to be broken, all running entities eventually stop running
         """
         # Call the pre update so we can tally how long the whole frame processing took (logic+render)
         self.renderer.preUpdate(now)
 
         # Initialize objects
-        loading_count = len(self.loading)
-        lc = 0
-        
-        while lc < loading_count:
-            task, req, data = self.loading.pop(0)
-            if req == None:
-                req,data = task.wakeup()
-                
-            if req == REQUESTS.done:
-                # Node is ready, start the update loop for it
-                node = data
-                
-                # Add it to the by type index
-                nodetype = node.getType()
-                if not self.nodesType.has_key(nodetype):
-                    self.nodesType[nodetype] = weakref.WeakSet()
-                self.nodesType[nodetype].add(node)
-                #debug(str(node.save()))
-                # Add it to the by z ordering index
-                zindex = node.z
-                if zindex != None:
-                    if not self.nodesZ.has_key(zindex):
-                        self.nodesZ[zindex] = weakref.WeakSet()
-                    if node not in self.nodesZ[zindex]:
-                        self.nodesZ[zindex].add(node)
-                if not wrapup:
-                    # Fire up the task to update the node
-                    task = Task(weakref.ref(node), node.update, parent=Task.getcurrent())
-                    req, data = task.wakeup({'now': now})
-                    self.running[node] = (task, req, data)
+        remove_entities = []
+        for entity_ref in self.loading.iterkeys():
+            task, req, data = self.loading[entity_ref]
+            if task != None:
+                task, req, data = self._processTask(task, req, data, now, wrapup, True)
 
-            elif req == REQUESTS.skip:
-                # Just skip this turn
-                self.loading.append((task, None, None))
-            elif req == REQUESTS.loadImage:
-                # Load an image
-                if data.has_key('url') and data['url'] != None:
-                    # Try to load an image
-                    img = self.dataManager.getImage(data['url'])
-                    if img == None:
-                        self.loading.append((task, req, data))
-                    else:
-                        req, data = task.wakeup(img)
-                        self.loading.append((task, req, data))
+            if task != None:
+                self.loading[entity_ref] = (task, req, data)
+            else:
+                remove_entities.append(entity_ref)
+
+        for entity_ref in remove_entities:
+            del self.loading[entity_ref]
+
+
+        # Update objects
+        remove_entities = []
+        for entity_ref in self.running.iterkeys():
+            task1, req1, data1,task2,req2,data2 = self.running[entity_ref]
+            if task1 != None:
+                task1, req1, data1 = self._processTask(task1, req1, data1, now, wrapup)
+
+            if task2 != None:
+                task2, req2, data2 = self._processTask(task2, req2, data2, now, wrapup)
+
+            if task1 != None or task2 != None:
+                self.running[entity_ref] = (task1, req1, data1,task2, req2, data2)
+            else:
+                remove_entities.append(entity_ref)
+
+        for entity_ref in remove_entities:
+            del self.running[entity_ref]
+
+    def _processTask(self, task, req, data, now, wrapup, init=False):
+        if req == None:
+            req, data = task.wakeup({'now': now})
+        if req == REQUESTS.done:
+            if init:
+                # Entity is ready, start the update loop for it
+                if not wrapup:
+                    # Fire up the task to update the entity and the entity components
+                    task1 = Task(task.entity, task.entity().update, parent=Task.getcurrent())
+                    req1, data1 = task1.wakeup({'now': now})
+                    task2 = Task(task.entity, task.entity()._update, parent=Task.getcurrent())
+                    req2, data2 = task2.wakeup({'now': now})
+                    self.running[task.entity] = (task1, req, data1,task2, req2, data2)
+                    return (None,None,None)
+            else:
+                if wrapup:
+                    return None,None,None
                 else:
-                    # URL is invalid, just keep going
-                    self.loading.append((task, None, None))
+                    # Restart the update loop
+                    task = Task(task.entity, task.runnable, parent=Task.getcurrent())
+                    req, data = task.wakeup({'now': now})
+                    return (task, req, data)
+        elif req == REQUESTS.skip:
+            # Normal operation continues
+            return (task, None, None)
+        elif req == REQUESTS.stop:
+            # Stop entity from updating
+            return None,None,None
+        elif req == REQUESTS.loadImage:
+            # Load an image
+            if data.has_key('url') and data['url'] != None:
+                # Try to load an image
+                img = self.dataManager.getImage(data['url'])
+                if img == None:
+                    return (task, req, data)
+                else:
+                    req, data = task.wakeup(img)
+                    return (task, req, data)
+            else:
+                # URL is invalid, just keep going
+                return (task, None, None)
 #            elif req == REQUESTS.loadSprite:
 #                # Load a sprite definition
 #                if data.has_key('url') and data['url'] != None:
 #                    # Try to load a sprite
 #                    sprite = self.dataManager.getSprite(data['url'])
 #                    if sprite == None:
-#                        self.loading.append((task, req, data))
+#                        self.loading[entity_ref] = (task, req, data)
 #                    else:
 #                        req, data = task.wakeup(sprite)
-#                        self.loading.append((task, req, data))
+#                        self.loading[entity_ref] = (task, req, data)
 #                else:
 #                    # URL is invalid, just keep going
-#                    self.loading.append((task, None, None))
-            elif req == REQUESTS.nativeResolution:
-                # Set the native resolution of the scene for scaling purpouses
-                w,h, ar = data
-                self.renderer.setNativeResolution(w,h, ar)
-                self.loading.append((task, None, None))
-            elif req == REQUESTS.sceneSize:
-                # Set the size of the scene for scrolling purpouses
-                w,h = data
-                self.renderer.setSceneSize(w,h)
-                self.loading.append((task, None, None))
-            else:
-                # Unrecognized request
-                self.loading.append((task, None, None))
-            
-            lc+=1
-        
-        # Update objects
-        for node in self.running.keys():
-            task, req, data = self.running[node]
-            if req == None:
-                req, data = task.wakeup({'now': now})
-            
-            if req == REQUESTS.done:
-                if wrapup:
-                    del self.running[node]
-                else:
-                    # Restart the update loop
-                    task = Task(weakref.ref(node), node.update, parent=Task.getcurrent())
-                    req, data = task.wakeup({'now': now})
-                    self.running[node] = (task, req, data)
-            elif req == REQUESTS.skip:
-                # Normal operation continues
-                self.running[node] = (task, None, None)
-            elif req == REQUESTS.stop:
-                # Stop node from updating
-                del self.running[node]
-#            elif req == REQUESTS.dirtyRects:
-#                if data != None:
-#                    # data is a ((x,y,w,h),(x,y,w,h), ...) list of rects in node coordinates
-#                    # Translate the dirty rectangle to scene coords position
-#                    if self.renderer.needsRects:
-#                        pos = node.position
-#                        for box in data:
-#                            self.renderer.dirty(box[0]+pos[0], box[1]+pos[1], box[2], box[3])
-#                self.running[node] = (task, None, None)
+#                    self.loading[entity_ref] = (task, None, None)
+#            elif req == REQUESTS.nativeResolution:
+#                # Set the native resolution of the scene for scaling purpouses
+#                w,h, ar = data
+#                self.renderer.setNativeResolution(w,h, ar)
+#                self.loading[entity_ref] = (task, None, None)
+#            elif req == REQUESTS.sceneSize:
+#                # Set the size of the scene for scrolling purpouses
+#                w,h = data
+#                self.renderer.setSceneSize(w,h)
+#                self.loading[entity_ref] = (task, None, None)
+
+        else:
+            # Unrecognized request
+            return (task, None, None)
 
     def renderScene(self):
         # Render a new scene
         self.renderer.update()
-        
-    def registerNode(self, node):
-        # Keep ONE strong reference to the node so it's not garbage collected
-        self.nodes.append(node)
 
-        # Add it to the loading queue
-        task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
-        self.loading.append((task, None, None))
-    
-    def unregisterNode(self, node):
-        """ Remove node, release its data """
-
-        # Add it to the loading queue
-        if node in self.loading:
-            self.loading.remove(node)
-        
-        node_type = node.getType()
-        if node_type in self.nodesType and node in self.nodesType[node_type]:
-            self.nodesType[node_type].remove(node)
-
-        zindex = node.z
-        if zindex != None and zindex in self.nodesZ and node in self.nodesZ[zindex]:
-            self.nodesZ[node.z].remove(node)
-        
-        if node in self.running:
-            del self.running[node]
-
-        # Remove the strong reference
-        if node in self.nodes:
-            self.nodes.remove(node)
-        else:
-            debug('Tried to unregister node %s, but Gilbert didnt know about it in the first place' % node)
-
-        #node.free()
-
-    def changeZ(self, node, new_z):
-        """ Change the node's z index ordering """
-        if node in self.loading:
-            return
-            
-        zindex = node.z
+    def refreshEntityZ(self, entity):
+        """ Change the entity's z index ordering """
         # Remove from the old z-index
-        if zindex != None and zindex in self.nodesZ and node in self.nodesZ[zindex]:
-            self.nodesZ[node.z].remove(node)
-           
+        if entity.id in self.loading:
+            return
+
+        self.hideEntity(entity)
         # Add to the new z-index
-        if new_z != None:
-            if not new_z in self.nodesZ:
-                self.nodesZ[new_z] = weakref.WeakSet()
-            self.nodesZ[new_z].add(node)
+        new_z = entity.z
+        if new_z != None and 'viewable' in entity.tags:
+            if not new_z in self.entitiesByZ:
+                self.entitiesByZ[new_z] = weakref.WeakSet()
+            self.entitiesByZ[new_z].add(entity)
+
+    def hideEntity(self, entity):
+        """ Check all the Z layers, remove the entity from it"""
+        for z, entities in self.entitiesByZ.iteritems():
+            if entity in entities:
+                entities.remove(entity)
+                break
+
+    def refreshEntityTags(self, entity, added_tags=[], removed_tags=[]):
+        for tag in added_tags:
+            if tag not in self.entitiesByTag:
+                self.entitiesByTag[tag] = weakref.WeakSet()
+            if entity not in self.entitiesByTag[tag]:
+                self.entitiesByTag[tag].add(entity)
+
+        for tag in removed_tags:
+            if tag in self.entitiesByTag:
+                if entity in self.entitiesByTag[tag]:
+                    self.entitiesByTag[tag].remove(entity)
+        
 
     def reportEvent(self, event):
-        """ Propagate an event through the nodes """
+        """ Propagate an event through the entities """
         # Do some event mapping/discarding
         if event.type == Event.TYPE._mousedown or event.type == Event.TYPE._moztouchdown:
             event.type = Event.TYPE.touchdown
@@ -498,7 +477,7 @@ class Gilbert:
                     event.deltax = event.x - lastTouch.x
                     event.deltay = event.y - lastTouch.y
 
-            # Walk the nodes, see if the event matches one of them and inform it of the event
+            # Walk the entities, see if the event matches one of them and inform it of the event
             scale_x, scale_y = self.renderer.scale
             # Scroll is in scene coordinates
             scroll_x, scroll_y = self.renderer.scroll
@@ -507,17 +486,17 @@ class Gilbert:
             y = int((event.y+ scroll_y)/scale_y)
 
             if not self._touchCaptured:
-                zindexs = self.nodesZ.keys()
+                zindexs = self.entitiesByZ.keys()
                 if len(zindexs) >0:
                     zindexs.sort(reverse=True)
                 for z in zindexs:
                     if not continuePropagation:
                         break
-                    for node in self.nodesZ[z]:
-                        if node.hits(x, y):
-                            continuePropagation, captureEvent = node.event(event)
+                    for entity in self.entitiesByZ[z]:
+                        if entity.hits(x, y):
+                            continuePropagation, captureEvent = entity.event(event)
                             if captureEvent:
-                                self._touchCaptor = node
+                                self._touchCaptor = entity
                                 self._touchCaptured = True
                             if not continuePropagation:
                                 break
@@ -556,17 +535,17 @@ class Gilbert:
                     self._storeEvent(event)
             
         elif event.ethereal:
-            # Send the event to all nodes until something stops it
-            zindexs = self.nodesZ.keys()
+            # Send the event to all entity until something stops it
+            zindexs = self.entitiesByZ.keys()
             if len(zindexs) >0:
                 zindexs.sort(reverse=True)
             for z in zindexs:
                 if not continuePropagation:
                     break
-                for node in self.nodesZ[z]:
-                    continuePropagation, captureEvent = node.event(event)
+                for entity in self.entitiesByZ[z]:
+                    continuePropagation, captureEvent = entity.event(event)
                     if captureEvent:
-                        self._touchCaptor = node
+                        self._touchCaptor = entity
                         self._touchCaptured = True
                     if not continuePropagation:
                         break
@@ -577,46 +556,6 @@ class Gilbert:
                 elif event.type == Event.TYPE.zoomout:
                     self.renderer.scaleByFactor(0.8)
                     
-    def resetScene(self):
-        """ Reset all the scene information """
-        # Make sure all nodes finished loading and running
-        debug('Waiting for nodes to finish loading/running')
-        tries = 0
-        while self.loading or self.running:
-            self.update(wrapup=True)
-            tries += 1
-            if tries > 100:
-                debug('Still waiting for loading nodes: %s' % self.loading)
-                debug('Still waiting for running nodes: %s' % self.running)
-                tries = 0
-
-        # Get rid of dirty rects
-        #self.renderer.dirtyAll()
-
-        nodes = self.nodes[:]
-        for node in nodes:
-            # Remove takes the node out of self.nodes and frees the data
-            node.remove()
-
-        del nodes
-        del self.nodes
-        del self.nodesZ
-        del self.nodesType
-        del self.loading
-        del self.running
-
-        # Really remove nodes and data
-        gc.collect()
-        # Clean up cache
-        self.dataManager.cleanup()
-        gc.collect()
-
-        self.nodes = []
-        self.nodesType = {}
-        self.nodesZ = {}
-        self.loading = []
-        self.running = {}
-
     def _storeEvent(self, event):
         """ Store a touch/mouse event for a stream, to be used for future reference"""
         self._touches[event.stream] = event
@@ -628,13 +567,13 @@ class Gilbert:
 
     def saveState(self):
         """ Serialize the current status of the engine """
-        debug('Waiting for nodes to finish loading before saving state')
+        debug('Waiting for entities to finish loading before saving state')
         tries = 0
         while self.loading:
             self.update()
             tries += 1
             if tries > 100:
-                debug('Still waiting for loading nodes: %s' % self.loading)
+                debug('Still waiting for loading entities: %s' % self.loading)
                 tries = 0
 
 
@@ -643,30 +582,138 @@ class Gilbert:
         #f.close()
 
     def loadState(self):
-        try:
-            if os.path.isfile('ignifuga.state'):
-                f = open('ignifuga.state', 'r')
-                self.nodes = pickle.load(f)
-                f.close()
+        pass
+        # TODO!
+#        try:
+#            if os.path.isfile('ignifuga.state'):
+#                f = open('ignifuga.state', 'r')
+#                self.nodes = pickle.load(f)
+#                f.close()
+#
+#                for node in self.nodes:
+#                    task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
+#                    self.loading.append((task, None, None))
+#
+#                return True
+#            else:
+#                return False
+#        except:
+#            return False
 
-                for node in self.nodes:
-                    task = Task(weakref.ref(node), node.init, parent=Task.getcurrent())
-                    self.loading.append((task, None, None))
-
-                return True
-            else:
-                return False
-        except:
+    def loadScenes(self, data):
+        """ Load scenes from a dictionary like structure. The data format is...
+        """
+        if not isinstance(data, dict):
             return False
-        
+
+        # As scene data may be cached or still referenced when the loop ends,
+        # we iterate over a deepcopy of it to avoid a reference circle with entities
+        # that prevents them from being garbage collected
+        for scene_id, scene_data in copy.deepcopy(data).iteritems():
+            self.loadScene(scene_id, scene_data)
+
+    def loadScene(self, scene_id, scene_data):
+        scene = Scene(id=scene_id, **scene_data)
+        self.scenes[scene_id] = scene
+
+    def startScene(self, scene_id):
+        if scene_id in self.scenes:
+            self.scene = self.scenes[scene_id]
+            self.entities = self.scene.entities
+            self.scene.init()
+            for entity in self.entities.itervalues():
+                self.startEntity(entity)
+
+            return True
+
+        return False
+
+    def resetScenes(self):
+        """ Reset all scene, garbage collect, get ready to leave! """
+        for scene_id in self.scenes.iterkeys():
+            self.resetScene(scene_id)
+
+
+        self.scenes = {}
+
+        # Clean up cache
+        self.dataManager.cleanup()
+        gc.collect()
+
+    def resetScene(self, scene_id):
+        """ Reset all the scene information """
+        # Make sure all entities finished loading and running
+        debug('Waiting for entities to finish loading/running')
+        tries = 0
+        while self.loading or self.running:
+            self.update(wrapup=True)
+            tries += 1
+            if tries > 100:
+                debug('Still waiting for loading entities: %s' % self.loading)
+                debug('Still waiting for running entities: %s' % self.running)
+                tries = 0
+
+
+        for entity in self.entities.values():
+            # Forget about the entity and release data
+            entity.unregister()
+
+        del self.entities
+        del self.scene
+        del self.entitiesByZ
+        del self.entitiesByTag
+        del self.loading
+        del self.running
+
+        # Really remove nodes and data
+        gc.collect()
+        # Clean up cache
+        self.dataManager.cleanup()
+        gc.collect()
+
+        self.scene = {}
+        self.entities = {}
+        self.entitiesByZ = {}
+        self.entitiesByTag = {}
+        self.loading = {}
+        self.running = {}
+
+    def startEntity(self, entity):
+        # Add it to the loading queue
+        wr = weakref.ref(entity)
+        task = Task(wr, entity.init, parent=Task.getcurrent())
+        self.loading[wr] = (task, None, None)
+        entity.loading = True
+
+    def stopEntity(self, entity):
+        """ Remove node, release its data """
+
+        # Add it to the loading queue
+        wr = weakref.ref(entity)
+        if wr in self.loading:
+            del self.loading[wr]
+
+        zindex = entity.z
+        if zindex != None and zindex in self.entitiesByZ and entity in self.entitiesByZ[zindex]:
+            self.entitiesByZ[entity.z].remove(entity)
+
+        self.refreshEntityTags(entity, [], entity.tags)
+
+        if wr in self.running:
+            del self.running[wr]
+
+#        # Remove the strong reference
+#        if weakref.ref(entity) in self.nodes:
+#            self.nodes.remove(node)
+#        else:
+#            debug('Tried to unregister node %s, but Gilbert didnt know about it in the first place' % node)
+         #node.free()
+
+
 
 # Gilbert imports
 from Renderer import Renderer as _Renderer
 from Log import Log
-
-# Nodes
-from Background import Background
+from Entity import Entity
+from components import Component
 from Scene import Scene
-from SpriteNode import SpriteNode
-from TextNode import TextNode
-from Node import Node

@@ -34,6 +34,11 @@
 #(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Ignifuga Game Engine
-# Base Entity class
-# Author: Gabriel Jacobo <gabriel@mdqinc.com>
+# Required for embedding
+__path__ = ['ignifuga/components',]
+
+# Import modules here so the end user can do from ignifuga.components import * and get all the available components
+from Component import Component
+from Sprite import Sprite
+from Text import Text
+
