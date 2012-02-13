@@ -75,7 +75,7 @@ class Sprite(Viewable):
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
 
 
-    def init(self, data):
+    def init(self, **data):
         """ Initialize the required external data """
 
 
@@ -90,11 +90,11 @@ class Sprite(Viewable):
                 self.sprite = None
 
         self._updateSize()
-        super(Sprite, self).init(data)
+        super(Sprite, self).init(**data)
 
-    def update(self, data):
+    def update(self, **data):
         """ Initialize the required external data """
-        super(Sprite, self).update(data)
+        super(Sprite, self).update(**data)
         if self.sprite != None:
             self.sprite.nextFrame()
 
@@ -187,7 +187,7 @@ class Sprite(Viewable):
 
 
     def __getstate__(self):
-        odict = super(Sprite, self).__getstate__()
+        odict = self.__dict__.copy()
         # Remove non pickable elements
         del odict['sprite']
         del odict['_atlas']

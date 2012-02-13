@@ -67,7 +67,7 @@ class Text(Viewable):
 
         super(Text, self).__init__(id, entity, active, frequency, **data)
 
-    def init(self, data):
+    def init(self, **data):
         """ Initialize the required external data """
 
         self._canvas = Canvas()(width=1, height=1)
@@ -76,7 +76,7 @@ class Text(Viewable):
         if self._text != '' and self._font != None:
             self._updateCanvas()
 
-        super(Text, self).init(data)
+        super(Text, self).init(**data)
 
     @property
     def canvas(self):

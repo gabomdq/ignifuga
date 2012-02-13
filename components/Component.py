@@ -81,6 +81,7 @@ class Component(object):
         self.entityTags += self.ENTITY_TAGS
         self.properties += self.PROPERTIES
 
+
     def _loadDefaults(self, data):
         """ Load data into the instance if said data doesn't exist """
         for key,value in data.iteritems():
@@ -158,10 +159,10 @@ class Component(object):
         """ Sets the update rate in hz"""
         self._period = 1000.0 / value
 
-    def init(self, data):
+    def init(self, **kwargs):
         self.active = self._initiallyActive
 
-    def update(self, now):
+    def update(self, now, **kwargs):
         """ Update the component"""
         pass
 

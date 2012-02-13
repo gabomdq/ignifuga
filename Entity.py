@@ -114,8 +114,20 @@ class Entity(object):
 
     def init(self,data):
         """ Initialize the required external data """
-        for component in self._components.itervalues():
-            component.init(data)
+        components = self._components.keys()
+        failcount = {}
+        while components:
+            component = components.pop()
+            try:
+                self._components[component].init(**data)
+            except:
+                # Something failed, try it again later
+                if component not in failcount:
+                    failcount[component] = 1
+                else:
+                    failcount[component] += 1
+                if failcount[component] < 10:
+                    components.append(component)
         return self
 
     def register(self):
@@ -135,30 +147,36 @@ class Entity(object):
     def load(self, data):
         """ Load components from given data
         data has the format may be:
-        { 'components': [{'type':'position','x':1.0,'y':1.0}, {'type':'sprite',image:'test.png'}, etc], otherdata }
+        { 'components': [{'id':'something', 'type':'position','x':1.0,'y':1.0}, {id:'somethingelse', 'type':'sprite',image:'test.png'}, etc], otherdata }
+        { 'components': {'something':{'type':'position','x':1.0,'y':1.0}, 'somethingelse': {'type':'sprite',image:'test.png'}, etc}, otherdata }
 
         The key of each entry
         """
         if 'components' in data:
-            for c_id, c_data in data['components'].iteritems():
-                c_data['id'] = c_id
-                c_data['entity'] = self
-                Component.create(**c_data)
+            if isinstance(data['components'], dict):
+                for c_id, c_data in data['components'].iteritems():
+                    c_data['id'] = c_id
+                    c_data['entity'] = self
+                    Component.create(**c_data)
+            elif isinstance(data['components'], list):
+                for c_data in data['components']:
+                    c_data['entity'] = self
+                    Component.create(**c_data)
 
     def __getstate__(self):
         odict = self.__dict__.copy()
         # These dont exist in self.__dict__ as they come from Cython (some weird voodoo, right?)...
         # So, we have to add them by hand for them to be pickled correctly
-        odict['id'] = self.id
-        odict['released'] = self.released
-        odict['components'] = self._components
-        odict['componentsByTag'] = self._componentsByTag
-        odict['componentsBySignal'] = self._componentsBySignal
-        odict['tags'] = self.tags
+#        odict['id'] = self.id
+#        odict['released'] = self._released
+#        odict['components'] = self._components
+#        odict['componentsByTag'] = self._componentsByTag
+#        odict['componentsBySignal'] = self._componentsBySignal
+#        odict['tags'] = self.tags
         return odict
 
-    def __reduce__(self):
-        return type(self), (self.parent,), self.__getstate__()
+#    def __reduce__(self):
+#        return type(self), (None,), self.__getstate__()
 
     def __setstate__(self, data):
         for k,v in data.iteritems():
@@ -205,13 +223,13 @@ class Entity(object):
 
             self.addProperties(component)
 
-        # Update tag index in the Gilbert overlord
-        #TODO
-
     def remove(self, component):
         """ Remove a component from the entity (accepts either the component object or the id) """
-        if isinstance(component, Component):
-            component = component.id
+        if not isinstance(component, Component):
+            if component in self._components:
+                component = self._components[component]
+            else:
+                return
 
         if component in self._components:
             del self._components[component]
@@ -282,7 +300,7 @@ class Entity(object):
         # Run the active components update loop
         for component in self._components.itervalues():
             if component.active:
-                component.update(data)
+                component.update(**data)
 
     # Events from the overlord
     def event(self, event):

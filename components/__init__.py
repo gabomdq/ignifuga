@@ -39,6 +39,9 @@ __path__ = ['ignifuga/components',]
 
 # Import modules here so the end user can do from ignifuga.components import * and get all the available components
 from Component import Component
+
+from Action import Action
 from Sprite import Sprite
 from Text import Text
+
 

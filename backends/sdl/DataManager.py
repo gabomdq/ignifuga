@@ -54,6 +54,11 @@ def sanitizeData (k,v, p=True):
         for k1, v1 in v.items():
             key1, value1 = sanitizeData(k1,v1)
             value[key1] = value1
+    elif isinstance(v, list):
+        value = []
+        for v1 in v:
+            k1,v1 =  sanitizeData(key, v1)
+            value.append(v1)
     else:
         value = v
 
