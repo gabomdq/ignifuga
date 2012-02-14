@@ -56,6 +56,7 @@ except:
 from base64 import b64decode
 #from zlib import decompress
 from ignifuga.Rect import Rect
+from ignifuga.Log import error
 import sys
 
 
@@ -170,18 +171,11 @@ class Sprite(Viewable):
         return [0, 0, self._width_src, self._height_src, self.x, self.y, self.width, self.height]
 
     def hits(self, x, y):
-        # Check if x,y hits the sprite
-        # TODO: account for sprite rotation!
-        # TODO: Let the entity know if there's a hit
-
-
-        if self.interactive and x>=self._x and x <= self._x+self.width and y >= self._y and y <= self._y + self.height:
+        """ x,y are in sprite coords"""
+        if self.interactive and x>=0 and x <= self._width_src and y >= 0 and y <= self._height_src:
             # Check if the point on the sprite is visible
-            x -= self._x
-            y -= self._y
             if self.sprite != None:
-                hits = self.sprite.hits(x,y)
-                return hits
+                return self.sprite.hits(x,y)
             return True
         return False
 
@@ -363,7 +357,10 @@ class _Sprite:
 
     def hits(self, x, y):
         # Check if the sprite has a transparent point at x,y
-        return self._hitmap[self._frame][y*self._width+x] if self._hitmap != None else False
+#        if int(y*self._width+x) > self._width*self._height:
+#            error('Tried to check %d,%d coords in a %d,%d sprite ' % (x,y, self._width, self._height))
+#            return False
+        return self._hitmap[self._frame][int(y*self._width+x)] if self._hitmap != None else False
 
     @property
     def mod(self, colormod):

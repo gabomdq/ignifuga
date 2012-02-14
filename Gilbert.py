@@ -113,6 +113,11 @@ class Event:
     def __str__(self):
         return "%s (%s,%s) btn:%s stream: %s pre: %s mod: %s ethereal: %s" % (self.type, self.x, self.y, self.button, self.stream, self.pressure, str(self.modifiers), str(self.ethereal))
 
+class Signal(object):
+    touches = 'touches'
+    zoom = 'zoom'
+    scroll = 'scroll'
+
 def Renderer():
     return Gilbert().renderer
 
@@ -482,8 +487,8 @@ class Gilbert:
             # Scroll is in scene coordinates
             scroll_x, scroll_y = self.renderer.scroll
             
-            x = int((event.x+ scroll_x)/scale_x)
-            y = int((event.y+ scroll_y)/scale_y)
+            event.scene_x = int((event.x+ scroll_x)/scale_x)
+            event.scene_y = int((event.y+ scroll_y)/scale_y)
 
             if not self._touchCaptured:
                 zindexs = self.entitiesByZ.keys()
@@ -493,13 +498,12 @@ class Gilbert:
                     if not continuePropagation:
                         break
                     for entity in self.entitiesByZ[z]:
-                        if entity.hits(x, y):
-                            continuePropagation, captureEvent = entity.event(event)
-                            if captureEvent:
-                                self._touchCaptor = entity
-                                self._touchCaptured = True
-                            if not continuePropagation:
-                                break
+                        continuePropagation, captureEvent = entity.event(event)
+                        if captureEvent:
+                            self._touchCaptor = entity
+                            self._touchCaptured = True
+                        if not continuePropagation:
+                            break
             elif self._touchCaptor != None:
                 continuePropagation, captureEvent = self._touchCaptor.event(event)
                 if not captureEvent:

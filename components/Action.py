@@ -47,7 +47,7 @@ class Action(Component):
     This component behaves a bit different from other components as it chains itself. Only the main action is "active" in the entity.
     The rest of the chain is inactive and only gets updates via the chain.
 
-    TODO: Separate the Component part from the actual chain of actions... Entitiy->Action Component->Actions (like Sprite does)
+    TODO: Would it be better to separate the Component part from the actual chain of actions... Entitiy->Action Component->Actions (like Sprite does)
 
     duration: The duration of the action
     relative: If true, the final value is that of target+initial value, if false, the final value is the target value
@@ -291,7 +291,6 @@ class Action(Component):
                 a._runNext = deepcopy(action)
                 break
             a = a._runNext
-        print new_action
         return new_action
 
     def __or__(self, action):
@@ -301,7 +300,6 @@ class Action(Component):
         action.root = False
         new_action._runWith.append(deepcopy(self))
         new_action._runWith.append(deepcopy(action))
-        print new_action
         return new_action
 
     def __mul__(self, other):

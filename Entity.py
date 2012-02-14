@@ -38,11 +38,14 @@
 # Base Entity class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import Event, Gilbert
+from ignifuga.Gilbert import Event, Gilbert, Signal
 from ignifuga.Log import error
 from ignifuga.components.Component import Component
 
 import weakref
+
+
+
 class Entity(object):
     ###########################################################################
     # Initialization, deletion, overlord registration functions
@@ -293,7 +296,7 @@ class Entity(object):
         """ Internal update function, updates components, etc, runs IN PARALLEL with update """
         # Dispatch signals
         for signal in self.signalQueue:
-            self.directSignal(signal['signal'], signal['target'], signal['tags'], signal['data'])
+            self.directSignal(signal['signal'], signal['sender'], signal['target'], signal['data'])
 
         self.signalQueue = []
 
@@ -307,15 +310,26 @@ class Entity(object):
         # Handle an event, return: bool1, bool2
         #bool1: False if the event has to cancel propagation
         #bool2: True if the node wants to capture the subsequent events
-#        if event.type == Event.TYPE.touchdown:
-#            return self.onTouchDown(event)
-#        elif event.type == Event.TYPE.touchup:
-#            return self.onTouchUp(event)
-#        elif event.type == Event.TYPE.touchmove:
-#            return self.onTouchMove(event)
+        # Send the event as directSignals to subscribed components.
 
         #Don't capture ethereal events
-        return event.ethereal, False
+        continuePropagation, captureEvent = True, False
+
+        if event.type in (Event.TYPE.touchdown, Event.TYPE.touchup, Event.TYPE.touchmove):
+            signal = Signal.touches
+        elif event.type in (Event.TYPE.zoomin, Event.TYPE.zoomout):
+            signal = Signal.zoom
+        elif event.type == Event.TYPE.scroll:
+            signal = Signal.scroll
+        else:
+            return continuePropagation, captureEvent
+
+        if signal in self._componentsBySignal:
+            for component in self._componentsBySignal[signal]:
+                continuePropagation, captureEvent = component.slot(signal, self, event=event)
+                if not continuePropagation:
+                    break
+        return continuePropagation, captureEvent
 
 
     ###########################################################################
@@ -344,21 +358,12 @@ class Entity(object):
                     if not self._componentsBySignal[signal]:
                         del self._componentsBySignal[signal]
 
-    def signal(self, signal_name, target=None, tags = [], **data):
+    def signal(self, signal_name, sender=None, target=None, tags = [], subscribers = True, **data):
         """ Function used to send signals to components via a queue (signals are processed in the next update) """
-        self.signalQueue.append({'signal': signal_name, 'target': target, 'tags': tags, 'data': data})
-
-    def directSignal(self, signal_name, target=None, tags = [], **data):
-        """ Function used to send direct signals to components """
-        targets = []
-        # Send to target
-        if target != None and not isinstance(target, Component):
-            if target in self._components:
-                target = self._components[target]
-            else:
-                target=None
         if target != None:
-            targets.append(target)
+            targets = [target,]
+        else:
+            targets = []
 
         # Send to tags
         if not hasattr(tags, '__contains__'):
@@ -367,10 +372,27 @@ class Entity(object):
             if tag in self._componentsByTag:
                 for component in self._componentsByTag[tag]:
                     if component not in targets:
-                        targets.append(component)
-        for component in targets:
-            if component.active:
-                component.signal(signal_name, **data)
+                        targets.append(target)
+
+        if subscribers and signal_name in self._componentsBySignal:
+            for component in self._componentsBySignal[signal_name]:
+                if component not in targets:
+                    targets.append(component)
+
+        for target in targets:
+            self.signalQueue.append({'signal': signal_name, 'sender': sender, 'target': target, 'data': data})
+
+    def directSignal(self, signal_name, sender=None, target=None, **data):
+        """ Function used to send direct signals to components """
+        if target != None and not isinstance(target, Component):
+            if target in self._components:
+                target = self._components[target]
+            else:
+                return
+        if target.active:
+            return target.slot(signal_name, sender, **data)
+
+        return None
 
     ###########################################################################
     # Properties routing

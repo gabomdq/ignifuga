@@ -166,6 +166,6 @@ class Component(object):
         """ Update the component"""
         pass
 
-    def slot(self, signal, **data):
+    def slot(self, signal, sender=None, **data):
         """ Receives signals from the entity"""
         pass

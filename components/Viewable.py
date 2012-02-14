@@ -38,10 +38,22 @@
 # Graphic component, common base for text and sprite components
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import REQUESTS, Gilbert, Event
+from ignifuga.Gilbert import REQUESTS, Gilbert, Event, Signal
 from ignifuga.Task import *
 from ignifuga.components.Component import Component
 import sys
+
+def rotate2d(degrees,point,origin):
+    """
+    A rotation function that rotates a point around a point
+    to rotate around the origin use [0,0]
+    """
+    x = point[0] - origin[0]
+    y = point[1] - origin[1]
+    newx = (x*cos(radians(degrees))) - (y*sin(radians(degrees))) + origin[0]
+    newy = (x*sin(radians(degrees))) + (y*cos(radians(degrees))) + origin[1]
+
+    return newx,newy
 
 class Viewable(Component):
     """ Basic "viewable" class (though it has not content itself!)
@@ -51,7 +63,7 @@ class Viewable(Component):
     """
     TAGS = ['viewable',]
     ENTITY_TAGS = ['viewable',]
-    PROPERTIES = ['canvas', 'position', 'x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax', 'getRect', 'getRenderArea', 'hits']
+    PROPERTIES = ['canvas', 'position', 'x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax', 'getRect', 'getRenderArea']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
         # We have to do this here otherwise the z ordering thingy breaks
         self._entity = entity
@@ -76,8 +88,8 @@ class Viewable(Component):
             '_red': 1.0,
             '_green': 1.0,
             '_blue': 1.0,
-            '_parallax_x': 0.0,
-            '_parallax_y': 0.0,
+            'parallax_x': 0.0,
+            'parallax_y': 0.0,
             '_scrollx': 0,      # Keep track of the renderer scroll for parallax functionality
             '_scrolly': 0,
             'interactive': True
@@ -97,6 +109,9 @@ class Viewable(Component):
                     for component in components:
                         if component != self:
                             component.active = False
+                    self.entity.subscribe(self, Signal.touches)
+                    self.entity.subscribe(self, Signal.zoom)
+                    self.entity.subscribe(self, Signal.scroll)
                     Gilbert().refreshEntityZ(self.entity) # If self.visible == False, it will not be really shown
                 else:
                     Gilbert().hideEntity(self.entity)
@@ -124,15 +139,15 @@ class Viewable(Component):
 
     @property
     def parallax(self):
-        return (self._parallax_x, self._parallax_y)
+        return (self.parallax_x, self.parallax_y)
 
     @parallax.setter
     def parallax(self, xy):
-        self._parallax_x, self._parallax_y = xy
+        self.parallax_x, self.parallax_y = xy
 
     @property
     def x(self):
-        return self._x + self._scrollx * self._parallax_x
+        return self._x + self._scrollx * self.parallax_x
 
     @x.setter
     def x(self, new_x):
@@ -144,7 +159,7 @@ class Viewable(Component):
 
     @property
     def y(self):
-        return self._y + self._scrolly * self._parallax_y
+        return self._y + self._scrolly * self.parallax_y
 
     @y.setter
     def y(self, new_y):
@@ -274,10 +289,25 @@ class Viewable(Component):
     def hits(self, x, y):
         return False
 
-    def event(self, event):
-        if event.type == Event.TYPE.scroll:
+    def _convertScenePointToSprite(self, x, y):
+        """ Convert a point in scene coordinates to a point in unscaled/unrotated sprite coordinates"""
+        if self.angle != 0:
+            # Rotate the point -angle around center
+            x,y = rotate2d(-self.angle, (x,y), self.center)
+        x = (x-self.x)*self._width_src/self.width
+        y = (y-self.y)*self._height_src/self.height
+        return x,y
+
+    def slot(self, signal, sender=None, event=None, **data):
+        """ Receives signals from the entity"""
+        if signal == Signal.touches:
+            x,y = self._convertScenePointToSprite(event.scene_x, event.scene_y)
+            if self.hits(x,y):
+                return False, False
+            return True, False
+        elif signal == Signal.scroll:
             self._scrollx = event.x
             self._scrolly = event.y
-
-        return super(Viewable, self).event(event)
-
+            return True, False
+        elif signal == Signal.zoom:
+            return True, False

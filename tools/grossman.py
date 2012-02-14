@@ -58,7 +58,7 @@ class InvalidHeightWidth(Exception):
     pass
 
 class Grossman:
-    def __init__(self, files, output, width=None, height=None, compress=None, verbose=True):
+    def __init__(self, files, output, width=None, height=None, compress=None, verbose=True, singleMode=False):
         self.files = []
         self.output = output
         self.compress = compress
@@ -82,7 +82,7 @@ class Grossman:
             self.singleMode = False
         else:
             # One file name provided, check if it is a regexp
-            self.singleMode = True
+            self.singleMode = singleMode
             self.cwd = os.path.dirname(files[0])
             if self.cwd == '':
                 self.cwd = '.'
@@ -658,6 +658,9 @@ if __name__ == '__main__':
     parser.add_option("--savediff",
                   action="store_true", dest="savediff", default=False,
                   help="Save the inter frame differences as images")
+    parser.add_option("--single",
+        action="store_true", dest="singleMode", default=False,
+        help="Take all sprites from a single image. Requires --width and --height")
     
     (options, args) = parser.parse_args()
 
@@ -674,7 +677,7 @@ if __name__ == '__main__':
     
     
     try:    
-        t = Grossman(args, options.output, options.width, options.height, compress, options.verbose)
+        t = Grossman(args, options.output, options.width, options.height, compress, options.verbose, options.singleMode)
     except NoFilesFound:
         print "ERROR: No input files found\n"
         parser.print_help()

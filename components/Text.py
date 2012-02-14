@@ -176,8 +176,8 @@ class Text(Viewable):
             self._canvas.mod(self._red, self._green, self._blue, self._alpha)
 
     def hits(self, x, y):
-        # Check if x,y hits the component
-        if x>=self._x and x <= self._x+self.width and y >= self._y and y <= self._y + self.height:
+        """ x,y are in sprite coords"""
+        if self.interactive and x>=0 and x <= self._width_src and y >= 0 and y <= self._height_src:
             # Check if the point on the sprite is visible
             return True
         return False
