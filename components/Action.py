@@ -1,38 +1,8 @@
-#Copyright (c) 2010,2011, Gabriel Jacobo
+#Copyright (c) 2010-2012, Gabriel Jacobo
 #All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-#Redistribution and use in source and binary forms, with or without
-#modification, are permitted provided that the following conditions are met:
-
-    #* Redistributions of source code must retain the above copyright
-      #notice, this list of conditions and the following disclaimer.
-    #* Redistributions in binary form must reproduce the above copyright
-      #notice, this list of conditions and the following disclaimer in the
-      #documentation and/or other materials provided with the distribution.
-    #* Altered source versions must be plainly marked as such, and must not be
-      #misrepresented as being the original software.
-    #* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-      #nor the names of its contributors may be used to endorse or promote
-      #products derived from this software without specific prior written permission.
-    #* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      #the duration, code functionality and graphic or audio material related to
-      #the "splash screen", which should always be the first screen shown by the
-      #derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      #original author's URL and company logo.
-
-#THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
-#TERMS AND CONDITIONS
-
-#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#DISCLAIMED. IN NO EVENT SHALL GABRIEL JACOBO NOR MDQ INCORPOREO NOR THE CONTRIBUTORS
-#BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # Ignifuga Game Engine
 # Base Action class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
@@ -40,6 +10,7 @@
 import pickle
 from copy import deepcopy
 from Component import Component
+from ignifuga.Gilbert import Gilbert
 
 class Action(Component):
     """
@@ -53,7 +24,7 @@ class Action(Component):
     relative: If true, the final value is that of target+initial value, if false, the final value is the target value
     increase: A function that affects the function. Possible values: 'linear', 'square'
     """
-    def __init__(self, id=None, entity=None, active=True, frequency=15.0, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
+    def __init__(self, id=None, entity=None, active=True, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
     #def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, *args, **kwargs):
 
         self._tasks = data
@@ -64,7 +35,9 @@ class Action(Component):
         self._loop = 0
         self._relative = relative
         self._increase = increase.lower()
-        self._stopCallback = stopCallback
+        self._onStop = onStop
+        self._onStart = onStart
+        self._onLoop = onLoop
         self._persistent = persistent
         self._running = False
         self._root = root
@@ -83,9 +56,9 @@ class Action(Component):
     def active(self, active):
         if active == self._active or self._entity == None:
             return
-        if active:
+        if active and not self._running:
             self.start()
-        else:
+        elif not active and self._running:
             self.stop()
 
         Component.active.fset(self, active)
@@ -129,10 +102,15 @@ class Action(Component):
             else:
                 self._entity.remove(self)
 
-    def start(self, stopCallback=None):
+    def start(self, onStart=None, onStop=None, onLoop=None):
         """ Fire up the action chain """
-        if stopCallback != None:
-            self._stopCallback = stopCallback
+        if onStart != None:
+            self._onStart = onStart
+        if onStop != None:
+            self._onStop = onStop
+        if onLoop != None:
+            self._onLoop = onLoop
+
         if not self._running and not self._done and self._entity != None:
             if self._entity != None:
                 self._tasksStatus = {}
@@ -141,10 +119,15 @@ class Action(Component):
                         'targetValue': self._tasks[task],
                         'initValue': getattr(self._entity, task)
                     }
-
             self._running = True
             for a in self._runWith:
                 a.start()
+
+            if self._onStart != None:
+                if hasattr(self._onStart, '__call__'):
+                    self._onStart(self)
+                else:
+                    exec self._onStart
     
     def reset(self):
         """ Reset the internal status """
@@ -163,8 +146,11 @@ class Action(Component):
             self.reset()
 
             # The associated entity doesnt need to get a callback, it polls the action status on each update
-            if self._stopCallback != None:
-                self._stopCallback(self)
+            if self._onStop != None:
+                if hasattr(self._onStop, '__call__'):
+                    self._onStop(self)
+                else:
+                    exec self._onStop
 
     def update(self, now=0):
         """ Update the action, dt is float specifying elapsed seconds """
@@ -222,11 +208,19 @@ class Action(Component):
                     else:
                         # Don't reload initial values!
                         self._running = True
+                    if self._onLoop != None:
+                        if hasattr(self._onLoop, '__call__'):
+                            self._onLoop(self)
+                        else:
+                            exec self._onLoop
                 else:
                     self._loop = 0
                     # The associated entity doesnt need to get a callback, it polls the action status on each update
-                    if self._stopCallback != None:
-                        self._stopCallback(self)
+#                    if self._onStop != None:
+#                        if hasattr(self._onStop, '__call__'):
+#                            self._onStop(self)
+#                        else:
+#                            exec self._onStop
                     self.reset()
 
             
@@ -339,7 +333,7 @@ class Action(Component):
 
     def __repr__(self):
         retval = ''
-        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s Root: %s\n" % (self.id, self._tasks, self._entity.id if self._entity != None else '',self._duration, self._loopMax, self._root)
+        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self._entity.id if self._entity != None else '',self._duration, self._loopMax, self._root, self._running)
         if len(self._runWith) > 0:
             retval += "|Runs With:\n"
             for a in self._runWith:

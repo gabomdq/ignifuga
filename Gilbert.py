@@ -1,38 +1,7 @@
-#Copyright (c) 2010,2011, Gabriel Jacobo
+#Copyright (c) 2010-2012, Gabriel Jacobo
 #All rights reserved.
-
-#Redistribution and use in source and binary forms, with or without
-#modification, are permitted provided that the following conditions are met:
-
-    #* Redistributions of source code must retain the above copyright
-      #notice, this list of conditions and the following disclaimer.
-    #* Redistributions in binary form must reproduce the above copyright
-      #notice, this list of conditions and the following disclaimer in the
-      #documentation and/or other materials provided with the distribution.
-    #* Altered source versions must be plainly marked as such, and must not be
-      #misrepresented as being the original software.
-    #* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-      #nor the names of its contributors may be used to endorse or promote
-      #products derived from this software without specific prior written permission.
-    #* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      #the duration, code functionality and graphic or audio material related to
-      #the "splash screen", which should always be the first screen shown by the
-      #derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      #original author's URL and company logo.
-
-#THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
-#TERMS AND CONDITIONS
-
-#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#DISCLAIMED. IN NO EVENT SHALL GABRIEL JACOBO NOR MDQ INCORPOREO NOR THE CONTRIBUTORS
-#BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
 # Ignifuga Game Engine
 # Main Singleton
@@ -41,7 +10,7 @@
 from ignifuga.Rect import Rect
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
-import sys, pickle, os, weakref, gc, platform, copy
+import sys, pickle, os, weakref, gc, platform, copy, base64
 
 class BACKENDS:
     sdl = 'sdl'
@@ -124,56 +93,57 @@ def Renderer():
 def Canvas():
     return _Canvas
 
+########################################################################################################################
+# SPLASH SCENE DEFINITION.
+# ANY MODIFICATION OF THE SCENE DEFINITION AND RELATED CODE AND ARTWORK RENDERS THE LICENSE TO USE THIS ENGINE VOID.
+########################################################################################################################
+
+SPLASH_SCENE = {
+    "resolution": {
+        "width": 1920,
+        "height": 1200,
+        "keep_aspect": True
+    },
+    "size": {
+        "width": 1920,
+        "height": 1200
+    },
+    "entities": {
+        "splash": {
+            "components": [{
+                "type": "Sprite",
+                "file": u"embedded:splash",
+                "z": 0,
+                "interactive": False
+            },
+            {
+                "id" : "pause",
+                "type": "Action",
+                "duration": 2.0,
+                "runNext": {
+                    "duration":1.0,
+                    "relative":True,
+                    "alpha":0.0,
+                    "onStop": "Gilbert().startFirstScene()"
+                }
+            }]
+        }
+    }
+}
+from embedded import SPLASH
+EMBEDDED_IMAGES = {
+    'splash': SPLASH
+}
+
+########################################################################################################################
+# END SPLASH SCENE DEFINITION
+########################################################################################################################
+
 # Dynamic imported modules (they are set up depending on the backend)
 GameLoop = None
 DataManager = None
 _Canvas = None
 Target = None
-
-#
-
-#def createNode(parent, data, restore = None):
-#    """ Create node dynamically from given data
-#
-#    data may be:
-#        {'type': entity_type, 'id': nodeid, 'position': 1.0, etc, etc} or
-#        { 'nodeid': {'type':entity_type, position: 1.0, etc,etc} }
-#
-#    """
-#    if data.has_key('type'):
-#        type = data['type']
-#    elif len(data.keys())==1:
-#        id = data.keys()[0]
-#        data = data[id]
-#        data['id'] = id
-#        if data.has_key('type'):
-#            type = data['type']
-#        else:
-#            return None
-#    else:
-#        return None
-#
-#    # Sanitize data, convert all the keys to strings
-#    nodeData = {}
-#    for k,v in data.items():
-#        key, value = sanitizeData(k,v)
-#        nodeData[key] = value
-#
-#
-#    node = None
-#    if type == 'Background':
-#        node = Background(parent, **nodeData)
-#    elif type == 'Scene':
-#        node = Scene(parent, **nodeData)
-#    elif type == 'SpriteNode':
-#        node = SpriteNode(parent, **nodeData)
-#    elif type == 'TextNode':
-#        node = TextNode(parent, **nodeData)
-#
-#    if node != None:
-#        Gilbert().registerNode(node)
-#
-#    return node
 
 class GilbertPickler(pickle.Pickler):
     def memoize(self, obj):
@@ -258,9 +228,18 @@ class Gilbert:
             debug('Failed loading previous state')
             scenes = self.dataManager.loadJsonFile(scenesFile)
             self.loadScenes(scenes)
-            if not self.startScene(firstScene):
-                error('Could not load first scene')
+########################################################################################################################
+# SPLASH SCENE CODE
+# ANY MODIFICATION OF THE SCENE DEFINITION AND RELATED CODE AND ARTWORK RENDERS THE LICENSE TO USE THIS ENGINE VOID.
+########################################################################################################################
+            self._firstScene = firstScene
+            self.loadScene('splash', copy.deepcopy(SPLASH_SCENE))
+            if not self.startScene('splash'):
+                error('Could not load splash scene')
                 return
+########################################################################################################################
+# SPLASH SCENE CODE ENDS.
+########################################################################################################################
 
         debug('Starting Game Loop')
         self.startLoop()
@@ -306,8 +285,6 @@ class Gilbert:
         debug('Terminating backend %s' % (self.backend,))
         terminateBackend()
 
-
-        
     def endLoop(self):
         """ End the game loop, free stuff """
         self.gameLoop.quit = True
@@ -318,7 +295,8 @@ class Gilbert:
         wrapup = True forces the update loop to be broken, all running entities eventually stop running
         """
         # Call the pre update so we can tally how long the whole frame processing took (logic+render)
-        self.renderer.preUpdate(now)
+        if not wrapup:
+            self.renderer.preUpdate(now)
 
         # Initialize objects
         remove_entities = []
@@ -338,7 +316,7 @@ class Gilbert:
 
         # Update objects
         remove_entities = []
-        for entity_ref in self.running.iterkeys():
+        for entity_ref in self.running.keys():
             task1, req1, data1,task2,req2,data2 = self.running[entity_ref]
             if task1 != None:
                 task1, req1, data1 = self._processTask(task1, req1, data1, now, wrapup)
@@ -459,7 +437,6 @@ class Gilbert:
             if tag in self.entitiesByTag:
                 if entity in self.entitiesByTag[tag]:
                     self.entitiesByTag[tag].remove(entity)
-        
 
     def reportEvent(self, event):
         """ Propagate an event through the entities """
@@ -632,19 +609,22 @@ class Gilbert:
 
         return False
 
+    def startFirstScene(self):
+        if not self.changeScene(self._firstScene):
+            error('Error loading first scene: %s' % self._firstScene)
+
     def resetScenes(self):
         """ Reset all scene, garbage collect, get ready to leave! """
-        for scene_id in self.scenes.iterkeys():
-            self.resetScene(scene_id)
+#        for scene_id in self.scenes.iterkeys():
+#            self.resetScene(scene_id)
 
-
+        self.resetScene()
         self.scenes = {}
-
         # Clean up cache
         self.dataManager.cleanup()
         gc.collect()
 
-    def resetScene(self, scene_id):
+    def resetScene(self):
         """ Reset all the scene information """
         # Make sure all entities finished loading and running
         debug('Waiting for entities to finish loading/running')
@@ -671,9 +651,6 @@ class Gilbert:
 
         # Really remove nodes and data
         gc.collect()
-        # Clean up cache
-        self.dataManager.cleanup()
-        gc.collect()
 
         self.scene = {}
         self.entities = {}
@@ -681,6 +658,15 @@ class Gilbert:
         self.entitiesByTag = {}
         self.loading = {}
         self.running = {}
+
+        # Clean up cache
+        self.dataManager.cleanup()
+        gc.collect()
+
+    def changeScene(self, scene_id):
+        debug("Switching scene to: %s " % scene_id)
+        self.resetScene()
+        return self.startScene(scene_id)
 
     def startEntity(self, entity):
         # Add it to the loading queue
@@ -697,22 +683,19 @@ class Gilbert:
         if wr in self.loading:
             del self.loading[wr]
 
-        zindex = entity.z
-        if zindex != None and zindex in self.entitiesByZ and entity in self.entitiesByZ[zindex]:
-            self.entitiesByZ[entity.z].remove(entity)
-
+        self.hideEntity(entity)
         self.refreshEntityTags(entity, [], entity.tags)
 
         if wr in self.running:
             del self.running[wr]
 
-#        # Remove the strong reference
-#        if weakref.ref(entity) in self.nodes:
-#            self.nodes.remove(node)
-#        else:
-#            debug('Tried to unregister node %s, but Gilbert didnt know about it in the first place' % node)
-         #node.free()
 
+    def getEmbedded(self, url):
+        url = str(url)
+        if url in EMBEDDED_IMAGES:
+            return base64.b64decode(EMBEDDED_IMAGES[url])
+
+        return None
 
 
 # Gilbert imports

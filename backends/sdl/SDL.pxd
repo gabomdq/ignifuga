@@ -1,38 +1,8 @@
-#Copyright (c) 2010,2011, Gabriel Jacobo
+#Copyright (c) 2010-2012, Gabriel Jacobo
 #All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-#Redistribution and use in source and binary forms, with or without
-#modification, are permitted provided that the following conditions are met:
-
-    #* Redistributions of source code must retain the above copyright
-      #notice, this list of conditions and the following disclaimer.
-    #* Redistributions in binary form must reproduce the above copyright
-      #notice, this list of conditions and the following disclaimer in the
-      #documentation and/or other materials provided with the distribution.
-    #* Altered source versions must be plainly marked as such, and must not be
-      #misrepresented as being the original software.
-    #* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-      #nor the names of its contributors may be used to endorse or promote
-      #products derived from this software without specific prior written permission.
-    #* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      #the duration, code functionality and graphic or audio material related to
-      #the "splash screen", which should always be the first screen shown by the
-      #derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      #original author's URL and company logo.
-
-#THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
-#TERMS AND CONDITIONS
-
-#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#DISCLAIMED. IN NO EVENT SHALL GABRIEL JACOBO NOR MDQ INCORPOREO NOR THE CONTRIBUTORS
-#BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cdef extern from "SDL.h":
     ctypedef unsigned char Uint8
@@ -383,6 +353,8 @@ cdef extern from "SDL.h":
     cdef void SDL_Delay(Uint32 ms)
     cdef int SDL_PollEvent(SDL_Event * event)
     cdef SDL_RWops * SDL_RWFromFile(char *file, char *mode)
+    cdef SDL_RWops * SDL_RWFromMem(void *mem, int size)
+    cdef SDL_RWops * SDL_RWFromConstMem(void *mem, int size)
     cdef void SDL_FreeRW(SDL_RWops *area)
     cdef int SDL_GetRendererInfo(SDL_Renderer *renderer, SDL_RendererInfo *info)
     cdef int SDL_RenderSetViewport(SDL_Renderer * renderer, SDL_Rect * rect)
@@ -392,8 +364,11 @@ cdef extern from "SDL.h":
     cdef int SDL_SetTextureAlphaMod(SDL_Texture * texture, Uint8 alpha)
     cdef char * SDL_GetError()
 
+
 cdef extern from "SDL_image.h":
     cdef SDL_Surface *IMG_Load(char *file)
+    cdef SDL_Surface *IMG_Load_RW(SDL_RWops *src, int freesrc)
+    cdef SDL_Surface *IMG_LoadTyped_RW(SDL_RWops *src, int freesrc, char *type)
 
 cdef extern from "SDL_ttf.h":
     ctypedef struct TTF_Font
@@ -542,3 +517,9 @@ cdef extern from "SDL_ttf.h":
     cdef int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index)
 
 cpdef str readFile(str name)
+
+cdef extern from "stdlib.h":
+    ctypedef int size_t
+    void* malloc(size_t)
+    void free(void*)
+    void *memcpy(void *dst, void *src, long n)

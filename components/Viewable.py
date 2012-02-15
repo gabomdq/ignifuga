@@ -1,38 +1,8 @@
-#Copyright (c) 2010,2011, Gabriel Jacobo
+#Copyright (c) 2010-2012, Gabriel Jacobo
 #All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-#Redistribution and use in source and binary forms, with or without
-#modification, are permitted provided that the following conditions are met:
-
-#* Redistributions of source code must retain the above copyright
-#notice, this list of conditions and the following disclaimer.
-#* Redistributions in binary form must reproduce the above copyright
-#notice, this list of conditions and the following disclaimer in the
-#documentation and/or other materials provided with the distribution.
-#* Altered source versions must be plainly marked as such, and must not be
-#misrepresented as being the original software.
-#* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-#nor the names of its contributors may be used to endorse or promote
-#products derived from this software without specific prior written permission.
-#* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-#the duration, code functionality and graphic or audio material related to
-#the "splash screen", which should always be the first screen shown by the
-#derived work and which should ALWAYS state the Ignifuga Game Engine name,
-#original author's URL and company logo.
-
-#THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
-#TERMS AND CONDITIONS
-
-#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#DISCLAIMED. IN NO EVENT SHALL GABRIEL JACOBO NOR MDQ INCORPOREO NOR THE CONTRIBUTORS
-#BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Ignifuga Game Engine
 # Graphic component, common base for text and sprite components
@@ -43,6 +13,7 @@ from ignifuga.Task import *
 from ignifuga.components.Component import Component
 import sys
 
+
 def rotate2d(degrees,point,origin):
     """
     A rotation function that rotates a point around a point
@@ -50,8 +21,9 @@ def rotate2d(degrees,point,origin):
     """
     x = point[0] - origin[0]
     y = point[1] - origin[1]
-    newx = (x*cos(radians(degrees))) - (y*sin(radians(degrees))) + origin[0]
-    newy = (x*sin(radians(degrees))) + (y*cos(radians(degrees))) + origin[1]
+    #newx = (x*cos(radians(degrees))) - (y*sin(radians(degrees))) + origin[0]
+    #newy = (x*sin(radians(degrees))) + (y*cos(radians(degrees))) + origin[1]
+    return x,y
 
     return newx,newy
 
@@ -293,7 +265,10 @@ class Viewable(Component):
         """ Convert a point in scene coordinates to a point in unscaled/unrotated sprite coordinates"""
         if self.angle != 0:
             # Rotate the point -angle around center
-            x,y = rotate2d(-self.angle, (x,y), self.center)
+            if self.center == None:
+                x,y = rotate2d(-self.angle, (x,y), (self._width_src/2.0, self._height_src/2.0))
+            else:
+                x,y = rotate2d(-self.angle, (x,y), self.center)
         x = (x-self.x)*self._width_src/self.width
         y = (y-self.y)*self._height_src/self.height
         return x,y

@@ -1,4 +1,6 @@
-Copyright (c) 2010,2011, Gabriel Jacobo
+Ignifuga Game Engine License
+
+Copyright (c) 2010-2012, Gabriel Jacobo
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -15,10 +17,12 @@ modification, are permitted provided that the following conditions are met:
       nor the names of its contributors may be used to endorse or promote
       products derived from this software without specific prior written permission.
     * You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      the duration, code functionality and graphic or audio material related to
-      the "splash screen", which should always be the first screen shown by the
-      derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      original author's URL and company logo.
+      the presentation, duration, code functionality and graphic and audio material,
+      and all other perceptible properties related to the "splash screen",
+      which should always be the first screen shown by any derived work done with,
+      based on or that uses in any way the licensed code. The splash screen
+      should ALWAYS be shown and should clearly state the "Ignifuga Game Engine" name,
+      the www.ignifuga.org URL and MDQ Incorporeo company logo EXACTLY as the original author provided.
 
 THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
 TERMS AND CONDITIONS

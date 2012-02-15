@@ -2,16 +2,10 @@
 #All rights reserved.
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
+#ANY MODIFICATION DONE TO THIS FILE ANY OF THE FILES CONTAINED IN THIS DIRECTORY AUTOMATICALLY RENDERS THE LICENSE VOID.
 
-
+# Embedded data (art and others)
 # Required for embedding
-__path__ = ['ignifuga/components',]
+__path__ = ['ignifuga/embedded',]
 
-# Import modules here so the end user can do from ignifuga.components import * and get all the available components
-from Component import Component
-
-from Action import Action
-from Sprite import Sprite
-from Text import Text
-
-
+from splash import DATA as SPLASH
