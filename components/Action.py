@@ -1,58 +1,33 @@
-#Copyright (c) 2010,2011, Gabriel Jacobo
+#Copyright (c) 2010-2012, Gabriel Jacobo
 #All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-#Redistribution and use in source and binary forms, with or without
-#modification, are permitted provided that the following conditions are met:
-
-    #* Redistributions of source code must retain the above copyright
-      #notice, this list of conditions and the following disclaimer.
-    #* Redistributions in binary form must reproduce the above copyright
-      #notice, this list of conditions and the following disclaimer in the
-      #documentation and/or other materials provided with the distribution.
-    #* Altered source versions must be plainly marked as such, and must not be
-      #misrepresented as being the original software.
-    #* Neither the name of Gabriel Jacobo, MDQ Incorporeo, Ignifuga Game Engine
-      #nor the names of its contributors may be used to endorse or promote
-      #products derived from this software without specific prior written permission.
-    #* You must NOT, under ANY CIRCUMSTANCES, remove, modify or alter in any way
-      #the duration, code functionality and graphic or audio material related to
-      #the "splash screen", which should always be the first screen shown by the
-      #derived work and which should ALWAYS state the Ignifuga Game Engine name,
-      #original author's URL and company logo.
-
-#THIS LICENSE AGREEMENT WILL AUTOMATICALLY TERMINATE UPON A MATERIAL BREACH OF ITS
-#TERMS AND CONDITIONS
-
-#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#DISCLAIMED. IN NO EVENT SHALL GABRIEL JACOBO NOR MDQ INCORPOREO NOR THE CONTRIBUTORS
-#BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # Ignifuga Game Engine
 # Base Action class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import pickle
 from copy import deepcopy
+from Component import Component
+from ignifuga.Gilbert import Gilbert
 
-class Action(object):
+class Action(Component):
     """
-    Base Action class
+    Action component
+    This component behaves a bit different from other components as it chains itself. Only the main action is "active" in the entity.
+    The rest of the chain is inactive and only gets updates via the chain.
+
+    TODO: Would it be better to separate the Component part from the actual chain of actions... Entitiy->Action Component->Actions (like Sprite does)
+
     duration: The duration of the action
     relative: If true, the final value is that of target+initial value, if false, the final value is the target value
     increase: A function that affects the function. Possible values: 'linear', 'square'
     """
-    def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, *args, **kwargs):
-        self.id = id if id != None else hash(self)
-        self._tasks = kwargs
-        self._node = None       # The target of the action
-        self.reset()
-        
+    def __init__(self, id=None, entity=None, active=True, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
+    #def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, *args, **kwargs):
+
+        self._tasks = data
         self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
         self._loopMax = loop if loop >= 0 else None
@@ -60,49 +35,99 @@ class Action(object):
         self._loop = 0
         self._relative = relative
         self._increase = increase.lower()
-        self._stopCallback = stopCallback
+        self._onStop = onStop
+        self._onStart = onStart
+        self._onLoop = onLoop
         self._persistent = persistent
-        
-        
-    def setTarget(self, node):
-        if self._node != node:
-            if not self._running:
-                if self._node != None:
-                    self._node.detachAction(self)
-                self._node = node
-                self.reset()
-                for a in self._runWith:
-                    a.target = node
-                if self._runNext != None:
-                    self._runNext.target = node
+        self._running = False
+        self._root = root
+        self.reset()
+        super(Action, self).__init__(id, entity, active, frequency, **data)
+
+        # Process runWith and runNext
+        if runWith != None:
+            for rw in runWith:
+                self._runWith.append(Action(root=False, entity=entity, **rw))
+
+        if runNext != None:
+            self._runNext = Action(root=False, entity=entity, **runNext)
+
+    @Component.active.setter
+    def active(self, active):
+        if active == self._active or self._entity == None:
+            return
+        if active and not self._running:
+            self.start()
+        elif not active and self._running:
+            self.stop()
+
+        Component.active.fset(self, active)
+
+    @Component.entity.setter
+    def entity(self, entity):
+        """ Actions do not add themselves to the entity unless they are a root action, the rest takes updates via the chain of actions"""
+        if self._entity == entity:
+            return
+
+        if not self._running:
+            if self._root:
+                Component.entity.fset(self, entity)
             else:
-                raise Exception('Tried to assign a running action to a node')
+                self._entity = entity
 
-    def getTarget(self):
-        return self._node
-
-    target = property(getTarget, setTarget)
+            self.reset()
+            for a in self._runWith:
+                a.entity = entity
+            if self._runNext != None:
+                self._runNext.entity = entity
+        else:
+            raise Exception('Tried to assign a running action to a entity')
 
     @property
     def persistent(self):
         return self._persistent
-    
-    def start(self, stopCallback=None):
+
+    @property
+    def root(self):
+        return self._root
+
+    @root.setter
+    def root(self, root):
+        if self._root == root:
+            return
+        self._root = root
+        if self._entity != None:
+            if self._root:
+                self._entity.add(self)
+            else:
+                self._entity.remove(self)
+
+    def start(self, onStart=None, onStop=None, onLoop=None):
         """ Fire up the action chain """
-        if stopCallback != None:
-            self._stopCallback = stopCallback
-        if not self._running and not self._done and self._node != None:
-            if self._node != None:
+        if onStart != None:
+            self._onStart = onStart
+        if onStop != None:
+            self._onStop = onStop
+        if onLoop != None:
+            self._onLoop = onLoop
+
+        if not self._running and not self._done and self._entity != None:
+            if self._entity != None:
                 self._tasksStatus = {}
                 for task in self._tasks:
                     self._tasksStatus[task] = {
                         'targetValue': self._tasks[task],
-                        'initValue': getattr(self._node, task)
+                        'initValue': getattr(self._entity, task)
                     }
-                
             self._running = True
             for a in self._runWith:
                 a.start()
+
+            if self._onStart != None:
+                if hasattr(self._onStart, '__call__'):
+                    self._onStart(self)
+                else:
+                    exec self._onStart
     
     def reset(self):
         """ Reset the internal status """
@@ -120,11 +145,14 @@ class Action(object):
                 self._runNext.stop()
             self.reset()
 
-            # The associated node doesnt need to get a callback, it polls the action status on each update
-            if self._stopCallback != None:
-                self._stopCallback(self)
+            # The associated entity doesnt need to get a callback, it polls the action status on each update
+            if self._onStop != None:
+                if hasattr(self._onStop, '__call__'):
+                    self._onStop(self)
+                else:
+                    exec self._onStop
 
-    def update(self, now):
+    def update(self, now=0):
         """ Update the action, dt is float specifying elapsed seconds """
         if self._running:
             if not self._done:
@@ -180,11 +208,19 @@ class Action(object):
                     else:
                         # Don't reload initial values!
                         self._running = True
+                    if self._onLoop != None:
+                        if hasattr(self._onLoop, '__call__'):
+                            self._onLoop(self)
+                        else:
+                            exec self._onLoop
                 else:
                     self._loop = 0
-                    # The associated node doesnt need to get a callback, it polls the action status on each update
-                    if self._stopCallback != None:
-                        self._stopCallback(self)
+                    # The associated entity doesnt need to get a callback, it polls the action status on each update
+#                    if self._onStop != None:
+#                        if hasattr(self._onStop, '__call__'):
+#                            self._onStop(self)
+#                        else:
+#                            exec self._onStop
                     self.reset()
 
             
@@ -196,18 +232,18 @@ class Action(object):
                 init = self._tasksStatus[task]['initValue']
                 target = self._tasksStatus[task]['targetValue']
                 if self._relative:
-                    setattr(self._node, task, init + (target*step))
+                    setattr(self._entity, task, init + (target*step))
                 else:
-                    setattr(self._node, task, init+(target-init)*step)
+                    setattr(self._entity, task, init+(target-init)*step)
         else:
             # The action should stop, set everything at their final value
             for task in self._tasksStatus:
                 init = self._tasksStatus[task]['initValue']
                 target = self._tasksStatus[task]['targetValue']
                 if self._relative:
-                    setattr(self._node, task, init+target)
+                    setattr(self._entity, task, init+target)
                 else:
-                    setattr(self._node, task, target)
+                    setattr(self._entity, task, target)
                     
             self._done = True
             
@@ -238,7 +274,9 @@ class Action(object):
     
     def __add__(self, action):
         """ Add an enclosing dummy action in line that harbors the two added actions, returns a new Action"""
-        new_action = Action(id = self.id, persistent=self.persistent)
+        new_action = Action(id = self.id, entity=self._entity, persistent=self.persistent)
+        self.root = False
+        action.root = False
         a = new_action._runNext = deepcopy(self)
 
         while True:
@@ -247,15 +285,15 @@ class Action(object):
                 a._runNext = deepcopy(action)
                 break
             a = a._runNext
-            
         return new_action
 
     def __or__(self, action):
         """ Add an enclosing dummy action in parallel that harbors the two or'ed actions, returns a new Action"""
-        new_action = Action(id = self.id, persistent=self.persistent)
+        new_action = Action(id = self.id, entity=self._entity, persistent=self.persistent)
+        self.root = False
+        action.root = False
         new_action._runWith.append(deepcopy(self))
         new_action._runWith.append(deepcopy(action))
-        
         return new_action
 
     def __mul__(self, other):
@@ -295,7 +333,7 @@ class Action(object):
 
     def __repr__(self):
         retval = ''
-        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s Persistent: %s\n" % (self.id, self._tasks, self._node.id if self._node != None else '',self._duration, self._loopMax, self._persistent)
+        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self._entity.id if self._entity != None else '',self._duration, self._loopMax, self._root, self._running)
         if len(self._runWith) > 0:
             retval += "|Runs With:\n"
             for a in self._runWith:

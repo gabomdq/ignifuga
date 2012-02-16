@@ -1,0 +1,26 @@
+www.ignifuga.org
+
+==About the Ignifuga Game Engine==
+
+Ignifuga is a multi platform 2D engine based in the Python language 
+inspired by similar offerings like Cocos2D, Cocos2D for iPhone, and AndEngine. 
+All your game logic code along with the engine's and supporting tools is converted to C during the build process, 
+and compiled into one big standalone binary for each of the supported platforms 
+(please refer to the FAQ for more information). 
+The project is currently in the alpha stage of development, so the expected performance may range from 
+not even working to attaining consciousness and starting the third world war for all we know. 
+For now, we hope that it lives up to its name and it at least doesn't catch fire.
+
+==Why Ignifuga? Who is he/her/it? What's in a name?==
+
+Ignifuga means fireproof in spanish. 
+That doesn't explain much, and it has little to do with game engines, I know. 
+Ignifuga is also the name of a chicken, Don Primerizo sidekick in my, ¿dead? long ago, 
+attempt at a graphic adventure "La Epopeya de Don Primerizo Lata". 
+Also, it's a catchy name, the art was already there, and the Linux OS has a penguin in their logo, 
+so don't come here judging me!
+
+== Where should I begin? ==
+
+Check out our Getting Started guide at http://ignifuga.org/gettingstarted
+Download the demo project at https://bitbucket.org/gabomdq/ignifuga-demo

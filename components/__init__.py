@@ -3,17 +3,15 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-# Ignifuga Game Engine
-# SDL Backend
-# Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 # Required for embedding
-__path__ = ['ignifuga/backends/sdl',]
+__path__ = ['ignifuga/components',]
 
-from SDL import *
+# Import modules here so the end user can do from ignifuga.components import * and get all the available components
+from Component import Component
 
-def initializeBackend():
-   initializeSDL()
+from Action import Action
+from Sprite import Sprite
+from Text import Text
 
-def terminateBackend():
-    terminateSDL()
+

@@ -1,0 +1,15 @@
+#!/bin/bash
+#Copyright (c) 2010-2012, Gabriel Jacobo
+#All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
+
+#ANY MODIFICATION DONE TO THIS FILE OR ANY OF THE FILES CONTAINED IN THIS DIRECTORY AUTOMATICALLY RENDERS THE LICENSE VOID.
+EMBEDDED_PATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+EMBEDDED_DIR=`dirname "$BUILDER_PATH"`
+
+cat $EMBEDDED_DIR/README > $2
+echo -ne "DATA=\"\"\"" >> $2
+base64 --wrap=76 $1 >> $2
+echo "\"\"\"" >> $2
+
