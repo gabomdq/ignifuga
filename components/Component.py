@@ -8,6 +8,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.Log import error
+from ignifuga.Gilbert import Gilbert
 
 class Component(object):
     TYPE = None
@@ -32,6 +33,7 @@ class Component(object):
         return None
 
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
+        self.overlord = Gilbert()
         self._id = id if id != None else hash(self)
         self._entity = None
         self._active = False
@@ -75,11 +77,13 @@ class Component(object):
             self._active = active
             if self.entity != None:
                 if self._active:
-                    self.entity.addTags(self.entityTags)
-                    self.entity.addProperties(self)
+                    #self.entity.addTags(self.entityTags)
+                    #self.entity.addProperties(self)
+                    self.entity.add(self)
                 else:
-                    self.entity.refreshTags()
-                    self.entity.removeProperties(self)
+                    #self.entity.refreshTags()
+                    #self.entity.removeProperties(self)
+                    self.entity.remove(self)
 
     @property
     def entity(self):
@@ -137,3 +141,10 @@ class Component(object):
     def slot(self, signal, sender=None, **data):
         """ Receives signals from the entity"""
         pass
+
+    def run(self, command=None):
+        if command != None:
+            if hasattr(command, '__call__'):
+                command(self)
+            else:
+                exec command

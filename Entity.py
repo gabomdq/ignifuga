@@ -188,32 +188,38 @@ class Entity(object):
 
     def getComponentsByTag(self, tags):
         """ Return a unique list of the components matching the tags or tag provided """
-        if not hasattr(tags, '__contains__'):
+        if isinstance(tags, basestring):
             tags = [tags,]
 
         components = []
+
         for tag in tags:
             if tag in self._componentsByTag:
                 for component in self._componentsByTag[tag]:
                     if component not in components:
                         components.append(component)
+
         return components
 
     def add(self, component):
         """ Add a component to the entity"""
-        if component.id in self._components:
-            error('Entity %s already has a component with id %s' % (self, component.id))
+        if component.id in self._components and self._components[component.id] != component:
+            error('Entity %s already has a different component with id %s' % (self, component.id))
             return
         self._components[component.id] = component
-        component.entity = self
+
+        if component.entity != self:
+            component.entity = self
+
         if component.active:
+            self.addProperties(component)
             self.addTags(component.entityTags)
             for tag in component.tags:
                 if tag not in self._componentsByTag:
                     self._componentsByTag[tag] = []
-                self._componentsByTag.append(component)
+                self._componentsByTag[tag].append(component)
 
-            self.addProperties(component)
+
 
     def remove(self, component):
         """ Remove a component from the entity (accepts either the component object or the id) """
@@ -242,7 +248,7 @@ class Entity(object):
 
     def addTags(self, tags):
         """ Add one tag or a list of tags to the entity"""
-        if not hasattr(tags, '__contains__'):
+        if isinstance(tags, basestring):
             tags = [tags,]
 
         for tag in tags:
@@ -253,7 +259,7 @@ class Entity(object):
 
     def removeTags(self, tags):
         """ Remove one tag or a list of tags to the entity"""
-        if not hasattr(tags, '__contains__'):
+        if isinstance(tags, basestring):
             tags = [tags,]
 
         for tag in tags:
@@ -355,7 +361,7 @@ class Entity(object):
             targets = []
 
         # Send to tags
-        if not hasattr(tags, '__contains__'):
+        if isinstance(tags, basestring):
             tags = [tags,]
         for tag in tags:
             if tag in self._componentsByTag:
@@ -391,8 +397,15 @@ class Entity(object):
             # If a request for _properties arrives here it means it doesn't yet exist. So, we just create it
             self.__dict__['_properties'] =  {}
             return self.__dict__['_properties']
+        if name == '_components':
+            self.__dict__['_components'] =  {}
+            return self.__dict__['_components']
+
         if name in self._properties:
             return getattr(self._properties[name], name)
+
+        if name in self._components:
+            return self._components[name]
 
         raise AttributeError('%s does not have a "%s" attribute. Properties are: %s ' % (self, name, self._properties))
 

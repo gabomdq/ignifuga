@@ -266,7 +266,6 @@ class Gilbert:
         for n in objs:
             if isinstance(n, Entity) or isinstance(n,Component):
                 debug ('%s: %s' % (n.__class__.__name__, n))
-                print dir(n)
                 for ref in gc.get_referrers(n):
                     if ref != objs:
                         debug('    REFERRER: %s %s'  % (ref.__class__, id(ref)))
@@ -421,9 +420,12 @@ class Gilbert:
 
     def hideEntity(self, entity):
         """ Check all the Z layers, remove the entity from it"""
-        for z, entities in self.entitiesByZ.iteritems():
+        for z in self.entitiesByZ.keys():
+            entities = self.entitiesByZ[z]
             if entity in entities:
                 entities.remove(entity)
+                if not entities:
+                    del self.entitiesByZ[z]
                 break
 
     def refreshEntityTags(self, entity, added_tags=[], removed_tags=[]):

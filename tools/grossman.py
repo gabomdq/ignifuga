@@ -640,8 +640,8 @@ if __name__ == '__main__':
     
     if options.deltap:
         compress = 'deltap'
-    elif options.deltak:
-        compress = 'deltak'
+#    elif options.deltak:
+#        compress = 'deltak'
     else:
         compress = None
     

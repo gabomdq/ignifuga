@@ -63,11 +63,13 @@ cdef class Renderer:
         gilbert = Gilbert()
         # Get a list of the z index of the entities in the scenes, we will traverse it in increasing order
         zindexs = gilbert.entitiesByZ.keys()
+        #print zindexs
         if len(zindexs) >0:
             zindexs.sort()
 
         for z in zindexs:
             for entity in gilbert.entitiesByZ[z]:
+                #print "Rendering", entity.id
 
                 # Intersect the entity rectangle with the screen rectangle
                 # nr is in scene coordinates

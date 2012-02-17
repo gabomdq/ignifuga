@@ -32,7 +32,8 @@ import sys
 class Sprite(Viewable):
     """ Sprite component class, viewable, potentially animated
     """
-    def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
+    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward']
+    def __init__(self, id=None, entity=None, active=True, frequency=15.0, loop=-1, **data):
 
         # Default values
         self._loadDefaults({
@@ -40,15 +41,21 @@ class Sprite(Viewable):
             '_spriteData': None,
             '_atlas': None,
             'sprite': None,
+            'loopMax': loop if loop >= 0 else None,
+            'loop': 0,
+            'onStart': None,
+            'onLoop': None,
+            'onStop': None,
+            'remainActiveOnStop': False,
+            'forward': True
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
 
+        self._started = True
 
     def init(self, **data):
         """ Initialize the required external data """
-
-
         # Do our initialization
         if self.file != None:
             self._atlas = LOAD_IMAGE(self.file)
@@ -56,6 +63,8 @@ class Sprite(Viewable):
                 self._spriteData = self._atlas.spriteData
                 self.sprite = _Sprite(self._spriteData, self._atlas, self.frequency)
                 self._updateColorModulation()
+                if not self.forward:
+                    self.sprite.frame = self.sprite.frameCount - 1
             else:
                 self.sprite = None
 
@@ -66,7 +75,34 @@ class Sprite(Viewable):
         """ Initialize the required external data """
         super(Sprite, self).update(**data)
         if self.sprite != None:
-            self.sprite.nextFrame()
+            if self.sprite.frame == 0 and self.loop == 0 and not self._started:
+                self._started = True
+                self.run(self.onStart)
+
+            if self.loopMax == None or self.loop < self.loopMax:
+                if self.forward:
+                    if self.sprite.nextFrame():
+                        if self.sprite.frame == 0:
+                            self.loop +=1
+                            self.run(self.onLoop)
+                        if self.loop == self.loopMax:
+                            self.run(self.onStop)
+                            if not self.remainActiveOnStop:
+                                self.active = False
+                                self.loop = 0
+                                self.frame = 0
+                else:
+                    if self.sprite.prevFrame():
+                        if self.sprite.frame == self.sprite.frameCount - 1:
+                            self.loop +=1
+                            self.run(self.onLoop)
+                        if self.loop == self.loopMax:
+                            self.run(self.onStop)
+                            if not self.remainActiveOnStop:
+                                self.active = False
+                                self.loop = 0
+                                self.frame = self.sprite.frameCount - 1
+
 
     def _updateSize(self):
         # Update our "public" width,height
@@ -132,6 +168,21 @@ class Sprite(Viewable):
         Viewable.alpha.fset(self,value)
         self._updateColorModulation()
 
+    @property
+    def frame(self):
+        return self.sprite.frame if self.sprite != None else 1
+
+    @frame.setter
+    def frame(self, frame):
+        if self.sprite != None:
+            self.sprite.frame = frame
+            if frame == 0:
+                self._started = False
+
+    @property
+    def frameCount(self):
+        return self.sprite.frameCount if self.sprite != None else 1
+
     def _updateColorModulation(self):
         if self.canvas != None:
             self.canvas.mod(self._red, self._green, self._blue, self._alpha)
@@ -157,7 +208,7 @@ class Sprite(Viewable):
         del odict['_spriteData']
         return odict
 
-class _Sprite:
+class _Sprite(object):
     """ Internal sprite implementation with animation"""
     def __init__(self, data, srcCanvas, rate=30):
         """ Data format is:
@@ -233,17 +284,32 @@ class _Sprite:
 
     def nextFrame(self):
         """ Forward to next frame or restart loop"""
-        if self.renderer.checkLapse(self._lastUpdate, self._lapse):
+        if self.renderer.checkLapse(self._lastUpdate, self._lapse) and self._frameCount > 1:
             self._lastUpdate = self.renderer.getTimestamp()
             self._frame+=1
             if self._frame >= self._frameCount:
                 self._frame=0
 
-
             # Consolidate the new sprite frame from _srcCanvas into _canvas
             for a in self._frames[self._frame]:
                 sx,sy,dx,dy,w,h = a
                 self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
+            return True
+
+        return False
+
+    def prevFrame(self):
+        """ Back to prev frame or restart loop"""
+        if self.renderer.checkLapse(self._lastUpdate, self._lapse) and self._frameCount > 1:
+            self._lastUpdate = self.renderer.getTimestamp()
+            prevFrame = self.frame -1
+            if prevFrame < 0:
+                prevFrame=self._frameCount -1
+
+            # Go back to the previous frame
+            self.frame = prevFrame
+            return True
+        return False
 
     def getFrameAreas(self):
         """ Return a set of areas from the Atlas that need to be renderer to conform the current sprite frame.
@@ -324,6 +390,32 @@ class _Sprite:
     def height(self):
         return self._height
 
+    @property
+    def frame(self):
+        return self._frame
+
+    @frame.setter
+    def frame(self, frame):
+        if frame < self._frameCount:
+            if self._type == 'atlas':
+                sx,sy,dx,dy,w,h = self._frames[frame][0]
+                self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
+                self._frame = frame
+            elif self._type == 'deltap':
+                sx,sy,dx,dy,w,h = self._frames[0][0]
+                self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
+                for f in range(1,frame):
+                    for a in self._frames[f]:
+                        sx,sy,dx,dy,w,h = a
+                        self._canvas.blitCanvas(self._srcCanvas, dx, dy, w, h, sx, sy, w, h, self._canvas.BLENDMODE_NONE)
+                self._frame = frame
+
+
+
+    @property
+    def frameCount(self):
+        return self._frameCount
+
     def hits(self, x, y):
         # Check if the sprite has a transparent point at x,y
         if y< 0 or y>self._height or x<0 or x>self._width:
@@ -345,7 +437,6 @@ class _Sprite:
         self.setColorMod(r,g,b,a)
 
     def setColorMod(self, r,g,b,a):
-        print "Setting colormod ",r,g,b,a
         if self._canvas != None:
             self._canvas.mod(r,g,b,a)
 

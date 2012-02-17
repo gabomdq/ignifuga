@@ -79,13 +79,16 @@ class Viewable(Component):
                     # Enforce exclusivity, disable other Viewable derived components
                     components = self.entity.getComponentsByTag('viewable')
                     for component in components:
-                        if component != self:
+                        if component != self and component.active:
                             component.active = False
                     self.entity.subscribe(self, Signal.touches)
                     self.entity.subscribe(self, Signal.zoom)
                     self.entity.subscribe(self, Signal.scroll)
                     Gilbert().refreshEntityZ(self.entity) # If self.visible == False, it will not be really shown
                 else:
+                    self.entity.unsubscribe(self, Signal.touches)
+                    self.entity.unsubscribe(self, Signal.zoom)
+                    self.entity.unsubscribe(self, Signal.scroll)
                     Gilbert().hideEntity(self.entity)
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)

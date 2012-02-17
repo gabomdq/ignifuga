@@ -123,11 +123,7 @@ class Action(Component):
             for a in self._runWith:
                 a.start()
 
-            if self._onStart != None:
-                if hasattr(self._onStart, '__call__'):
-                    self._onStart(self)
-                else:
-                    exec self._onStart
+            self.run(self._onStart)
     
     def reset(self):
         """ Reset the internal status """
@@ -146,11 +142,7 @@ class Action(Component):
             self.reset()
 
             # The associated entity doesnt need to get a callback, it polls the action status on each update
-            if self._onStop != None:
-                if hasattr(self._onStop, '__call__'):
-                    self._onStop(self)
-                else:
-                    exec self._onStop
+            self.run(self._onStop)
 
     def update(self, now=0):
         """ Update the action, dt is float specifying elapsed seconds """
@@ -208,11 +200,7 @@ class Action(Component):
                     else:
                         # Don't reload initial values!
                         self._running = True
-                    if self._onLoop != None:
-                        if hasattr(self._onLoop, '__call__'):
-                            self._onLoop(self)
-                        else:
-                            exec self._onLoop
+                    self.run(self._onLoop)
                 else:
                     self._loop = 0
                     # The associated entity doesnt need to get a callback, it polls the action status on each update
