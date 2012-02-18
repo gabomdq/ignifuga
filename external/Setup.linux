@@ -500,3 +500,6 @@ zlib zlibmodule.c -I$(prefix)/include
 greenlet greenlet.c
 _bitarray _bitarray.c
 
+#Profiling via cProfile
+# _lsprof is for cProfile.py
+_lsprof _lsprof.c rotatingtree.c
