@@ -604,7 +604,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
             # Fully static config
-            cmd = './configure LDFLAGS="-static-libgcc %s" CPPFLAGS="%s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
+            cmd = './configure LDFLAGS="-static-libgcc -m64 %s" CFLAGS="-m64" CPPFLAGS="-m64 %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
             # Mostly static, minus pthread and dl - Linux
             #cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
@@ -1264,7 +1264,7 @@ def make_sdl(platform, env=None):
 
         # i386 builds
         if not isfile(join(sdl_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch i386" LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
+            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
         cmd = 'make'
         Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
@@ -1272,7 +1272,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
 
         if not isfile(join(sdl_image_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch i386"  --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32"  --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_i386, 'Makefile'),)
@@ -1286,7 +1286,7 @@ def make_sdl(platform, env=None):
             cmd = './autogen.sh'
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if not isfile(join(sdl_ttf_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch i386" LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
             # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_i386, 'Makefile'),)
@@ -1296,7 +1296,7 @@ def make_sdl(platform, env=None):
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
 
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
             log('SDL i386 built successfully')
         else:
             error('Problem building SDL i386')
@@ -1315,6 +1315,8 @@ def make_sdl(platform, env=None):
         # Rename libraries with the _i386 suffix
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2.a'), join(DIST_DIR, 'lib', 'libSDL2_i386.a'))
         Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2main.a'), join(DIST_DIR, 'lib', 'libSDL2main_i386.a'))
+        Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_image.a'), join(DIST_DIR, 'lib', 'libSDL2_image_i386.a'))
         Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_ttf.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf_i386.a'))
@@ -1322,7 +1324,7 @@ def make_sdl(platform, env=None):
 
         # x86_64 builds
         if not isfile(join(sdl_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch x86_64" LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
+            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
 
         cmd = 'make'
@@ -1331,7 +1333,7 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
         
         if not isfile(join(sdl_image_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch x86_64" LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
@@ -1345,7 +1347,7 @@ def make_sdl(platform, env=None):
             cmd = './autogen.sh'
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if not isfile(join(sdl_ttf_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -arch x86_64" LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
             # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
@@ -1355,7 +1357,7 @@ def make_sdl(platform, env=None):
         cmd = 'make install'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
 
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
             log('SDL x86_64 built successfully')
         else:
             error('Problem building SDL x86_64')
@@ -1374,6 +1376,8 @@ def make_sdl(platform, env=None):
         # Rename libraries with the _x86_64 suffix
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2.a'), join(DIST_DIR, 'lib', 'libSDL2_x86_64.a'))
         Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2main.a'), join(DIST_DIR, 'lib', 'libSDL2main_x86_64.a'))
+        Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_image.a'), join(DIST_DIR, 'lib', 'libSDL2_image_x86_64.a'))
         Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_ttf.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf_x86_64.a'))
@@ -1386,6 +1390,17 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
+            log('SDL built successfully')
+        else:
+            error('Problem building SDL')
+            exit()
+
+        cmd = 'lipo -create %s %s -output %s' % (join(DIST_DIR, 'lib', 'libSDL2main_i386.a'), join(DIST_DIR, 'lib', 'libSDL2main_x86_64.a'), join(DIST_DIR, 'lib', 'libSDL2main.a'))
+        Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'ranlib %s' % join(DIST_DIR, 'lib', 'libSDL2main.a')
+        Popen(shlex.split(cmd), env=env).communicate()
+
+        if isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
             log('SDL built successfully')
         else:
             error('Problem building SDL')
