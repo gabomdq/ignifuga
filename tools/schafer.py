@@ -454,7 +454,7 @@ def get_available_platforms():
             AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
 
 def check_ignifuga_libraries(platform):
-    if platform == 'linux64' or platform == 'mingw32':
+    if platform in ['linux64', 'mingw32', 'osx']:
         if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
             return True
     elif platform == 'android':
@@ -1648,7 +1648,7 @@ def spawn_shell(platform):
     info('Exited from %s shell environment' % (platform,))
     
 def build_generic(options, platform, env=None):
-    if platform in ['linux64', 'mingw32']:
+    if platform in ['linux64', 'mingw32', 'osx']:
         # Android has its own skeleton set up
         cmd = 'mkdir -p "%s"' % DIST_DIR
         Popen(shlex.split(cmd), env=env).communicate()
@@ -1711,7 +1711,7 @@ def build_project_generic(options, platform, env=None):
         if not isfile(mfc):
             error ('Could not cythonize main file')
             exit()
-        cmd = "sed -i '1i#include \"SDL.h\"' %s" % mfc
+        cmd = "sed -i "" '1i#include \"SDL.h\"' %s" % mfc
         Popen(shlex.split(cmd), cwd = platform_build).communicate()
         shutil.move(mfc, main_file_c)
 
@@ -1720,19 +1720,30 @@ def build_project_generic(options, platform, env=None):
     for cf in cfiles:
         sources += cf + ' '
 
-    if platform in ['linux64', 'mingw32']:
+    if platform in ['linux64', 'mingw32', 'osx']:
         # Get some required flags
         cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
         sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
+        sdlflags = sdlflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
         freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --libs'
+        freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
+        pngflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
+        pngflags = pngflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+
         if platform == 'linux64':
-            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image -lSDL2 -lfreetype -lm -lz %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, options.project)
+            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
+            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
+        elif platform == 'osx':
+            cmd = '%s -arch i386 -arch x86_64 -static-libgcc -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
             Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
         elif platform == 'mingw32':
             extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
             cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz %s %s %s -o %s' % (env['CC'], sources, join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, extralibs, options.project)
-            print cmd
             Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
 
         if not isfile(join(cython_src, options.project)):
@@ -1740,7 +1751,7 @@ def build_project_generic(options, platform, env=None):
             exit()
         cmd = '%s %s' % (env['STRIP'], join(cython_src, options.project))
         Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
-        if platform == 'linux64':
+        if platform in ['linux64', 'osx']:
             shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
         elif platform == 'mingw32':
             shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project+'.exe'))
@@ -1849,6 +1860,8 @@ def build_project_linux64(options):
 def prepare_osx_env():
     """ Set up the environment variables for Linux64 compilation"""
     env = deepcopy(os.environ)
+    env['CC'] = 'gcc'
+    env['STRIP'] = 'strip'
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk'
     return env
 
@@ -1863,6 +1876,9 @@ def build_osx (options):
         os.makedirs(DIST_DIR)
     env = prepare_osx_env()
     build_generic(options, platform, env)
+    # Remove dynamic libraries to avoid confusions with the linker
+    cmd = 'rm *.dylib'
+    Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib')).communicate()
 
 def build_project_osx(options):
     platform = 'osx'
