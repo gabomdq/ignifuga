@@ -233,13 +233,13 @@ def check_host_tools():
         python_build = join(ROOT_DIR, 'tmp', 'python_host')
         if system == 'Linux' and arch == '64bit':
             prepare_python('linux64', None, python_build)
-            cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         elif system == 'Darwin' and arch == '64bit':
             prepare_python('osx', None, python_build)
-            cmd = './configure --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
+            cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        cmd = 'make install -k -j4'
+        cmd = 'make V=0 install -k -j4'
         Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         # Check that it built successfully
         if not isfile(join(python_build, 'python')) or not isfile(join(python_build, 'Parser', 'pgen')):
@@ -572,9 +572,9 @@ def make_python(platform, ignifuga_src, env=os.environ):
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
             # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
-            #cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
+            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
             # Mostly static, minus pthread and dl - Linux
-            cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
             # Patch the Makefile to optimize the static libraries inclusion... - Linux
             cmd = 'sed -i "s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
@@ -587,7 +587,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
         if isfile(join(PYTHON_BUILD,'setup.py')):
             os.unlink(join(PYTHON_BUILD,'setup.py'))
             
-        cmd = 'make install -k -j4'
+        cmd = 'make V=0 install -k -j4'
         # Rebuild Python including the frozen modules!
         Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
@@ -604,9 +604,9 @@ def make_python(platform, ignifuga_src, env=os.environ):
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
             # Fully static config
-            cmd = './configure LDFLAGS="-static-libgcc -m64 %s" CFLAGS="-m64" CPPFLAGS="-m64 %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
+            cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="%s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
             # Mostly static, minus pthread and dl - Linux
-            #cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
+            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
             # Patch the Makefile to optimize the static libraries inclusion... - Linux
             #cmd = 'sed -i "" "s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
@@ -619,7 +619,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
         if isfile(join(PYTHON_BUILD,'setup.py')):
             os.unlink(join(PYTHON_BUILD,'setup.py'))
 
-        cmd = 'make install -k -j4'
+        cmd = 'make V=0 install -k -j4'
         # Rebuild Python including the frozen modules!
         Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
@@ -632,11 +632,11 @@ def make_python(platform, ignifuga_src, env=os.environ):
         make_python_freeze(freeze_modules)
         # Android is built in shared mode
         if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
             cmd = 'sed -i "s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(PYTHON_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-        cmd = 'make -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+        cmd = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
         Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
         # Copy some files to the skeleton directory
@@ -659,9 +659,9 @@ def make_python(platform, ignifuga_src, env=os.environ):
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
             extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
-            cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s" CFLAGS="-DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i586-mingw32msvc --build=i686-pc-linux-gnu  --prefix="%s"'% (sdlldflags, extralibs, sdlcflags, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s" CFLAGS="-DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i586-mingw32msvc --build=i686-pc-linux-gnu  --prefix="%s"'% (sdlldflags, extralibs, sdlcflags, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
             # Mostly static, minus pthread and dl - Linux
-            #cmd = './configure LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
+            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
             cmd = 'sed -i "s|\${LIBOBJDIR}fileblocks\$U\.o||g" %s' % (join(PYTHON_BUILD, 'Makefile'))
@@ -683,7 +683,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
         if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
 
-        cmd = 'make install -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes'  % (HOSTPYTHON, HOSTPGEN)
+        cmd = 'make V=0 install -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes'  % (HOSTPYTHON, HOSTPGEN)
         Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
         # Check success
@@ -1053,9 +1053,9 @@ def make_sdl(platform, env=None):
         if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
 
-        cmd = 'make prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make install prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
 
         # Build libjpeg
@@ -1063,7 +1063,7 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
             
         if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
             cmd = 'sed -i "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
@@ -1073,11 +1073,11 @@ def make_sdl(platform, env=None):
             cmd = 'sed -i "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
-        cmd = 'make'
+        cmd = 'make V=0 '
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-lib'
+        cmd = 'make V=0 install-lib'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-headers'
+        cmd = 'make V=0 install-headers'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
@@ -1091,11 +1091,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
             
         if not isfile(join(SDL_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make '
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
@@ -1109,11 +1109,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
             
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
             log('SDL Image built successfully')
@@ -1126,11 +1126,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
             
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (DIST_DIR,DIST_DIR)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (DIST_DIR,DIST_DIR)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
             log('Freetype built successfully')
@@ -1147,11 +1147,11 @@ def make_sdl(platform, env=None):
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
             
         if not isfile(join(SDL_TTF_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
             log('SDL TTF built successfully')
@@ -1170,9 +1170,9 @@ def make_sdl(platform, env=None):
             # Force zlib to build universally
             cmd = 'sed -e "s|CFLAGS=|CFLAGS=%s %s |g" -i "" %s' % (universal_cflags, env['CFLAGS'], (join(ZLIB_BUILD, 'Makefile')))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libz.a')):
             log('zlib built successfully')
@@ -1184,9 +1184,9 @@ def make_sdl(platform, env=None):
         if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
 
-        cmd = 'make prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make install prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
 
         # Build libjpeg
@@ -1194,7 +1194,7 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
 
         if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure CFLAGS="%s %s" LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"' % (universal_cflags, env['CFLAGS'], DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"' % (universal_cflags, env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
             cmd = 'sed -e "s|\./libtool||g" -i "" %s' % (join(JPG_BUILD, 'Makefile'))
@@ -1204,11 +1204,11 @@ def make_sdl(platform, env=None):
             cmd = 'sed -e "s|^A = la|A = a|g" -i "" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-lib'
+        cmd = 'make V=0 install-lib'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-headers'
+        cmd = 'make V=0 install-headers'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
@@ -1222,11 +1222,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
 
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            cmd = './configure CFLAGS="%s %s" LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (universal_cflags, env['CFLAGS'],DIST_DIR,DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (universal_cflags, env['CFLAGS'],DIST_DIR,DIST_DIR)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
             log('Freetype built successfully')
@@ -1264,36 +1264,36 @@ def make_sdl(platform, env=None):
 
         # i386 builds
         if not isfile(join(sdl_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0 '
         Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
 
         if not isfile(join(sdl_image_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32"  --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_i386, 'Makefile'),)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
 
         if not isfile(join(sdl_ttf_build_i386, 'configure')):
             cmd = './autogen.sh'
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if not isfile(join(sdl_ttf_build_i386, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
             # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_i386, 'Makefile'),)
-            Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-        cmd = 'make'
+            #cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_i386, 'Makefile'),)
+            #Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
@@ -1324,37 +1324,37 @@ def make_sdl(platform, env=None):
 
         # x86_64 builds
         if not isfile(join(sdl_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
 
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
         
         if not isfile(join(sdl_image_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
-            Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make'
+            #cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
+            #Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
 
         if not isfile(join(sdl_ttf_build_x86_64, 'configure')):
             cmd = './autogen.sh'
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if not isfile(join(sdl_ttf_build_x86_64, 'Makefile')):
-            cmd = './configure CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
             # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
 
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
@@ -1434,9 +1434,9 @@ def make_sdl(platform, env=None):
         # Build freetype
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
             env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (ANDROID_NDK,DIST_DIR)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (ANDROID_NDK,DIST_DIR)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         if isfile(join(FREETYPE_BUILD, 'objs', '.libs', 'libfreetype.a')):
             cmd = 'rsync -aqut --exclude .svn --exclude .hg %s/ %s' % (join(FREETYPE_BUILD, 'include'), join(SDL_BUILD, 'jni', 'freetype', 'include'))
@@ -1474,9 +1474,9 @@ def make_sdl(platform, env=None):
         if not isfile(join(ZLIB_BUILD, 'Makefile')):
             cmd = './configure --static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libz.a')):
             log('zlib built successfully')
@@ -1487,9 +1487,9 @@ def make_sdl(platform, env=None):
         # Build libpng
         if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
-        cmd = 'make prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make install prefix="%s"' % (DIST_DIR,)
+        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
             log('libpng built successfully')
@@ -1502,7 +1502,7 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
 
         if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" LIBTOOL= --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
             cmd = 'sed -i "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
@@ -1512,11 +1512,11 @@ def make_sdl(platform, env=None):
             cmd = 'sed -i "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
         
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-lib'
+        cmd = 'make V=0 install-lib'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make install-headers'
+        cmd = 'make V=0 install-headers'
         Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
             log('libjpeg built successfully')
@@ -1527,7 +1527,7 @@ def make_sdl(platform, env=None):
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
             os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
         if not isfile(join(SDL_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
 
             # HACK FIX for SDL problem, this can be removed once SDL fixes this error
@@ -1538,9 +1538,9 @@ def make_sdl(platform, env=None):
 
 
 
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
             log('SDL built successfully')
@@ -1551,11 +1551,11 @@ def make_sdl(platform, env=None):
         if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
             os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = './configure LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
             log('SDL Image built successfully')
@@ -1568,11 +1568,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
         if not isfile(join(FREETYPE_BUILD, 'config.mk')):
             env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make install'
+        cmd = 'make V=0 install'
         Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
             log('Freetype built successfully')
@@ -1588,13 +1588,13 @@ def make_sdl(platform, env=None):
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
 
         if not isfile(join(SDL_TTF_BUILD, 'Makefile')):
-            cmd = './configure LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make'
+        cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make install-libSDL2_ttfincludeHEADERS'
+        cmd = 'make V=0 install-libSDL2_ttfincludeHEADERS'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make install-libLTLIBRARIES'
+        cmd = 'make V=0 install-libLTLIBRARIES'
         Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
         if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
             log('SDL TTF built successfully')
@@ -1891,7 +1891,7 @@ def prepare_android_env():
     env['AR'] = "arm-linux-androideabi-ar"
     env['RANLIB'] = "arm-linux-androideabi-ranlib"
     env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
-    env['MAKE'] = 'make -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
 
     env['DIST_DIR'] = DIST_DIR
     env['TMP_DIR'] = TMP_DIR
@@ -1946,7 +1946,7 @@ def prepare_mingw32_env():
     env['DLLTOOL'] = "i586-mingw32msvc-dlltool"
     env['OBJDUMP'] = "i586-mingw32msvc-objdump"
     env['RESCOMP'] = "i586-mingw32msvc-windres"
-    env['MAKE'] = 'make -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
     env['DIST_DIR'] = DIST_DIR
     env['TMP_DIR'] = TMP_DIR
     return env

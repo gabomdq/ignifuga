@@ -8,7 +8,7 @@ Index: Lib/site.py
  # set it to False to disable the feature or True to force the feature
 -ENABLE_USER_SITE = None
 +ENABLE_USER_SITE = False
- 
+
  # for distutils.commands.install
  # These values are initialized by the getuserbase() and getusersitepackages()
  # functions, through the main() function when Python starts.
@@ -16,6 +16,15 @@ Index: Lib/site.py
 -USER_BASE = None
 +USER_SITE = "."
 +USER_BASE = "."
- 
- 
+
+
  def makepath(*paths):
+@@ -307,7 +307,7 @@
+         else:
+             sitepackages.append(prefix)
+             sitepackages.append(os.path.join(prefix, "lib", "site-packages"))
+-        if sys.platform == "darwin":
++        if False: #sys.platform == "darwin":
+             # for framework builds *only* we add the standard Apple
+             # locations.
+             from sysconfig import get_config_var

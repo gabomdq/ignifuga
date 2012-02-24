@@ -178,6 +178,8 @@ class Gilbert:
             self.distro_name, self.distro_version, self.distro_id = platform.linux_distribution()
             if self.distro_name.lower() == 'android':
                 self.platform = 'android'
+        elif self.platform == 'darwin':
+            self.distro_name, self.distro_version, self.distro_id = platform.mac_ver()
         elif self.platform.startswith('win32'):
             self.distro_name, self.distro_version, self.distro_id, self.multi_cpu = platform.win32_ver()
 
