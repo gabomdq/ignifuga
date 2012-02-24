@@ -54,6 +54,7 @@ ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/o
 ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
 PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
 IGNIFUGA_SRC = ROOT_DIR
+SED_CMD = 'sed -i '
 
 PROJECT_ROOT = ""
 PROJECT_BUILD = ""
@@ -444,14 +445,16 @@ def get_build_platform():
 def get_available_platforms():
     """ Determine which build platforms are available depending on which platform we are building """
     system, arch, distro_name, distro_version, distro_id = get_build_platform()
-    global AVAILABLE_PLATFORMS
+    global AVAILABLE_PLATFORMS, SED_CMD
     if system == 'Linux':
+        SED_CMD = 'sed -i '
         if arch == '64bit':
             AVAILABLE_PLATFORMS = ['linux64', 'mingw32', 'android']
         else:
             AVAILABLE_PLATFORMS = ['mingw32', 'android']
     elif system == 'Darwin':
-            AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
+        SED_CMD = 'sed -i "" '
+        AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
 
 def check_ignifuga_libraries(platform):
     if platform in ['linux64', 'mingw32', 'osx']:
@@ -529,7 +532,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                cmd = 'sed -i "s|Windows.h|windows.h|g" %s' % (join(PYTHON_BUILD, 'Modules', 'signalmodule.c'),)
+                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(PYTHON_BUILD, 'Modules', 'signalmodule.c'),)
                 Popen(shlex.split(cmd), cwd = PYTHON_BUILD ).communicate()
 
                 # Copy some additional files in the right place
@@ -577,7 +580,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
             cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
             # Patch the Makefile to optimize the static libraries inclusion... - Linux
-            cmd = 'sed -i "s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
         make_python_freeze(freeze_modules)
         if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
@@ -598,19 +601,13 @@ def make_python(platform, ignifuga_src, env=os.environ):
             error('Error building python')
     elif platform == 'osx':
         if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
             sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] #.replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
             cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            # Fully static config
+            # As static as possible
             cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="%s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
-            # Mostly static, minus pthread and dl - Linux
-            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            # Patch the Makefile to optimize the static libraries inclusion... - Linux
-            #cmd = 'sed -i "" "s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
-            #Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
         make_python_freeze(freeze_modules)
         if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
             os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
@@ -634,7 +631,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
         if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
             cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(PYTHON_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(PYTHON_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
         cmd = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
         Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
@@ -664,18 +661,18 @@ def make_python(platform, ignifuga_src, env=os.environ):
             #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
 
-            cmd = 'sed -i "s|\${LIBOBJDIR}fileblocks\$U\.o||g" %s' % (join(PYTHON_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|\${LIBOBJDIR}fileblocks\$U\.o||g" %s' % (join(PYTHON_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
             # Enable NT Threads
-            cmd = 'sed -i "s|.*NT_THREADS.*|#define NT_THREADS|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
+            cmd = SED_CMD + '"s|.*NT_THREADS.*|#define NT_THREADS|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
 
             # Disable PTY stuff that gets activated because of errors in the configure script
-            cmd = 'sed -i "s|.*HAVE_OPENPTY.*|#undef HAVE_OPENPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
+            cmd = SED_CMD + '"s|.*HAVE_OPENPTY.*|#undef HAVE_OPENPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            cmd = 'sed -i "s|.*HAVE__GETPTY.*|#undef HAVE__GETPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
+            cmd = SED_CMD + '"s|.*HAVE__GETPTY.*|#undef HAVE__GETPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            cmd = 'sed -i "s|.*HAVE_DEV_PTMX.*|#undef HAVE_DEV_PTMX|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
+            cmd = SED_CMD + '"s|.*HAVE_DEV_PTMX.*|#undef HAVE_DEV_PTMX|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
             Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
 
         freeze_modules += ['ntpath', 'locale', 'functools']
@@ -918,16 +915,16 @@ def cythonize(build_dir, package_name, skip=[]):
         if f in updatedfiles:
             log('Patching %s' % (basename(f),))
             if module != '__init__':
-                cmd = """sed -i "" 's|Py_InitModule4(__Pyx_NAMESTR("\(.*\)")|Py_InitModule4(__Pyx_NAMESTR("%s.\\1")|g' %s""" % (package,f)
+                cmd = SED_CMD + """'s|Py_InitModule4(__Pyx_NAMESTR("\(.*\)")|Py_InitModule4(__Pyx_NAMESTR("%s.\\1")|g' %s""" % (package,f)
             else:
-                cmd = """sed -i "" 's|Py_InitModule4(__Pyx_NAMESTR("\(.*\)")|Py_InitModule4(__Pyx_NAMESTR("%s")|g' %s""" % (package,f)
+                cmd = SED_CMD + """'s|Py_InitModule4(__Pyx_NAMESTR("\(.*\)")|Py_InitModule4(__Pyx_NAMESTR("%s")|g' %s""" % (package,f)
             Popen(shlex.split(cmd), cwd = cython_src).communicate()
             if module != '__init__':
-                cmd = """sed -i "" 's|init%s|init%s_%s|g' %s""" % (module,package.replace('.', '_'),module,f)
+                cmd = SED_CMD + """'s|init%s|init%s_%s|g' %s""" % (module,package.replace('.', '_'),module,f)
             else:
-                cmd = """sed -i "" 's|init%s|init%s|g' %s""" % (subpackage,package.replace('.', '_'),f)
+                cmd = SED_CMD + """'s|init%s|init%s|g' %s""" % (subpackage,package.replace('.', '_'),f)
             Popen(shlex.split(cmd), cwd = cython_src).communicate()
-            cmd = """sed -i "" 's|__pyx_import_star_type_names|__pyx_import_star_type_names_%s%s|g' %s""" % (package.replace('.', '_'),module, f)
+            cmd = SED_CMD + """'s|__pyx_import_star_type_names|__pyx_import_star_type_names_%s%s|g' %s""" % (package.replace('.', '_'),module, f)
             Popen(shlex.split(cmd), cwd = cython_src).communicate()
 
         if module != '__init__':
@@ -982,13 +979,13 @@ def prepare_sdl(platform):
             shutil.copy(join(PNG_BUILD, 'scripts', 'makefile.darwin'), join(PNG_BUILD, 'Makefile'))
             # Force libpng to build universally
             env = prepare_osx_env()
-            cmd = 'sed -e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" -i "" %s' % (env['CFLAGS'] if 'CFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['CFLAGS'] if 'CFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = 'sed -e "s|LDFLAGS=|LDFLAGS= %s -arch i386 -arch x86_64 |g" -i "" %s' % (env['LDFLAGS'] if 'LDFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '-e "s|LDFLAGS=|LDFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['LDFLAGS'] if 'LDFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = 'sed -e "s|-dynamiclib|-dynamiclib -arch i386 -arch x86_64 |g" -i "" %s' % join(PNG_BUILD, 'Makefile')
+            cmd = SED_CMD + '-e "s|-dynamiclib|-dynamiclib -arch i386 -arch x86_64 |g" %s' % join(PNG_BUILD, 'Makefile')
             Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = 'sed -e "s|prefix=.*|prefix=%s|g" -i "" %s' % (join(PNG_BUILD, 'Makefile'), DIST_DIR)
+            cmd = SED_CMD + '-e "s|prefix=.*|prefix=%s|g" %s' % (join(PNG_BUILD, 'Makefile'), DIST_DIR)
             Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
         prepare_source('libjpeg', JPG_SRC, JPG_BUILD)
         prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
@@ -1000,7 +997,7 @@ def prepare_sdl(platform):
         
         prepare_source('SDL Android Skeleton', join(SDL_SRC, 'android-project'), SDL_BUILD)
         if patch_target:
-            cmd = """sed -i 's|^target=.*|target=android-7|g' %s""" % (join(SDL_BUILD, 'default.properties'),)
+            cmd = SED_CMD + """'s|^target=.*|target=android-7|g' %s""" % (join(SDL_BUILD, 'default.properties'),)
             Popen(shlex.split(cmd), cwd = SDL_BUILD).communicate()
             if isdir(join(SDL_BUILD, 'jni', 'src')):
                 shutil.rmtree(join(SDL_BUILD, 'jni', 'src'))
@@ -1064,6 +1061,9 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
         cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
+        # Remove dynamic libraries to avoid confusions with the linker
+        cmd = 'find %s -name "*.so*" -delete' % join(DIST_DIR, 'lib')
+        Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib'), env=env).communicate()
 
         # Build libjpeg
         if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
@@ -1073,11 +1073,11 @@ def make_sdl(platform, env=None):
             cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
-            cmd = 'sed -i "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
         cmd = 'make V=0 '
@@ -1120,7 +1120,7 @@ def make_sdl(platform, env=None):
             pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
             cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
             pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
+            cmd = './configure --enable-silent-rules CFLAGS="%s" LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
@@ -1179,7 +1179,7 @@ def make_sdl(platform, env=None):
             cmd = './configure --static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
             # Force zlib to build universally
-            cmd = 'sed -e "s|CFLAGS=|CFLAGS=%s %s |g" -i "" %s' % (universal_cflags, env['CFLAGS'], (join(ZLIB_BUILD, 'Makefile')))
+            cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS=%s %s |g" %s' % (universal_cflags, env['CFLAGS'], (join(ZLIB_BUILD, 'Makefile')))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
         cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
@@ -1199,6 +1199,9 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
         cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
         Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
+        # Remove dynamic libraries to avoid confusions with the linker
+        cmd = 'rm *.dylib'
+        Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib')).communicate()
 
         # Build libjpeg
         if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
@@ -1208,11 +1211,11 @@ def make_sdl(platform, env=None):
             cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"' % (universal_cflags, env['CFLAGS'], DIST_DIR)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
-            cmd = 'sed -e "s|\./libtool||g" -i "" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '-e "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -e "s|^O = lo|O = o|g" -i "" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '-e "s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -e "s|^A = la|A = a|g" -i "" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '-e "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
 
         cmd = 'make V=0'
@@ -1291,7 +1294,7 @@ def make_sdl(platform, env=None):
             cmd = './configure --disable-imageio --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_i386, 'Makefile'),)
+            cmd = SED_CMD + '-e "s|.*showimage.*||g" %s' % (join(sdl_image_build_i386, 'Makefile'),)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
         cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
@@ -1371,7 +1374,7 @@ def make_sdl(platform, env=None):
             cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
             # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
+            cmd = SED_CMD + '-e "s|.*showfont.*||g" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
             Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
         cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
@@ -1526,11 +1529,11 @@ def make_sdl(platform, env=None):
             cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
             # Fixes for the Makefile
-            cmd = 'sed -i "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = 'sed -i "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
+            cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
             Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
         
         cmd = 'make V=0'
@@ -1711,7 +1714,7 @@ def build_project_generic(options, platform, env=None):
         if not isfile(mfc):
             error ('Could not cythonize main file')
             exit()
-        cmd = "sed -i "" '1i#include \"SDL.h\"' %s" % mfc
+        cmd = SED_CMD + """ '1i#include \"SDL.h\"' %s""" % mfc
         Popen(shlex.split(cmd), cwd = platform_build).communicate()
         shutil.move(mfc, main_file_c)
 
@@ -1736,7 +1739,11 @@ def build_project_generic(options, platform, env=None):
         pngflags = pngflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
         if platform == 'linux64':
+            sdlflags = sdlflags.replace('-lpthread', '').replace('-ldl', '')
+            freetypeflags = freetypeflags.replace('-lpthread', '').replace('-ldl', '')
+            pngflags = pngflags.replace('-lpthread', '').replace('-ldl', '')
             cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
+            print cmd
             Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
         elif platform == 'osx':
             cmd = '%s -arch i386 -arch x86_64 -static-libgcc -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
@@ -1774,19 +1781,19 @@ def build_project_generic(options, platform, env=None):
                 shutil.move(join(android_project, 'AndroidManifest.wallpaper.xml'), join(android_project, 'AndroidManifest.xml'))
 
         # Modify the glue code to suit the project
-        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
+        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'AndroidManifest.xml'))
+        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'AndroidManifest.xml'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
+        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.wallpaper.java'))
+        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.wallpaper.java'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'build.xml'))
+        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'build.xml'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[SDK_LOCATION\]\]|%s|g' %s" % (ANDROID_SDK, join(android_project, 'local.properties'))
+        cmd = SED_CMD + "'s|\[\[SDK_LOCATION\]\]|%s|g' %s" % (ANDROID_SDK, join(android_project, 'local.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = "sed -i 's|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
+        cmd = SED_CMD + "'s|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
 
         # Make the correct structure inside src
@@ -1835,6 +1842,7 @@ def prepare_linux64_env():
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
+    env['CFLAGS'] = "" if not 'CFLAGS' in env else env['CFLAGS']
     return env
 
 def build_linux64 (options):
@@ -1846,7 +1854,8 @@ def build_linux64 (options):
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(DIST_DIR):
         os.makedirs(DIST_DIR)
-    build_generic(options, platform)
+    env = prepare_linux64_env()
+    build_generic(options, platform, env)
 
 def build_project_linux64(options):
     platform = 'linux64'
@@ -1876,9 +1885,6 @@ def build_osx (options):
         os.makedirs(DIST_DIR)
     env = prepare_osx_env()
     build_generic(options, platform, env)
-    # Remove dynamic libraries to avoid confusions with the linker
-    cmd = 'rm *.dylib'
-    Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib')).communicate()
 
 def build_project_osx(options):
     platform = 'osx'
