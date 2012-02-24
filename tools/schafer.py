@@ -512,7 +512,7 @@ def prepare_python(platform, ignifuga_src, python_build):
                 freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
             if platform == 'linux64' or platform == 'osx':
-                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
 
             elif platform== 'android':
                 # Hardcoded for now
@@ -978,11 +978,18 @@ def prepare_sdl(platform):
         prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD+'_x86_64')
         prepare_source('zlib', ZLIB_SRC, ZLIB_BUILD)
         prepare_source('libpng', PNG_SRC, PNG_BUILD)
-        shutil.copy(join(PNG_BUILD, 'scripts', 'makefile.darwin'), join(PNG_BUILD, 'Makefile'))
-        # Force libpng to build universally
-        env = prepare_osx_env()
-        cmd = 'sed -e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" -i "" %s' % (env['CFLAGS'], join(PNG_BUILD, 'Makefile'))
-        Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
+        if not isfile(join(PNG_BUILD, 'Makefile')):
+            shutil.copy(join(PNG_BUILD, 'scripts', 'makefile.darwin'), join(PNG_BUILD, 'Makefile'))
+            # Force libpng to build universally
+            env = prepare_osx_env()
+            cmd = 'sed -e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" -i "" %s' % (env['CFLAGS'] if 'CFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
+            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
+            cmd = 'sed -e "s|LDFLAGS=|LDFLAGS= %s -arch i386 -arch x86_64 |g" -i "" %s' % (env['LDFLAGS'] if 'LDFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
+            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
+            cmd = 'sed -e "s|-dynamiclib|-dynamiclib -arch i386 -arch x86_64 |g" -i "" %s' % join(PNG_BUILD, 'Makefile')
+            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
+            cmd = 'sed -e "s|prefix=.*|prefix=%s|g" -i "" %s' % (join(PNG_BUILD, 'Makefile'), DIST_DIR)
+            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
         prepare_source('libjpeg', JPG_SRC, JPG_BUILD)
         prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
         shutil.copy(join(FREETYPE_SRC, 'Makefile'), join(FREETYPE_BUILD, 'Makefile') )
@@ -1109,7 +1116,11 @@ def make_sdl(platform, env=None):
             os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
             
         if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR)
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
+            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
+            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
         cmd = 'make V=0'
         Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
@@ -1272,7 +1283,12 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
 
         if not isfile(join(sdl_image_build_i386, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
+            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
+            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            # --disable-imageio is required otherwise the sprite data extracting code for PNGs is never enabled!
+            cmd = './configure --disable-imageio --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_i386, 'Makefile'),)
@@ -1333,7 +1349,12 @@ def make_sdl(platform, env=None):
         Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
         
         if not isfile(join(sdl_image_build_x86_64, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" LIBPNG_CFLAGS="" LIBPNG_LIBS="-lpng12 -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], DIST_DIR, DIST_DIR)
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
+            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
+            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            # --disable-imageio is required otherwise the sprite data extracting code for PNGs is never enabled!
+            cmd = './configure --disable-imageio --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
             Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
             # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
             #cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
