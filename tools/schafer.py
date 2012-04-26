@@ -28,52 +28,6 @@ class loglevel:
     WARNING = 20
     ERROR = 30
 
-
-AVAILABLE_PLATFORMS = []
-CYTHON_GIT = 'https://github.com/cython/cython.git'
-ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r7b-linux-x86.tar.bz2', 'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r7b-darwin-x86.tar.bz2'}
-ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r16-linux.tgz', 'Darwin': 'http://dl.google.com/android/android-sdk_r16-macosx.zip' }
-
-ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
-HOST_DIST_DIR = join(ROOT_DIR, 'host')
-HOSTPYTHON = join(HOST_DIST_DIR, 'bin', 'python')
-HOSTPGEN = join(HOST_DIST_DIR, 'bin', 'pgen')
-TMP_DIR = join (ROOT_DIR, 'tmp')
-DIST_DIR = join (ROOT_DIR, 'dist')
-PYTHON_SRC = join(ROOT_DIR, 'external', 'Python')
-SDL_SRC = join(ROOT_DIR, 'external', 'SDL')
-SDL_IMAGE_SRC = join(ROOT_DIR, 'external', 'SDL_image')
-SDL_TTF_SRC = join(ROOT_DIR, 'external', 'SDL_ttf')
-FREETYPE_SRC = join(ROOT_DIR, 'external', 'freetype')
-PNG_SRC = join(ROOT_DIR, 'external', 'png')
-JPG_SRC = join(ROOT_DIR, 'external', 'jpeg')
-ZLIB_SRC = join(ROOT_DIR, 'external', 'zlib')
-GREENLET_SRC = join(ROOT_DIR, 'external', 'greenlet')
-BITARRAY_SRC = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
-ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
-ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
-PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
-IGNIFUGA_SRC = ROOT_DIR
-SED_CMD = 'sed -i '
-
-PROJECT_ROOT = ""
-PROJECT_BUILD = ""
-
-
-PLATFORM_FILE = ""
-PYTHON_BUILD = ""
-PYTHON_HEADERS = ""
-SDL_BUILD = ""
-SDL_IMAGE_BUILD = ""
-SDL_TTF_BUILD = ""
-FREETYPE_BUILD = ""
-SDL_HEADERS = ""
-PNG_BUILD = ""
-JPG_BUILD = ""
-ZLIB_BUILD = ""
-IGNIFUGA_BUILD = ""
-
-
 def info(msg):
     log(msg, loglevel.INFO)
 def warn(msg):
@@ -95,343 +49,6 @@ def log(msg, level = loglevel.DEBUG):
         # Error
         print bcolors.FAIL + "* " + msg + bcolors.ENDC
 
-def setup_variables(dist_dir = join (ROOT_DIR, 'dist'), tmp_dir = join (ROOT_DIR, 'tmp')):
-    """ Set up some global variables """
-    global DIST_DIR, TMP_DIR, HOST_DIST_DIR, HOSTPYTHON, HOSTPGEN, PLATFORM_FILE, PYTHON_BUILD
-    global PYTHON_HEADERS, SDL_BUILD, SDL_IMAGE_BUILD, SDL_TTF_BUILD, FREETYPE_BUILD, SDL_HEADERS, PNG_BUILD, JPG_BUILD, ZLIB_BUILD, IGNIFUGA_BUILD
-    DIST_DIR = dist_dir
-    TMP_DIR = tmp_dir
-    PLATFORM_FILE = join(TMP_DIR, 'platform')
-    PYTHON_BUILD = join(TMP_DIR, 'python')
-    PYTHON_HEADERS = join(PYTHON_BUILD, 'Include')
-    SDL_BUILD = join(TMP_DIR, 'sdl')
-    SDL_IMAGE_BUILD = join(TMP_DIR, 'sdl_image')
-    SDL_TTF_BUILD = join(TMP_DIR, 'sdl_ttf')
-    FREETYPE_BUILD = join(TMP_DIR, 'freetype')
-    SDL_HEADERS = join(DIST_DIR, 'include', 'SDL')
-    PNG_BUILD = join(TMP_DIR, 'png')
-    JPG_BUILD = join(TMP_DIR, 'jpg')
-    ZLIB_BUILD = join(TMP_DIR, 'zlib')
-    IGNIFUGA_BUILD = join(TMP_DIR, 'ignifuga')
-
-    if not isdir(TMP_DIR):
-        os.makedirs(TMP_DIR)
-    
-def find_cython():
-    cmd = 'which cython'
-    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
-    cython = output.split('\n')[0]
-    if isfile(cython):
-        # Get the version
-        cmd = '%s -V' % cython
-        output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
-        version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
-        v = re.search("(\d+)\.(\d+)\.(.*)", version)
-        # We are looking for 0.15.1+ or higher
-        if v.groups(0) > 0:
-            return cython
-        if v.groups(0) == 0:
-            if v.groups(1) > 15:
-                return cython
-            if v.groups(1) == 15:
-                if v.groups(2).startswith('1+') or v.groups(2) >= 2:
-                    return cython
-        error ('Cython version %s is incompatible')
-    return None
-
-def check_tool(tool, fatal=True):
-    cmd = 'which ' + tool
-    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
-    tool_path = output.split('\n')[0]
-    if not isfile(tool_path):
-        if fatal:
-            error("Can not find %s, try running schafer -D to install dependencies automatically" % tool)
-            exit()
-        else:
-            return None
-
-    return tool_path
-
-def check_gnutools():
-    tools = ['make', 'gcc', 'strip']
-    for tool in tools:
-        check_tool(tool)
-    return True
-
-def check_mingw32tools():
-    tools = ['i586-mingw32msvc-gcc', 'i586-mingw32msvc-g++', 'i586-mingw32msvc-ar', 'i586-mingw32msvc-ranlib', 'i586-mingw32msvc-strip', 'i586-mingw32msvc-ld', 'i586-mingw32msvc-as',
-            'i586-mingw32msvc-nm', 'i586-mingw32msvc-dlltool', 'i586-mingw32msvc-objdump', 'i586-mingw32msvc-windres']
-
-    for tool in tools:
-        check_tool(tool)
-
-    return True
-
-def check_xcode():
-    if check_tool('xcodebuild', False) == None:
-        error('Can not detect XCode, please install it')
-        exit()
-
-    # Check SDKs
-    cmd = 'xcodebuild -showsdks'
-    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
-    sdks = ['macosx10.6', 'macosx10.7', 'iphoneos5.0', 'iphonesimulator5.0', None]
-
-    for line in output:
-
-        for sdk in sdks:
-            if sdk != None and sdk in line:
-                break
-        if sdk != None:
-            sdks.remove(sdk)
-
-    sdks.remove(None)
-    if sdks:
-        for sdk in sdks:
-            error('Could not find XCode SDK: %s' % sdk)
-        exit()
-
-    return True
-
-def check_host_tools():
-    """ Check if the required host tools are present """
-    setup_variables(join (ROOT_DIR, 'dist'), join (ROOT_DIR, 'tmp'))
-
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
-    supported_platform = False
-    if system == 'Linux':
-        if arch == '64bit':
-            if distro_name == 'Ubuntu':
-                if distro_id in ['natty', 'oneiric']:
-                    supported_platform = True
-    elif system == 'Darwin':
-        if arch == '64bit':
-            if distro_name == '10.7':
-                supported_platform = True
-
-    if not supported_platform:
-        error('Warning: Unsupported host platform/architecture. Proceed with caution. No really, this thing may blow up any minute now')
-
-    if find_cython() == None:
-        error("Can not find Cython, run with -D to install dependencies automatically")
-        exit()
-
-    if check_tool('rsync', False) == None:
-        error("Can not find Rsync, run with -D to install dependencies automatically")
-        exit()
-
-    if not check_gnutools():
-        error("Can not find compilation tools (Make, GCC), run with -D to install dependencies automatically")
-        exit()
-
-    if system == 'Darwin':
-        check_xcode()
-
-
-    if not isfile(HOSTPYTHON) or not isfile(HOSTPGEN):
-        # First let's make the host version of Python, statically linked
-        info('Building Python for the host')
-        python_build = join(ROOT_DIR, 'tmp', 'python_host')
-        if system == 'Linux' and arch == '64bit':
-            prepare_python('linux64', None, python_build)
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        elif system == 'Darwin' and arch == '64bit':
-            prepare_python('osx', None, python_build)
-            cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        cmd = 'make V=0 install -k -j4'
-        Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        # Check that it built successfully
-        if not isfile(join(python_build, 'python')) or not isfile(join(python_build, 'Parser', 'pgen')):
-            error('Could not build Python for host system')
-            exit()
-        shutil.copy(join(python_build, 'Parser', 'pgen'), HOSTPGEN)
-
-def install_mac_ports():
-    if check_tool('port', False) == None:
-        # Install Mac Ports
-        log('Installing Mac Ports (macports.org)')
-        portsdmg = join(tempfile.gettempdir(), 'MacPorts.dmg')
-        cmd = 'curl -o %s https://distfiles.macports.org/MacPorts/MacPorts-2.0.3-10.7-Lion.dmg' % portsdmg
-        Popen(shlex.split(cmd)).communicate()
-
-        if isfile(portsdmg):
-            cmd = 'hdiutil attach %s' % portsdmg
-            Popen(shlex.split(cmd)).communicate()
-            if exists('/Volumes/MacPorts-2.0.3/MacPorts-2.0.3.pkg'):
-                cmd = 'sudo installer -pkg /Volumes/MacPorts-2.0.3/MacPorts-2.0.3.pkg -target "/"'
-                Popen(shlex.split(cmd)).communicate()
-                cmd = 'hdiutil detach /Volumes/MacPorts-2.0.3'
-                Popen(shlex.split(cmd)).communicate()
-                if check_tool('port', False) == None:
-                    error('Could not install Mac Ports, please install manually and try again')
-                    exit()
-            else:
-                cmd = 'hdiutil detach /Volumes/MacPorts-2.0.3'
-                Popen(shlex.split(cmd)).communicate()
-                error('Could not mount Mac Ports dmg')
-                exit()
-        else:
-            error('Could not download Mac Ports dmg. Please install manually and try again')
-            exit()
-    else:
-        log('Mac Ports is available')
-
-def install_host_tools():
-    """ Install all the required host tools.
-    Platforms supported:
-    * Ubuntu 64 Natty 11.04
-    * Ubuntu 64 Oneiric 11.10
-    * OS X Lion 64
-    """
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
-
-    log ('Installing development packages')
-    if system == 'Linux':
-        cmd = 'sudo apt-get -y install rsync python-dev mingw32 mingw32-binutils mingw32-runtime make gcc-4.5 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
-        Popen(shlex.split(cmd)).communicate()
-    elif system == 'Darwin':
-        check_xcode()
-        install_mac_ports()
-        cmd = 'sudo port install rsync'
-        Popen(shlex.split(cmd)).communicate()
-
-    cython = find_cython()
-    if cython == None:
-        git = check_tool('git', False)
-        if git == None:
-            # Try to install GIT
-            log('Trying to install GIT')
-            if system == 'Linux':
-                cmd = 'sudo apt-get -y install git'
-                Popen(shlex.split(cmd)).communicate()
-            else:
-                cmd = 'sudo port install git-core'
-                Popen(shlex.split(cmd)).communicate()
-            git = check_tool('git', False)
-            if git == None:
-                error('Could not install GIT. Try installing it manually')
-                exit()
-        log ('GIT is available')
-    
-        log ('Installing Cython')
-        tmp_cython = tempfile.mkdtemp()
-        cmd = 'chmod 777 %s' % tmp_cython
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'git clone %s %s' % (CYTHON_GIT, tmp_cython)
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo python setup.py install'
-        Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
-        cmd = 'sudo rm -rf %s' % tmp_cython
-        Popen(shlex.split(cmd)).communicate()
-        cython = find_cython()
-        if cython == None:
-            error('Could not install Cython (0.15.1+ or higher). Try installing it manually')
-            exit()
-    else:
-        log('Cython is available')
-
-    # Android SDK and NDK
-    if ANDROID_NDK == None or not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or \
-       not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")) if system=='Linux' else \
-       not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin")) if system == 'Darwin' else False:
-        log('Installing Android NDK to %s' % ANDROID_NDK)
-        if system == 'Linux':
-            cmd = 'wget %s' % ANDROID_NDK_URL[system]
-        elif system == 'Darwin':
-            cmd = 'curl -O %s' % ANDROID_NDK_URL[system]
-        else:
-            error ('Can not install dependencies for this system')
-            exit()
-
-
-        ndkfile = ANDROID_NDK_URL[system].split('/')[-1]
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'tar -jxvf %s' % ndkfile
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'sudo mv %s %s' % ('-'.join(ndkfile.split('-')[0:3]), ANDROID_NDK)
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        log('Adding ANDROID_NDK variable %s to .bashrc' % ANDROID_NDK)
-        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
-        f.write('export ANDROID_NDK="%s"\n' % ANDROID_NDK)
-        f.close()
-    else:
-        log('Android NDK is available at %s' % ANDROID_NDK)
-        
-    if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
-        log('Installing Android SDK to %s' % ANDROID_SDK)
-        if system == 'Linux':
-            cmd = 'wget %s' % ANDROID_SDK_URL[system]
-        elif system == 'Darwin':
-            cmd = 'curl -O %s' % ANDROID_SDK_URL[system]
-        else:
-            error ('Can not install dependencies for this system')
-            exit()
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'tar -zxvf %s' % ANDROID_SDK_URL[system].split('/')[-1]
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        if system == 'Linux':
-            cmd = 'sudo mv android-sdk-linux %s' % ANDROID_SDK
-        elif system == 'Darwin':
-            cmd = 'sudo mv android-sdk-macosx %s' % ANDROID_SDK
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        log('Adding ANDROID_SDK variable %s to .bashrc' % ANDROID_SDK)
-        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
-        f.write('export ANDROID_SDK="%s"\n' % ANDROID_SDK)
-        f.close()
-    else:
-        log('Android SDK is available at %s' % ANDROID_SDK)
-    
-    
-def clean_modules(platforms, modules, everything=False):
-    log('Cleaning Build Directories')
-    if isinstance(platforms, str):
-        platforms = [platforms,]
-
-    for platform in platforms:
-        setup_variables(join (ROOT_DIR, 'dist', platform), join (ROOT_DIR, 'tmp', platform))
-        if not everything:
-            if isdir(TMP_DIR):
-                if 'ignifuga' in modules:
-                    if isdir(IGNIFUGA_BUILD):
-                        shutil.rmtree(IGNIFUGA_BUILD)
-                    if isdir(PYTHON_BUILD):
-                        shutil.rmtree(PYTHON_BUILD)
-                if 'sdl' in modules and isdir(SDL_BUILD):
-                    shutil.rmtree(SDL_BUILD)
-        else:
-            if isdir(TMP_DIR):
-                shutil.rmtree(TMP_DIR)
-            if isdir(DIST_DIR):
-                shutil.rmtree(DIST_DIR)
-
-def locate(pattern, root=os.curdir, skip = []):
-    '''Locate all files matching supplied filename pattern in and below
-    supplied root directory.'''
-    for path, dirs, files in os.walk(os.path.abspath(root)):
-        for filename in fnmatch.filter(files, pattern):
-            yieldit = True
-            for s in skip:
-                if path.startswith(s):
-                    yieldit = False
-                    break
-            if yieldit:
-                yield os.path.join(path, filename)
-
-def save_platform(platform):
-    f = open(PLATFORM_FILE, 'w')
-    f.write(platform)
-    f.close()
-
-def read_platform():
-    if not isfile(PLATFORM_FILE):
-        return None
-    f = open (PLATFORM_FILE, 'r')
-    platform = f.read()
-    f.close()
-    return platform
-
 def get_build_platform():
     # Check the host distro
     arch, exe = platform.architecture()
@@ -445,7 +62,7 @@ def get_build_platform():
 def get_available_platforms():
     """ Determine which build platforms are available depending on which platform we are building """
     system, arch, distro_name, distro_version, distro_id = get_build_platform()
-    global AVAILABLE_PLATFORMS, SED_CMD
+
     if system == 'Linux':
         SED_CMD = 'sed -i '
         if arch == '64bit':
@@ -455,6 +72,114 @@ def get_available_platforms():
     elif system == 'Darwin':
         SED_CMD = 'sed -i "" '
         AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
+
+    return AVAILABLE_PLATFORMS, SED_CMD
+
+AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
+
+CYTHON_GIT = 'https://github.com/cython/cython.git'
+ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r7b-linux-x86.tar.bz2', 'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r7b-darwin-x86.tar.bz2'}
+ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r16-linux.tgz', 'Darwin': 'http://dl.google.com/android/android-sdk_r16-macosx.zip' }
+
+ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
+HOST_DIST_DIR = join(ROOT_DIR, 'host')
+HOSTPYTHON = join(HOST_DIST_DIR, 'bin', 'python')
+HOSTPGEN = join(HOST_DIST_DIR, 'bin', 'pgen')
+TMP_DIR = join (ROOT_DIR, 'tmp')
+DIST_DIR = join (ROOT_DIR, 'dist')
+
+SOURCES = {}
+SOURCES['PYTHON'] = join(ROOT_DIR, 'external', 'Python')
+SOURCES['SDL'] = join(ROOT_DIR, 'external', 'SDL')
+SOURCES['SDL_IMAGE'] = join(ROOT_DIR, 'external', 'SDL_image')
+SOURCES['SDL_TTF'] = join(ROOT_DIR, 'external', 'SDL_ttf')
+SOURCES['FREETYPE'] = join(ROOT_DIR, 'external', 'freetype')
+SOURCES['PNG'] = join(ROOT_DIR, 'external', 'png')
+SOURCES['JPG'] = join(ROOT_DIR, 'external', 'jpeg')
+SOURCES['ZLIB'] = join(ROOT_DIR, 'external', 'zlib')
+SOURCES['GREENLET'] = join(ROOT_DIR, 'external', 'greenlet')
+SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
+SOURCES['IGNIFUGA'] = ROOT_DIR
+
+ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
+ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
+PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
+
+PROJECT_ROOT = ""
+BUILDS = {}
+BUILDS['PROJECT'] = ""
+
+PLATFORM_FILE = ""
+BUILDS['PYTHON'] = ""
+PYTHON_HEADERS = ""
+BUILDS['SDL'] = ""
+BUILDS['SDL_IMAGE'] = ""
+BUILDS['SDL_TTF'] = ""
+BUILDS['FREETYPE'] = ""
+SDL_HEADERS = ""
+BUILDS['PNG'] = ""
+BUILDS['JPG'] = ""
+BUILDS['ZLIB'] = ""
+BUILDS['IGNIFUGA'] = ""
+
+from modules.util import *
+from modules.env import *
+
+def setup_variables(dist_dir = join (ROOT_DIR, 'dist'), tmp_dir = join (ROOT_DIR, 'tmp')):
+    """ Set up some global variables """
+    global DIST_DIR, TMP_DIR, HOST_DIST_DIR, HOSTPYTHON, HOSTPGEN, PLATFORM_FILE, BUILDS, PYTHON_HEADERS
+    DIST_DIR = dist_dir
+    TMP_DIR = tmp_dir
+    PLATFORM_FILE = join(TMP_DIR, 'platform')
+    BUILDS['PYTHON'] = join(TMP_DIR, 'python')
+    PYTHON_HEADERS = join(BUILDS['PYTHON'], 'Include')
+    BUILDS['SDL'] = join(TMP_DIR, 'sdl')
+    BUILDS['SDL_IMAGE'] = join(TMP_DIR, 'sdl_image')
+    BUILDS['SDL_TTF'] = join(TMP_DIR, 'sdl_ttf')
+    BUILDS['FREETYPE'] = join(TMP_DIR, 'freetype')
+    SDL_HEADERS = join(DIST_DIR, 'include', 'SDL')
+    BUILDS['PNG'] = join(TMP_DIR, 'png')
+    BUILDS['JPG'] = join(TMP_DIR, 'jpg')
+    BUILDS['ZLIB'] = join(TMP_DIR, 'zlib')
+    BUILDS['IGNIFUGA'] = join(TMP_DIR, 'ignifuga')
+
+    if not isdir(TMP_DIR):
+        os.makedirs(TMP_DIR)
+
+def clean_modules(platforms, modules, everything=False):
+    log('Cleaning Build Directories')
+    if isinstance(platforms, str):
+        platforms = [platforms,]
+
+    for platform in platforms:
+        setup_variables(join (ROOT_DIR, 'dist', platform), join (ROOT_DIR, 'tmp', platform))
+        if not everything:
+            if isdir(TMP_DIR):
+                if 'ignifuga' in modules:
+                    if isdir(BUILDS['IGNIFUGA']):
+                        shutil.rmtree(BUILDS['IGNIFUGA'])
+                    if isdir(BUILDS['PYTHON']):
+                        shutil.rmtree(BUILDS['PYTHON'])
+                if 'sdl' in modules and isdir(BUILDS['SDL']):
+                    shutil.rmtree(BUILDS['SDL'])
+        else:
+            if isdir(TMP_DIR):
+                shutil.rmtree(TMP_DIR)
+            if isdir(DIST_DIR):
+                shutil.rmtree(DIST_DIR)
+
+def save_platform(platform):
+    f = open(PLATFORM_FILE, 'w')
+    f.write(platform)
+    f.close()
+
+def read_platform():
+    if not isfile(PLATFORM_FILE):
+        return None
+    f = open (PLATFORM_FILE, 'r')
+    platform = f.read()
+    f.close()
+    return platform
 
 def check_ignifuga_libraries(platform):
     if platform in ['linux64', 'mingw32', 'osx']:
@@ -488,7 +213,7 @@ def prepare_source(name, src, dst):
 # ===============================================================================================================
 
 def prepare_python(platform, ignifuga_src, python_build):
-    if prepare_source('Python', PYTHON_SRC, python_build):
+    if prepare_source('Python', SOURCES['PYTHON'], python_build):
         # Now copy the Setup.dist files
         python_setup = join(ROOT_DIR, 'external', 'Setup.'+platform)
         if not isfile(python_setup):
@@ -515,16 +240,16 @@ def prepare_python(platform, ignifuga_src, python_build):
                 freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
             if platform == 'linux64' or platform == 'osx':
-                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),IGNIFUGA_BUILD, sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),BUILDS['IGNIFUGA'], sdlflags, freetypeflags)
 
             elif platform== 'android':
                 # Hardcoded for now
-                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(SDL_BUILD, 'jni', 'SDL', 'include'), join(SDL_BUILD, 'jni', 'SDL_image'), join(SDL_BUILD, 'jni', 'SDL_ttf'))
+                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(BUILDS['SDL'], 'jni', 'SDL', 'include'), join(BUILDS['SDL'], 'jni', 'SDL_image'), join(BUILDS['SDL'], 'jni', 'SDL_ttf'))
 
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(SDL_BUILD, 'libs', 'armeabi'), sdlflags)
+                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), BUILDS['IGNIFUGA'], join(BUILDS['SDL'], 'libs', 'armeabi'), sdlflags)
 
             elif platform == 'mingw32':
                 # Remove some perjudicial flags
@@ -532,16 +257,16 @@ def prepare_python(platform, ignifuga_src, python_build):
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(PYTHON_BUILD, 'Modules', 'signalmodule.c'),)
-                Popen(shlex.split(cmd), cwd = PYTHON_BUILD ).communicate()
+                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(BUILDS['PYTHON'], 'Modules', 'signalmodule.c'),)
+                Popen(shlex.split(cmd), cwd = BUILDS['PYTHON'] ).communicate()
 
                 # Copy some additional files in the right place
-                shutil.copy(join(PYTHON_BUILD, 'PC', 'import_nt.c'), join(PYTHON_BUILD, 'Python', 'import_nt.c'))
-                shutil.copy(join(PYTHON_BUILD, 'PC', 'dl_nt.c'), join(PYTHON_BUILD, 'Python', 'dl_nt.c'))
-                shutil.copy(join(PYTHON_BUILD, 'PC', 'getpathp.c'), join(PYTHON_BUILD, 'Python', 'getpathp.c'))
-                shutil.copy(join(PYTHON_BUILD, 'PC', 'errmap.h'), join(PYTHON_BUILD, 'Objects', 'errmap.h'))
+                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'import_nt.c'), join(BUILDS['PYTHON'], 'Python', 'import_nt.c'))
+                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'dl_nt.c'), join(BUILDS['PYTHON'], 'Python', 'dl_nt.c'))
+                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'getpathp.c'), join(BUILDS['PYTHON'], 'Python', 'getpathp.c'))
+                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'errmap.h'), join(BUILDS['PYTHON'], 'Objects', 'errmap.h'))
 
-                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), IGNIFUGA_BUILD, join(PYTHON_BUILD, 'Include'), sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), BUILDS['IGNIFUGA'], join(BUILDS['PYTHON'], 'Include'), sdlflags, freetypeflags)
 
             
             f = open(setupfile, 'at')
@@ -549,14 +274,13 @@ def prepare_python(platform, ignifuga_src, python_build):
             f.close()
 
         # Append the greenlet module
-        shutil.copy(join(GREENLET_SRC, 'greenlet.c'), join(python_build, 'Modules'))
-        shutil.copy(join(GREENLET_SRC, 'greenlet.h'), join(python_build, 'Modules'))
-        shutil.copy(join(GREENLET_SRC, 'slp_platformselect.h'), join(python_build, 'Modules'))
-        shutil.copytree(join(GREENLET_SRC, 'platform'), join(python_build, 'Modules', 'platform'))
+        shutil.copy(join(SOURCES['GREENLET'], 'greenlet.c'), join(python_build, 'Modules'))
+        shutil.copy(join(SOURCES['GREENLET'], 'greenlet.h'), join(python_build, 'Modules'))
+        shutil.copy(join(SOURCES['GREENLET'], 'slp_platformselect.h'), join(python_build, 'Modules'))
+        shutil.copytree(join(SOURCES['GREENLET'], 'platform'), join(python_build, 'Modules', 'platform'))
 
         # Append the bitarray module
-        shutil.copy(join(BITARRAY_SRC, '_bitarray.c'), join(python_build, 'Modules'))
-
+        shutil.copy(join(SOURCES['BITARRAY'], '_bitarray.c'), join(python_build, 'Modules'))
 
 
 def make_python(platform, ignifuga_src, env=os.environ):
@@ -566,131 +290,12 @@ def make_python(platform, ignifuga_src, env=os.environ):
     freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref']
     # For profiling
     freeze_modules += ['cProfile', 'runpy', 'pkgutil']
-        
-    if platform == 'linux64':
-        if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
-            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
-            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
-            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
-            # Mostly static, minus pthread and dl - Linux
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            # Patch the Makefile to optimize the static libraries inclusion... - Linux
-            cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc  -Wl,-Bstatic -lutil -lz -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(PYTHON_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-        make_python_freeze(freeze_modules)
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
 
-        # Remove setup.py as its of no use here and it tries to compile a lot of extensions that don't work in static mode
-        if isfile(join(PYTHON_BUILD,'setup.py')):
-            os.unlink(join(PYTHON_BUILD,'setup.py'))
-            
-        cmd = 'make V=0 install -k -j4'
-        # Rebuild Python including the frozen modules!
-        Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-
-        # Check success
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            log('Python built successfully')
-        else:
-            error('Error building python')
-    elif platform == 'osx':
-        if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
-            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] #.replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
-            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            # As static as possible
-            cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="%s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-        make_python_freeze(freeze_modules)
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
-
-        # Remove setup.py as its of no use here and it tries to compile a lot of extensions that don't work in static mode
-        if isfile(join(PYTHON_BUILD,'setup.py')):
-            os.unlink(join(PYTHON_BUILD,'setup.py'))
-
-        cmd = 'make V=0 install -k -j4'
-        # Rebuild Python including the frozen modules!
-        Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-
-        # Check success
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            log('Python built successfully')
-        else:
-            error('Error building python')
-    elif platform == 'android':
-        make_python_freeze(freeze_modules)
-        # Android is built in shared mode
-        if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-            cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(PYTHON_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-        cmd = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
-        Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-
-        # Copy some files to the skeleton directory
-        try:
-            if isdir(join(DIST_DIR, 'jni', 'python', 'Include')):
-                shutil.rmtree(join(DIST_DIR, 'jni', 'python', 'Include'))
-            shutil.copytree(join(PYTHON_BUILD, 'Include'), join(DIST_DIR, 'jni', 'python', 'Include'))
-            shutil.copy(join(PYTHON_BUILD, 'pyconfig.h'), join(DIST_DIR, 'jni', 'python', 'pyconfig.h'))
-            shutil.copy(join(PYTHON_BUILD, 'libpython2.7.so'), join(DIST_DIR, 'jni', 'python', 'libpython2.7.so'))
-            log('Python built successfully')
-        except:
-            error('Error while building Python for target')
-            exit()
-
-    elif platform == 'mingw32':
-        if not isfile(join(PYTHON_BUILD, 'pyconfig.h')) or not isfile(join(PYTHON_BUILD, 'Makefile')):
-            # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
-            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-            cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
-            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
-            extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s" CFLAGS="-DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i586-mingw32msvc --build=i686-pc-linux-gnu  --prefix="%s"'% (sdlldflags, extralibs, sdlcflags, HOSTPYTHON, HOSTPGEN, DIST_DIR,)
-            # Mostly static, minus pthread and dl - Linux
-            #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -Wl,-Bstatic %s -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-
-            cmd = SED_CMD + '"s|\${LIBOBJDIR}fileblocks\$U\.o||g" %s' % (join(PYTHON_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            # Enable NT Threads
-            cmd = SED_CMD + '"s|.*NT_THREADS.*|#define NT_THREADS|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-
-            # Disable PTY stuff that gets activated because of errors in the configure script
-            cmd = SED_CMD + '"s|.*HAVE_OPENPTY.*|#undef HAVE_OPENPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            cmd = SED_CMD + '"s|.*HAVE__GETPTY.*|#undef HAVE__GETPTY|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-            cmd = SED_CMD + '"s|.*HAVE_DEV_PTMX.*|#undef HAVE_DEV_PTMX|g" %s' % (join(PYTHON_BUILD, 'pyconfig.h'))
-            Popen(shlex.split(cmd), cwd = PYTHON_BUILD).communicate()
-
-        freeze_modules += ['ntpath', 'locale', 'functools']
-        make_python_freeze(freeze_modules)
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpython2.7.a'))
-
-        cmd = 'make V=0 install -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes'  % (HOSTPYTHON, HOSTPGEN)
-        Popen(shlex.split(cmd), cwd = PYTHON_BUILD, env=env).communicate()
-
-        # Check success
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
-            log('Python built successfully')
-        else:
-            error('Error building python')
+    mod = __import__('modules.python.'+platform, fromlist=['make'])
+    mod.make(env, DIST_DIR, BUILDS, freeze_modules, join(BUILDS['PYTHON'], 'Python', 'frozen.c'))
 
 
-def make_python_freeze(modules):
+def make_python_freeze(modules, frozen_file):
     """Get a list of python native modules, return them frozen"""
     frozen_h = '//Ignifuga auto generated file, contains the following modules: %s\n#include "Python.h"\n\n' % (','.join(modules))
     mod_sizes = {}
@@ -784,7 +389,7 @@ compileall.compile_dir("%s")
 
     frozen_h +='\nstruct _frozen *PyImport_FrozenModules = _PyImport_FrozenModules;\n'
 
-    f = open(join(PYTHON_BUILD, 'Python', 'frozen.c'), 'w')
+    f = open(frozen_file, 'w')
     f.write(frozen_h)
     f.close()
 
@@ -794,8 +399,8 @@ compileall.compile_dir("%s")
 
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (IGNIFUGA_SRC, IGNIFUGA_BUILD)
-    Popen(shlex.split(cmd), cwd = IGNIFUGA_SRC).communicate()
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], BUILDS['IGNIFUGA'])
+    Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
 
 def make_glue(package, glue_h, glue_c):
     glue = """
@@ -823,7 +428,7 @@ init%s(){
     return glue
 
 def make_ignifuga():
-    return cythonize(IGNIFUGA_BUILD, 'ignifuga')
+    return cythonize(BUILDS['IGNIFUGA'], 'ignifuga')
     
 def cythonize(build_dir, package_name, skip=[]):
     files = []
@@ -955,676 +560,13 @@ def cythonize(build_dir, package_name, skip=[]):
 # SDL BUILDING
 # ===============================================================================================================
 def prepare_sdl(platform):
-    if platform == 'linux64':
-        prepare_source('SDL', SDL_SRC, SDL_BUILD)
-        prepare_source('SDL_image', SDL_IMAGE_SRC, SDL_IMAGE_BUILD)
-        prepare_source('zlib', ZLIB_SRC, ZLIB_BUILD)
-        prepare_source('libpng', PNG_SRC, PNG_BUILD)
-        shutil.copy(join(PNG_BUILD, 'scripts', 'makefile.linux'), join(PNG_BUILD, 'Makefile'))
-        prepare_source('libjpeg', JPG_SRC, JPG_BUILD)
-        prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
-        shutil.copy(join(FREETYPE_SRC, 'Makefile'), join(FREETYPE_BUILD, 'Makefile') )
-        prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD)
-
-    elif platform == 'osx':
-        prepare_source('SDL', SDL_SRC, SDL_BUILD+'_i386')
-        prepare_source('SDL', SDL_SRC, SDL_BUILD+'_x86_64')
-        prepare_source('SDL_image', SDL_IMAGE_SRC, SDL_IMAGE_BUILD+'_i386')
-        prepare_source('SDL_image', SDL_IMAGE_SRC, SDL_IMAGE_BUILD+'_x86_64')
-        prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD+'_i386')
-        prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD+'_x86_64')
-        prepare_source('zlib', ZLIB_SRC, ZLIB_BUILD)
-        prepare_source('libpng', PNG_SRC, PNG_BUILD)
-        if not isfile(join(PNG_BUILD, 'Makefile')):
-            shutil.copy(join(PNG_BUILD, 'scripts', 'makefile.darwin'), join(PNG_BUILD, 'Makefile'))
-            # Force libpng to build universally
-            env = prepare_osx_env()
-            cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['CFLAGS'] if 'CFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = SED_CMD + '-e "s|LDFLAGS=|LDFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['LDFLAGS'] if 'LDFLAGS' in env else '', join(PNG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = SED_CMD + '-e "s|-dynamiclib|-dynamiclib -arch i386 -arch x86_64 |g" %s' % join(PNG_BUILD, 'Makefile')
-            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-            cmd = SED_CMD + '-e "s|prefix=.*|prefix=%s|g" %s' % (join(PNG_BUILD, 'Makefile'), DIST_DIR)
-            Popen(shlex.split(cmd), cwd = PNG_BUILD).communicate()
-        prepare_source('libjpeg', JPG_SRC, JPG_BUILD)
-        prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
-        shutil.copy(join(FREETYPE_SRC, 'Makefile'), join(FREETYPE_BUILD, 'Makefile') )
-        prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD)
-
-    elif platform == 'android':
-        patch_target = not isdir(SDL_BUILD) # Keep count if we are starting from scratch to avoid rebuilding excessively too many files
-        
-        prepare_source('SDL Android Skeleton', join(SDL_SRC, 'android-project'), SDL_BUILD)
-        if patch_target:
-            cmd = SED_CMD + """'s|^target=.*|target=android-7|g' %s""" % (join(SDL_BUILD, 'default.properties'),)
-            Popen(shlex.split(cmd), cwd = SDL_BUILD).communicate()
-            if isdir(join(SDL_BUILD, 'jni', 'src')):
-                shutil.rmtree(join(SDL_BUILD, 'jni', 'src'))
-            
-
-        # Copy SDL and SDL_image to the android project structure
-        prepare_source('SDL', SDL_SRC, join(SDL_BUILD, 'jni', 'SDL'))
-        if patch_target:
-            shutil.copy(join(SDL_BUILD, 'jni', 'SDL', 'include', 'SDL_config_android.h'), join(SDL_BUILD, 'jni', 'SDL', 'include', 'SDL_config.h'))
-        prepare_source('libpng', PNG_SRC, join(SDL_BUILD, 'jni', 'png'))
-        prepare_source('libjpeg', JPG_SRC, join(SDL_BUILD, 'jni', 'jpeg'))
-        prepare_source('SDL_image', SDL_IMAGE_SRC, join(SDL_BUILD, 'jni', 'SDL_image'))
-        if not isfile(join(SDL_BUILD, 'jni', 'SDL_image', 'Android.mk')):
-            shutil.copy(join(ROOT_DIR, 'external', 'Android.mk.SDL_image'), join(SDL_BUILD, 'jni', 'SDL_image', 'Android.mk'))
-
-        prepare_source('SDL_ttf', SDL_TTF_SRC, join(SDL_BUILD, 'jni', 'SDL_ttf'))
-        prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
-        shutil.copy(join(FREETYPE_SRC, 'Makefile'), join(FREETYPE_BUILD, 'Makefile') )
-        
-        if not isdir(join(SDL_BUILD, 'jni', 'freetype')):
-            os.makedirs(join(SDL_BUILD, 'jni', 'freetype'))
-            shutil.copy(join(ROOT_DIR, 'external', 'Android.mk.freetype'), join(SDL_BUILD, 'jni', 'freetype', 'Android.mk'))
-
-    elif platform == 'mingw32':
-        prepare_source('SDL', SDL_SRC, SDL_BUILD)
-        prepare_source('SDL_image', SDL_IMAGE_SRC, SDL_IMAGE_BUILD)
-        prepare_source('zlib', ZLIB_SRC, ZLIB_BUILD)
-        prepare_source('libpng', PNG_SRC, PNG_BUILD)
-        prepare_source('libjpeg', JPG_SRC, JPG_BUILD)
-        prepare_source('freetype', FREETYPE_SRC, FREETYPE_BUILD)
-        shutil.copy(join(FREETYPE_SRC, 'Makefile'), join(FREETYPE_BUILD, 'Makefile') )
-        prepare_source('SDL_ttf', SDL_TTF_SRC, SDL_TTF_BUILD)
-
-        shutil.copy(join(ROOT_DIR, 'external', 'Makefile.in.zlib'), join(ZLIB_BUILD, 'Makefile.in'))
-        shutil.copy(join(ROOT_DIR, 'external', 'Makefile.libpng.mingw32'), join(PNG_BUILD, 'Makefile'))
-
+    mod = __import__('modules.sdl.'+platform, fromlist=['prepare'])
+    mod.prepare(DIST_DIR, SOURCES, BUILDS)
 
 def make_sdl(platform, env=None):
-    if platform == 'linux64':
-        # Build zlib
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libz.a'))
-        if not isfile(join(ZLIB_BUILD, 'Makefile')):
-            cmd = './configure --static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make install'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            log('zlib built successfully')
-        else:
-            error('Problem building zlib')
-            exit()
+    mod = __import__('modules.sdl.'+platform, fromlist=['make'])
+    mod.make(env, DIST_DIR, BUILDS)
 
-        # Build libpng
-        if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
-
-        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        # Remove dynamic libraries to avoid confusions with the linker
-        cmd = 'find %s -name "*.so*" -delete' % join(DIST_DIR, 'lib')
-        Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib'), env=env).communicate()
-
-        # Build libjpeg
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
-            
-        if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            # Fixes for the Makefile
-            cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '"s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-
-        cmd = 'make V=0 '
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-lib'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-headers'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            log('libjpeg built successfully')
-        else:
-            error('Problem building libjpeg')
-            exit()
-        
-        # Build SDL
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
-            
-        if not isfile(join(SDL_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            log('SDL built successfully')
-        else:
-            error('Problem building SDL')
-            exit()
-
-        # Build SDL_Image
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
-            
-        if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
-            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
-            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            cmd = './configure --enable-silent-rules CFLAGS="%s" LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            log('SDL Image built successfully')
-        else:
-            error('Problem building SDL Image')
-            exit()
-
-        # Build freetype
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
-            
-        if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (DIST_DIR,DIST_DIR)
-            Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            log('Freetype built successfully')
-        else:
-            error('Problem building Freetype')
-            exit()
-
-        # Build SDL_ttf
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
-            
-        if not isfile(join(SDL_TTF_BUILD, 'configure')):
-            cmd = './autogen.sh'
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-            
-        if not isfile(join(SDL_TTF_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            log('SDL TTF built successfully')
-        else:
-            error('Problem building SDL TTF')
-            exit()
-    elif platform == 'osx':
-        universal_cflags = '-arch i386 -arch x86_64'
-        # Build all libraries in universal mode (i386 and x86_64)
-        # Build zlib
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libz.a'))
-        if not isfile(join(ZLIB_BUILD, 'Makefile')):
-            cmd = './configure --static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-            # Force zlib to build universally
-            cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS=%s %s |g" %s' % (universal_cflags, env['CFLAGS'], (join(ZLIB_BUILD, 'Makefile')))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            log('zlib built successfully')
-        else:
-            error('Problem building zlib')
-            exit()
-
-        # Build libpng
-        if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
-
-        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        # Remove dynamic libraries to avoid confusions with the linker
-        cmd = 'rm *.dylib'
-        Popen(shlex.split(cmd), cwd = join(DIST_DIR, 'lib')).communicate()
-
-        # Build libjpeg
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
-
-        if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" LIBTOOL= --disable-shared --enable-static --prefix="%s"' % (universal_cflags, env['CFLAGS'], DIST_DIR)
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            # Fixes for the Makefile
-            cmd = SED_CMD + '-e "s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '-e "s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '-e "s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-lib'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-headers'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            log('libjpeg built successfully')
-        else:
-            error('Problem building libjpeg')
-            exit()
-
-        # Build freetype
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
-
-        if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (universal_cflags, env['CFLAGS'],DIST_DIR,DIST_DIR)
-            Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            log('Freetype built successfully')
-        else:
-            error('Problem building Freetype')
-            exit()
-
-        # Build SDL, SDL Image, SDL TTF
-        # SDL can not be built with multiple -arch flags, so we build it twice and then lipo the results
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_i386.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_i386.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_x86_64.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_x86_64.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image_i386.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image_i386.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image_x86_64.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image_x86_64.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf_i386.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf_i386.a'))
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf_x86_64.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf_x86_64.a'))
-
-        sdl_build_i386 = SDL_BUILD+'_i386'
-        sdl_build_x86_64 = SDL_BUILD+'_x86_64'
-        sdl_image_build_i386 = SDL_IMAGE_BUILD+'_i386'
-        sdl_image_build_x86_64 = SDL_IMAGE_BUILD+'_x86_64'
-        sdl_ttf_build_i386 = SDL_TTF_BUILD+'_i386'
-        sdl_ttf_build_x86_64 = SDL_TTF_BUILD+'_x86_64'
-
-        # i386 builds
-        if not isfile(join(sdl_build_i386, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
-        cmd = 'make V=0 '
-        Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_build_i386, env=env).communicate()
-
-        if not isfile(join(sdl_image_build_i386, 'Makefile')):
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
-            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
-            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            # --disable-imageio is required otherwise the sprite data extracting code for PNGs is never enabled!
-            cmd = './configure --disable-imageio --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-            # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = SED_CMD + '-e "s|.*showimage.*||g" %s' % (join(sdl_image_build_i386, 'Makefile'),)
-            Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-
-        if not isfile(join(sdl_ttf_build_i386, 'configure')):
-            cmd = './autogen.sh'
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if not isfile(join(sdl_ttf_build_i386, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m32" LDFLAGS="-m32 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-            # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            #cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_i386, 'Makefile'),)
-            #Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
-            log('SDL i386 built successfully')
-        else:
-            error('Problem building SDL i386')
-            exit()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            log('SDL Image i386 built successfully')
-        else:
-            error('Problem building SDL Image i386')
-            exit()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            log('SDL TTF built successfully')
-        else:
-            error('Problem building SDL TTF i386')
-            exit()
-
-        # Rename libraries with the _i386 suffix
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2.a'), join(DIST_DIR, 'lib', 'libSDL2_i386.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2main.a'), join(DIST_DIR, 'lib', 'libSDL2main_i386.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_image.a'), join(DIST_DIR, 'lib', 'libSDL2_image_i386.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_ttf.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf_i386.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        # x86_64 builds
-        if not isfile(join(sdl_build_x86_64, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
-
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
-        
-        if not isfile(join(sdl_image_build_x86_64, 'Makefile')):
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
-            pngcf = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
-            pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-            # --disable-imageio is required otherwise the sprite data extracting code for PNGs is never enabled!
-            cmd = './configure --disable-imageio --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --disable-sdltest --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
-            # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            #cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
-            #Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
-
-        if not isfile(join(sdl_ttf_build_x86_64, 'configure')):
-            cmd = './autogen.sh'
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if not isfile(join(sdl_ttf_build_x86_64, 'Makefile')):
-            cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (env['CFLAGS'],DIST_DIR, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-            # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
-            cmd = SED_CMD + '-e "s|.*showfont.*||g" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
-            Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')) and isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
-            log('SDL x86_64 built successfully')
-        else:
-            error('Problem building SDL x86_64')
-            exit()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            log('SDL Image built successfully')
-        else:
-            error('Problem building SDL Image x86_64')
-            exit()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            log('SDL TTF built successfully')
-        else:
-            error('Problem building SDL TTF x86_64')
-            exit()
-
-        # Rename libraries with the _x86_64 suffix
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2.a'), join(DIST_DIR, 'lib', 'libSDL2_x86_64.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2main.a'), join(DIST_DIR, 'lib', 'libSDL2main_x86_64.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_image.a'), join(DIST_DIR, 'lib', 'libSDL2_image_x86_64.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mv -f "%s" "%s"' % (join(DIST_DIR, 'lib', 'libSDL2_ttf.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf_x86_64.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        # Lipo SDL library versions together
-        cmd = 'lipo -create %s %s -output %s' % (join(DIST_DIR, 'lib', 'libSDL2_i386.a'), join(DIST_DIR, 'lib', 'libSDL2_x86_64.a'), join(DIST_DIR, 'lib', 'libSDL2.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'ranlib %s' % join(DIST_DIR, 'lib', 'libSDL2.a')
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            log('SDL built successfully')
-        else:
-            error('Problem building SDL')
-            exit()
-
-        cmd = 'lipo -create %s %s -output %s' % (join(DIST_DIR, 'lib', 'libSDL2main_i386.a'), join(DIST_DIR, 'lib', 'libSDL2main_x86_64.a'), join(DIST_DIR, 'lib', 'libSDL2main.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'ranlib %s' % join(DIST_DIR, 'lib', 'libSDL2main.a')
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2main.a')):
-            log('SDL built successfully')
-        else:
-            error('Problem building SDL')
-            exit()
-
-        # Lipo SDL Image library versions together
-        cmd = 'lipo -create %s %s -output %s' % (join(DIST_DIR, 'lib', 'libSDL2_image_i386.a'), join(DIST_DIR, 'lib', 'libSDL2_image_x86_64.a'), join(DIST_DIR, 'lib', 'libSDL2_image.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'ranlib %s' % join(DIST_DIR, 'lib', 'libSDL2_image.a')
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            log('SDL Image built successfully')
-        else:
-            error('Problem building SDL Image')
-            exit()
-
-        # Lipo SDL TTF library versions together
-        cmd = 'lipo -create %s %s -output %s' % (join(DIST_DIR, 'lib', 'libSDL2_ttf_i386.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf_x86_64.a'), join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
-        Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'ranlib %s' % join(DIST_DIR, 'lib', 'libSDL2_ttf.a')
-        Popen(shlex.split(cmd), env=env).communicate()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            log('SDL TTF built successfully')
-        else:
-            error('Problem building SDL TTF')
-            exit()
-
-    elif platform == 'android':
-        # Build freetype
-        if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (ANDROID_NDK,DIST_DIR)
-            Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        if isfile(join(FREETYPE_BUILD, 'objs', '.libs', 'libfreetype.a')):
-            cmd = 'rsync -aqut --exclude .svn --exclude .hg %s/ %s' % (join(FREETYPE_BUILD, 'include'), join(SDL_BUILD, 'jni', 'freetype', 'include'))
-            Popen(shlex.split(cmd)).communicate()
-            shutil.copy(join(FREETYPE_BUILD, 'objs', '.libs', 'libfreetype.a'), join(SDL_BUILD, 'jni', 'freetype', 'libfreetype.a'))
-        else:
-            error('Error compiling freetype')
-            exit()
-        
-        
-        cmd = 'ndk-build'
-        Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        # Copy some files to the skeleton directory
-        if isdir(join(DIST_DIR, 'jni', 'SDL', 'include')):
-            shutil.rmtree(join(DIST_DIR, 'jni', 'SDL', 'include'))
-        if isdir(join(DIST_DIR, 'jni', 'SDL', 'src')):
-            shutil.rmtree(join(DIST_DIR, 'jni', 'SDL', 'src'))
-
-        try:
-            shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'include'), join(DIST_DIR, 'jni', 'SDL', 'include'))
-            shutil.copytree(join(SDL_BUILD, 'jni', 'SDL', 'src'), join(DIST_DIR, 'jni', 'SDL', 'src'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2.so'), join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2_image.so'), join(DIST_DIR, 'jni', 'SDL_image', 'libSDL2_image.so'))
-            shutil.copy(join(SDL_BUILD, 'libs', 'armeabi', 'libSDL2_ttf.so'), join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL2_ttf.so'))
-            shutil.copy(join(SDL_BUILD, 'jni', 'SDL_image', 'SDL_image.h'), join(DIST_DIR, 'jni', 'SDL_image', 'SDL_image.h'))
-            shutil.copy(join(SDL_BUILD, 'jni', 'SDL_ttf', 'SDL_ttf.h'), join(DIST_DIR, 'jni', 'SDL_ttf', 'SDL_ttf.h'))
-            log('SDL built successfully')
-        except:
-            error('Error while building SDL for target')
-            exit()
-    elif platform == 'mingw32':
-        # Build zlib
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libz.a'))
-        if not isfile(join(ZLIB_BUILD, 'Makefile')):
-            cmd = './configure --static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = ZLIB_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libz.a')):
-            log('zlib built successfully')
-        else:
-            error('Problem building zlib')
-            exit()
-        
-        # Build libpng
-        if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libpng.a'))
-        cmd = 'make V=0 prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install prefix="%s"' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = PNG_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libpng.a')):
-            log('libpng built successfully')
-        else:
-            error('Problem building libpng')
-            exit()
-
-        # Build libjpeg
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libjpeg.a'))
-
-        if not isfile(join(JPG_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            # Fixes for the Makefile
-            cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '"s|^O = lo|O = o|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-            cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(JPG_BUILD, 'Makefile'))
-            Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-lib'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-headers'
-        Popen(shlex.split(cmd), cwd = JPG_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libjpeg.a')):
-            log('libjpeg built successfully')
-        else:
-            error('Problem building libjpeg')
-            exit()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2.a'))
-        if not isfile(join(SDL_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-
-            # HACK FIX for SDL problem, this can be removed once SDL fixes this error
-#            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_XAUDIO2.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
-#            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-#            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_DSOUND.*||g" %s' % (join(SDL_BUILD, 'include', 'SDL_config_windows.h'),)
-#            Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-
-
-
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = SDL_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2.a')):
-            log('SDL built successfully')
-        else:
-            error('Problem building SDL')
-            exit()
-
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_image.a'))
-        if not isfile(join(SDL_IMAGE_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(DIST_DIR, 'lib'), join(DIST_DIR, 'include'), DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = SDL_IMAGE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_image.a')):
-            log('SDL Image built successfully')
-        else:
-            error('Problem building SDL Image')
-            exit()
-
-         # Build freetype
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libfreetype.a'))
-        if not isfile(join(FREETYPE_BUILD, 'config.mk')):
-            env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        cmd = 'make V=0 install'
-        Popen(shlex.split(cmd), cwd = FREETYPE_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libfreetype.a')):
-            log('Freetype built successfully')
-        else:
-            error('Problem building Freetype')
-            exit()
-
-        # Build SDL_ttf
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            os.remove(join(DIST_DIR, 'lib', 'libSDL2_ttf.a'))
-        if not isfile(join(SDL_TTF_BUILD, 'configure')):
-            cmd = './autogen.sh'
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-
-        if not isfile(join(SDL_TTF_BUILD, 'Makefile')):
-            cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (DIST_DIR, DIST_DIR, DIST_DIR)
-            Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make V=0'
-        Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-libSDL2_ttfincludeHEADERS'
-        Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        cmd = 'make V=0 install-libLTLIBRARIES'
-        Popen(shlex.split(cmd), cwd = SDL_TTF_BUILD, env=env).communicate()
-        if isfile(join(DIST_DIR, 'lib', 'libSDL2_ttf.a')):
-            log('SDL TTF built successfully')
-        else:
-            error('Problem building SDL TTF')
-            exit()
 
 # ===============================================================================================================
 # USER PROJECT BUILDS
@@ -1677,7 +619,7 @@ def build_generic(options, platform, env=None):
         prepare_ignifuga(platform)
         ignifuga_src, glue_h, glue_c = make_ignifuga()
         info('Building Python')
-        prepare_python(platform, ignifuga_src, PYTHON_BUILD)
+        prepare_python(platform, ignifuga_src, BUILDS['PYTHON'])
         make_python(platform, ignifuga_src, env)
 
 def build_project_generic(options, platform, env=None):
@@ -1690,12 +632,12 @@ def build_project_generic(options, platform, env=None):
         error('Your main file can not have the same name as the project. If your project is com.mdqinc.test your main file can not be named test.py')
         exit()
 
-    platform_build = join(PROJECT_BUILD, platform)
+    platform_build = join(BUILDS['PROJECT'], platform)
     main_file = join(platform_build, options.main)
-    cython_src = join(PROJECT_BUILD, platform, 'cython_src')
+    cython_src = join(BUILDS['PROJECT'], platform, 'cython_src')
     info('Building %s for %s  (package: %s)' % (options.project, platform, package))
-    if not isdir(PROJECT_BUILD):
-        os.makedirs(PROJECT_BUILD)
+    if not isdir(BUILDS['PROJECT']):
+        os.makedirs(BUILDS['PROJECT'])
 
     # Prepare and cythonize project sources
     prepare_project(PROJECT_ROOT, platform_build)
@@ -1714,8 +656,10 @@ def build_project_generic(options, platform, env=None):
         if not isfile(mfc):
             error ('Could not cythonize main file')
             exit()
-        cmd = SED_CMD + """ '1i#include \"SDL.h\"' %s""" % mfc
-        Popen(shlex.split(cmd), cwd = platform_build).communicate()
+
+        # Insert SDL.h into the cythonized file
+        with file(mfc, 'r') as original: mfc_data = original.read()
+        with file(mfc, 'w') as modified: modified.write("#include \"SDL.h\"\n"+mfc_data)
         shutil.move(mfc, main_file_c)
 
     # Build the executable
@@ -1723,113 +667,8 @@ def build_project_generic(options, platform, env=None):
     for cf in cfiles:
         sources += cf + ' '
 
-    if platform in ['linux64', 'mingw32', 'osx']:
-        # Get some required flags
-        cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
-        sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-        cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
-        sdlflags = sdlflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-        cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
-        freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-        cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --libs'
-        freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-        cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
-        pngflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-        cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
-        pngflags = pngflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-
-        if platform == 'linux64':
-            sdlflags = sdlflags.replace('-lpthread', '').replace('-ldl', '')
-            freetypeflags = freetypeflags.replace('-lpthread', '').replace('-ldl', '')
-            pngflags = pngflags.replace('-lpthread', '').replace('-ldl', '')
-            cmd = '%s -static-libgcc -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
-            print cmd
-            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
-        elif platform == 'osx':
-            cmd = '%s -arch i386 -arch x86_64 -static-libgcc -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -lpthread -ldl -o %s' % (env['CC'], sources,join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
-            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
-        elif platform == 'mingw32':
-            extralibs = "-lstdc++ -lgcc -lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
-            cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz %s %s %s -o %s' % (env['CC'], sources, join(DIST_DIR, 'include'), join(DIST_DIR, 'include', 'python2.7'), join(DIST_DIR, 'lib'), sdlflags, freetypeflags, extralibs, options.project)
-            Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
-
-        if not isfile(join(cython_src, options.project)):
-            error('Error during compilation of project')
-            exit()
-        cmd = '%s %s' % (env['STRIP'], join(cython_src, options.project))
-        Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
-        if platform in ['linux64', 'osx']:
-            shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project))
-        elif platform == 'mingw32':
-            shutil.move(join(cython_src, options.project), join(PROJECT_BUILD, '..', options.project+'.exe'))
-
-    elif platform == 'android':
-        # Copy/update the skeleton
-        android_project = join(platform_build, 'android_project')
-        jni_src = join(android_project, 'jni', 'src')
-        local_cfiles = []
-        for cfile in cfiles:
-            local_cfiles.append(basename(cfile))
-
-        cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (DIST_DIR, android_project)
-        Popen(shlex.split(cmd), cwd = DIST_DIR).communicate()
-
-
-        if options.wallpaper:
-            # Wallpapers use a slightly different manifest
-            if isfile(join(android_project, 'AndroidManifest.wallpaper.xml')):
-                shutil.move(join(android_project, 'AndroidManifest.wallpaper.xml'), join(android_project, 'AndroidManifest.xml'))
-
-        # Modify the glue code to suit the project
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'AndroidManifest.xml'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.wallpaper.java'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'build.xml'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[SDK_LOCATION\]\]|%s|g' %s" % (ANDROID_SDK, join(android_project, 'local.properties'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
-        Popen(shlex.split(cmd), cwd = jni_src).communicate()
-
-        # Make the correct structure inside src
-        sdlActivityDir = join(android_project, 'src', options.project.replace('.', os.sep))
-        if not isdir(sdlActivityDir):
-            os.makedirs(sdlActivityDir)
-        if options.wallpaper:
-            # Wallpapers use a slightly different activity
-            shutil.move(join(android_project, 'src', 'SDLActivity.wallpaper.java'), join(sdlActivityDir, 'SDLActivity.java'))
-            os.unlink(join(android_project, 'src', 'SDLActivity.java'))
-        else:
-            shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
-            os.unlink(join(android_project, 'src', 'SDLActivity.wallpaper.java'))
-
-        # Copy cythonized sources
-        cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (cython_src, jni_src)
-        Popen(shlex.split(cmd), cwd = cython_src).communicate()
-
-        # Copy assets
-        for asset in options.assets:
-            cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s %s' % (asset, join(android_project, 'assets'))
-            Popen(shlex.split(cmd)).communicate()
-
-        # Build it
-        cmd = 'ndk-build'
-        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
-        cmd = 'ant debug'
-        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
-
-        apk = join(android_project, 'bin', options.project+'-debug.apk')
-        if not isfile(apk):
-            error ('Error during compilation of the project')
-            exit()
-
-        shutil.move(apk, join(PROJECT_BUILD, '..', options.project+'.apk'))
-
+    mod = __import__('modules.project.'+platform, fromlist=['make'])
+    mod.make(options, env, DIST_DIR, BUILDS, sources, cython_src, cfiles)
 
     info('Project built successfully')
 
@@ -1837,14 +676,6 @@ def build_project_generic(options, platform, env=None):
 # ===============================================================================================================
 # LINUX 64
 # ===============================================================================================================
-def prepare_linux64_env():
-    """ Set up the environment variables for Linux64 compilation"""
-    env = deepcopy(os.environ)
-    env['CC'] = 'gcc'
-    env['STRIP'] = 'strip'
-    env['CFLAGS'] = "" if not 'CFLAGS' in env else env['CFLAGS']
-    return env
-
 def build_linux64 (options):
     platform = 'linux64'
     setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
@@ -1866,14 +697,6 @@ def build_project_linux64(options):
 # ===============================================================================================================
 # OS X
 # ===============================================================================================================
-def prepare_osx_env():
-    """ Set up the environment variables for Linux64 compilation"""
-    env = deepcopy(os.environ)
-    env['CC'] = 'gcc'
-    env['STRIP'] = 'strip'
-    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk'
-    return env
-
 def build_osx (options):
     platform = 'osx'
     setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
@@ -1895,51 +718,6 @@ def build_project_osx(options):
 # ===============================================================================================================
 # ANDROID
 # ===============================================================================================================
-def prepare_android_env():
-    """ Set up the environment variables for Android compilation"""
-
-    # Check that the NDK and SDK exist
-    if ANDROID_NDK == None:
-        error('No Android NDK location provided (use command line parameters or environment variable ANDROID_NDK)')
-        exit()
-    if ANDROID_SDK == None:
-        error('No Android SDK location provided (use command line parameters or environment variable ANDROID_SDK)')
-        exit()
-        
-    if not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")):
-        error('Can not locate Valid Android NDK at %s, install or update it' % (ANDROID_NDK,))
-        exit()
-    if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
-        error('Can not locate Android SDK at %s' % ANDROID_SDK)
-        exit()
-    env = deepcopy(os.environ)
-    if 'JAVA_HOME' not in os.environ:
-        env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
-
-    if not isdir(env['JAVA_HOME']) or  not isfile(join(env['JAVA_HOME'], 'bin', 'java')):
-        error('Can not locate JAVA at %s' % (env['JAVA_HOME'],))
-        exit()
-    
-    env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
-    env['ARCH'] = "armeabi"
-    env['SDK'] = ANDROID_SDK
-    
-    #env['ARCH'] = "armeabi-v7a"
-    env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" % (ANDROID_NDK)
-    if env['ARCH'] == "armeabi-v7a":
-       env['CFLAGS']+=" -march=armv7-a -mfloat-abi=softfp -mfpu=vfp -mthumb"
-    env['CXXFLAGS'] = env['CFLAGS']
-    env['CC'] = 'arm-linux-androideabi-gcc %s' % (env['CFLAGS'],)
-    env['CXX'] = 'arm-linux-androideabi-g++ %s' % (env['CXXFLAGS'],)
-    env['AR'] = "arm-linux-androideabi-ar"
-    env['RANLIB'] = "arm-linux-androideabi-ranlib"
-    env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
-    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
-
-    env['DIST_DIR'] = DIST_DIR
-    env['TMP_DIR'] = TMP_DIR
-    return env
-
 def prepare_android_skeleton():
     """ Copy a skeleton of the final project to the dist directory """
     if not isdir(DIST_DIR):
@@ -1965,35 +743,6 @@ def build_project_android(options):
 # ===============================================================================================================
 # Windows - Mingw32
 # ===============================================================================================================
-
-def prepare_mingw32_env():
-    """ Set up the environment variables for Mingw32 compilation"""
-    env = deepcopy(os.environ)
-    #env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
-    env['ARCH'] = "win32"
-    #env['CFLAGS'] ="-I %s" % (join(PYTHON_BUILD, 'PC'),)
-    # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
-    # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
-    # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should
-    #env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
-    env['CFLAGS'] = ""
-    env['CXXFLAGS'] = env['CFLAGS']
-    env['CC'] = 'i586-mingw32msvc-gcc %s' % (env['CFLAGS'],)
-    env['CXX'] = 'i586-mingw32msvc-g++ %s' % (env['CXXFLAGS'],)
-    env['AR'] = "i586-mingw32msvc-ar"
-    env['RANLIB'] = "i586-mingw32msvc-ranlib"
-    env['STRIP'] = "i586-mingw32msvc-strip --strip-unneeded"
-    env['LD'] = "i586-mingw32msvc-ld"
-    env['AS'] = "i586-mingw32msvc-as"
-    env['NM'] = "i586-mingw32msvc-nm"
-    env['DLLTOOL'] = "i586-mingw32msvc-dlltool"
-    env['OBJDUMP'] = "i586-mingw32msvc-objdump"
-    env['RESCOMP'] = "i586-mingw32msvc-windres"
-    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
-    env['DIST_DIR'] = DIST_DIR
-    env['TMP_DIR'] = TMP_DIR
-    return env
-
 def build_mingw32 (options):
     platform = 'mingw32'
     setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
@@ -2056,8 +805,6 @@ if __name__ == '__main__':
         install_host_tools()
         exit()
 
-    get_available_platforms()
-
     options.platform = str(options.platform).lower()
 
     if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
@@ -2089,7 +836,10 @@ if __name__ == '__main__':
     if options.clean or options.forceclean:
         clean_modules(platforms, options.modules, options.forceclean)
 
+    # Check the availability of host tools, build host Python if required.
+    setup_variables(join (ROOT_DIR, 'dist'), join (ROOT_DIR, 'tmp'))
     check_host_tools()
+
     for platform in platforms:
         locals()["build_"+platform](options)
 
@@ -2106,6 +856,6 @@ if __name__ == '__main__':
 
     
     PROJECT_ROOT = abspath(dirname(options.main))
-    PROJECT_BUILD = join(PROJECT_ROOT, 'build')
+    BUILDS['PROJECT'] = join(PROJECT_ROOT, 'build')
     for platform in platforms:
         locals()["build_project_"+platform](options)
