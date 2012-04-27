@@ -696,6 +696,13 @@ if __name__ == '__main__':
     parser.add_option("-w", "--wallpaper",
         action="store_true", dest="wallpaper", default=False,
         help="Build a Live Wallpaper (only valid for Android)")
+    parser.add_option("--android-keystore",
+        default=None, dest="androidkeystore",
+        help="Android keystore location, if provided the package will be signed ")
+    parser.add_option("--android-keyalias",
+        default="", dest="androidkeyalias",
+        help="Android key alias used to sign the package ")
+
     (options, args) = parser.parse_args()
 
 
