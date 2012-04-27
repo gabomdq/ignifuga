@@ -2,3 +2,5 @@ dist
 tmp
 host
 .idea
+.pyc
+

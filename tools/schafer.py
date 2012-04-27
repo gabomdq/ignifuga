@@ -8,85 +8,34 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 # Requires: RSync, Cython, GNU Tools, MINGW32, Android SDK, etc
 
-import os, sys, shutil, shlex, fnmatch, imp, marshal, platform, tempfile, re
+import os, sys, shutil, shlex, imp, marshal
 from subprocess import Popen, PIPE
 from os.path import *
 from optparse import OptionParser
-from copy import deepcopy
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
+########################################################################################################################
+# Host system variables, *fixed* values and locations constant during all the execution
+########################################################################################################################
+ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
 
-class loglevel:
-    DEBUG = 5
-    INFO = 10
-    WARNING = 20
-    ERROR = 30
-
-def info(msg):
-    log(msg, loglevel.INFO)
-def warn(msg):
-    log(msg, loglevel.WARNING)
-def error(msg):
-    log(msg, loglevel.ERROR)
-
-def log(msg, level = loglevel.DEBUG):
-    if level < 10:
-        # Debug
-        print bcolors.OKBLUE + "* " + msg + bcolors.ENDC
-    elif level < 20:
-        # Info
-        print bcolors.OKGREEN + "* " + msg + bcolors.ENDC
-    elif level < 30:
-        # Warning
-        print bcolors.WARNING + "* " + msg + bcolors.ENDC
-    elif level < 50:
-        # Error
-        print bcolors.FAIL + "* " + msg + bcolors.ENDC
-
-def get_build_platform():
-    # Check the host distro
-    arch, exe = platform.architecture()
-    system = platform.system()
-    if system == 'Linux':
-        distro_name, distro_version, distro_id = platform.linux_distribution()
-    elif system == 'Darwin':
-        distro_name, distro_version, distro_id = platform.mac_ver()
-    return system, arch, distro_name, distro_version, distro_id
-
-def get_available_platforms():
-    """ Determine which build platforms are available depending on which platform we are building """
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
-
-    if system == 'Linux':
-        SED_CMD = 'sed -i '
-        if arch == '64bit':
-            AVAILABLE_PLATFORMS = ['linux64', 'mingw32', 'android']
-        else:
-            AVAILABLE_PLATFORMS = ['mingw32', 'android']
-    elif system == 'Darwin':
-        SED_CMD = 'sed -i "" '
-        AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
-
-    return AVAILABLE_PLATFORMS, SED_CMD
+from modules.log import log, error, info
+from modules.env import *
+from modules.util import *
 
 AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
 
 CYTHON_GIT = 'https://github.com/cython/cython.git'
-ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r7b-linux-x86.tar.bz2', 'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r7b-darwin-x86.tar.bz2'}
-ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r16-linux.tgz', 'Darwin': 'http://dl.google.com/android/android-sdk_r16-macosx.zip' }
+ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r7b-linux-x86.tar.bz2',
+                   'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r7b-darwin-x86.tar.bz2'}
+ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r16-linux.tgz',
+                   'Darwin': 'http://dl.google.com/android/android-sdk_r16-macosx.zip' }
+ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
+ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
 
-ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
 HOST_DIST_DIR = join(ROOT_DIR, 'host')
 HOSTPYTHON = join(HOST_DIST_DIR, 'bin', 'python')
 HOSTPGEN = join(HOST_DIST_DIR, 'bin', 'pgen')
-TMP_DIR = join (ROOT_DIR, 'tmp')
-DIST_DIR = join (ROOT_DIR, 'dist')
+PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
 
 SOURCES = {}
 SOURCES['PYTHON'] = join(ROOT_DIR, 'external', 'Python')
@@ -101,50 +50,8 @@ SOURCES['GREENLET'] = join(ROOT_DIR, 'external', 'greenlet')
 SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
 SOURCES['IGNIFUGA'] = ROOT_DIR
 
-ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
-ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
-PATCHES_DIR = join(ROOT_DIR, 'tools', 'patches')
+########################################################################################################################
 
-PROJECT_ROOT = ""
-BUILDS = {}
-BUILDS['PROJECT'] = ""
-
-PLATFORM_FILE = ""
-BUILDS['PYTHON'] = ""
-PYTHON_HEADERS = ""
-BUILDS['SDL'] = ""
-BUILDS['SDL_IMAGE'] = ""
-BUILDS['SDL_TTF'] = ""
-BUILDS['FREETYPE'] = ""
-SDL_HEADERS = ""
-BUILDS['PNG'] = ""
-BUILDS['JPG'] = ""
-BUILDS['ZLIB'] = ""
-BUILDS['IGNIFUGA'] = ""
-
-from modules.util import *
-from modules.env import *
-
-def setup_variables(dist_dir = join (ROOT_DIR, 'dist'), tmp_dir = join (ROOT_DIR, 'tmp')):
-    """ Set up some global variables """
-    global DIST_DIR, TMP_DIR, HOST_DIST_DIR, HOSTPYTHON, HOSTPGEN, PLATFORM_FILE, BUILDS, PYTHON_HEADERS
-    DIST_DIR = dist_dir
-    TMP_DIR = tmp_dir
-    PLATFORM_FILE = join(TMP_DIR, 'platform')
-    BUILDS['PYTHON'] = join(TMP_DIR, 'python')
-    PYTHON_HEADERS = join(BUILDS['PYTHON'], 'Include')
-    BUILDS['SDL'] = join(TMP_DIR, 'sdl')
-    BUILDS['SDL_IMAGE'] = join(TMP_DIR, 'sdl_image')
-    BUILDS['SDL_TTF'] = join(TMP_DIR, 'sdl_ttf')
-    BUILDS['FREETYPE'] = join(TMP_DIR, 'freetype')
-    SDL_HEADERS = join(DIST_DIR, 'include', 'SDL')
-    BUILDS['PNG'] = join(TMP_DIR, 'png')
-    BUILDS['JPG'] = join(TMP_DIR, 'jpg')
-    BUILDS['ZLIB'] = join(TMP_DIR, 'zlib')
-    BUILDS['IGNIFUGA'] = join(TMP_DIR, 'ignifuga')
-
-    if not isdir(TMP_DIR):
-        os.makedirs(TMP_DIR)
 
 def clean_modules(platforms, modules, everything=False):
     log('Cleaning Build Directories')
@@ -152,67 +59,45 @@ def clean_modules(platforms, modules, everything=False):
         platforms = [platforms,]
 
     for platform in platforms:
-        setup_variables(join (ROOT_DIR, 'dist', platform), join (ROOT_DIR, 'tmp', platform))
+        target = get_target(platform)
         if not everything:
-            if isdir(TMP_DIR):
+            if isdir(target.tmp):
                 if 'ignifuga' in modules:
-                    if isdir(BUILDS['IGNIFUGA']):
-                        shutil.rmtree(BUILDS['IGNIFUGA'])
-                    if isdir(BUILDS['PYTHON']):
-                        shutil.rmtree(BUILDS['PYTHON'])
-                if 'sdl' in modules and isdir(BUILDS['SDL']):
-                    shutil.rmtree(BUILDS['SDL'])
+                    if isdir(target.builds.IGNIFUGA):
+                        shutil.rmtree(target.builds.IGNIFUGA)
+                    if isdir(target.builds.PYTHON):
+                        shutil.rmtree(target.builds.PYTHON)
+                if 'sdl' in modules and isdir(target.builds.SDL):
+                    shutil.rmtree(target.builds.SDL)
         else:
-            if isdir(TMP_DIR):
-                shutil.rmtree(TMP_DIR)
-            if isdir(DIST_DIR):
-                shutil.rmtree(DIST_DIR)
-
-def save_platform(platform):
-    f = open(PLATFORM_FILE, 'w')
-    f.write(platform)
-    f.close()
-
-def read_platform():
-    if not isfile(PLATFORM_FILE):
-        return None
-    f = open (PLATFORM_FILE, 'r')
-    platform = f.read()
-    f.close()
-    return platform
+            if isdir(target.tmp):
+                shutil.rmtree(target.tmp)
+            if isdir(target.dist):
+                shutil.rmtree(target.dist)
 
 def check_ignifuga_libraries(platform):
+    target = get_target(platform)
     if platform in ['linux64', 'mingw32', 'osx']:
-        if isfile(join(DIST_DIR, 'lib', 'libpython2.7.a')):
+        if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
             return True
     elif platform == 'android':
-        if isfile(join(DIST_DIR, 'jni', 'python', 'libpython2.7.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL', 'libSDL2.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL_image', 'libSDL2_image.so')) and \
-        isfile(join(DIST_DIR, 'jni', 'SDL_ttf', 'libSDL2_ttf.so')):
+        if isfile(join(target.dist, 'jni', 'python', 'libpython2.7.so')) and \
+        isfile(join(target.dist, 'jni', 'SDL', 'libSDL2.so')) and \
+        isfile(join(target.dist, 'jni', 'SDL_image', 'libSDL2_image.so')) and \
+        isfile(join(target.dist, 'jni', 'SDL_ttf', 'libSDL2_ttf.so')):
             return True
 
     return False
-    
-def prepare_source(name, src, dst):
-    if not isdir(src):
-        error ("Can not find %s source code" % (name,) )
-        exit()
-
-    retval = False
-    if not isdir(dst):
-        retval = True
-
-    cmd = 'rsync -aqut --exclude .svn --exclude .hg --exclude Makefile %s/ %s' % (src, dst)
-    Popen(shlex.split(cmd), cwd = src).communicate()
-    
-    return retval
 
 # ===============================================================================================================
 # PYTHON BUILDING - Requires Ignifuga building!
 # ===============================================================================================================
 
 def prepare_python(platform, ignifuga_src, python_build):
+    target = get_target(platform)
+    if not isdir(target.tmp):
+        os.makedirs(target.tmp)
+
     if prepare_source('Python', SOURCES['PYTHON'], python_build):
         # Now copy the Setup.dist files
         python_setup = join(ROOT_DIR, 'external', 'Setup.'+platform)
@@ -230,26 +115,26 @@ def prepare_python(platform, ignifuga_src, python_build):
         if ignifuga_src != None:
             if platform in ['linux64', 'mingw32', 'osx']:
                 # Get some required flags
-                cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
+                cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
                 sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
+                cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
                 sdlflags = sdlflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
+                cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --cflags'
                 freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --libs'
+                cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --libs'
                 freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
 
             if platform == 'linux64' or platform == 'osx':
-                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),BUILDS['IGNIFUGA'], sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
 
             elif platform== 'android':
                 # Hardcoded for now
-                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(BUILDS['SDL'], 'jni', 'SDL', 'include'), join(BUILDS['SDL'], 'jni', 'SDL_image'), join(BUILDS['SDL'], 'jni', 'SDL_ttf'))
+                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
 
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), BUILDS['IGNIFUGA'], join(BUILDS['SDL'], 'libs', 'armeabi'), sdlflags)
+                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.SDL, 'libs', 'armeabi'), sdlflags)
 
             elif platform == 'mingw32':
                 # Remove some perjudicial flags
@@ -257,16 +142,16 @@ def prepare_python(platform, ignifuga_src, python_build):
                 # Patch some problems with cross compilation
                 cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
                 Popen(shlex.split(cmd)).communicate()
-                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(BUILDS['PYTHON'], 'Modules', 'signalmodule.c'),)
-                Popen(shlex.split(cmd), cwd = BUILDS['PYTHON'] ).communicate()
+                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(target.builds.PYTHON, 'Modules', 'signalmodule.c'),)
+                Popen(shlex.split(cmd), cwd = target.builds.PYTHON ).communicate()
 
                 # Copy some additional files in the right place
-                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'import_nt.c'), join(BUILDS['PYTHON'], 'Python', 'import_nt.c'))
-                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'dl_nt.c'), join(BUILDS['PYTHON'], 'Python', 'dl_nt.c'))
-                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'getpathp.c'), join(BUILDS['PYTHON'], 'Python', 'getpathp.c'))
-                shutil.copy(join(BUILDS['PYTHON'], 'PC', 'errmap.h'), join(BUILDS['PYTHON'], 'Objects', 'errmap.h'))
+                shutil.copy(join(target.builds.PYTHON, 'PC', 'import_nt.c'), join(target.builds.PYTHON, 'Python', 'import_nt.c'))
+                shutil.copy(join(target.builds.PYTHON, 'PC', 'dl_nt.c'), join(target.builds.PYTHON, 'Python', 'dl_nt.c'))
+                shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
+                shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
 
-                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), BUILDS['IGNIFUGA'], join(BUILDS['PYTHON'], 'Include'), sdlflags, freetypeflags)
+                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
 
             
             f = open(setupfile, 'at')
@@ -291,12 +176,14 @@ def make_python(platform, ignifuga_src, env=os.environ):
     # For profiling
     freeze_modules += ['cProfile', 'runpy', 'pkgutil']
 
+    target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])
-    mod.make(env, DIST_DIR, BUILDS, freeze_modules, join(BUILDS['PYTHON'], 'Python', 'frozen.c'))
+    mod.make(env, target, freeze_modules, join(target.builds.PYTHON, 'Python', 'frozen.c'))
 
 
-def make_python_freeze(modules, frozen_file):
+def make_python_freeze(platform, modules, frozen_file):
     """Get a list of python native modules, return them frozen"""
+    target = get_target(platform)
     frozen_h = '//Ignifuga auto generated file, contains the following modules: %s\n#include "Python.h"\n\n' % (','.join(modules))
     mod_sizes = {}
     # Locate the Python library
@@ -311,7 +198,7 @@ def make_python_freeze(modules, frozen_file):
         exit()
 
     # Copy module source to a temp location
-    modtemp = join(TMP_DIR, 'freezer')
+    modtemp = join(target.tmp, 'freezer')
     if isdir(modtemp):
         shutil.rmtree(modtemp)
 
@@ -399,7 +286,8 @@ compileall.compile_dir("%s")
 
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], BUILDS['IGNIFUGA'])
+    target = get_target(platform)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
 
 def make_glue(package, glue_h, glue_c):
@@ -427,8 +315,8 @@ init%s(){
 
     return glue
 
-def make_ignifuga():
-    return cythonize(BUILDS['IGNIFUGA'], 'ignifuga')
+def make_ignifuga(build_dir):
+    return cythonize(build_dir, 'ignifuga')
     
 def cythonize(build_dir, package_name, skip=[]):
     files = []
@@ -560,16 +448,18 @@ def cythonize(build_dir, package_name, skip=[]):
 # SDL BUILDING
 # ===============================================================================================================
 def prepare_sdl(platform):
+    target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['prepare'])
-    mod.prepare(DIST_DIR, SOURCES, BUILDS)
+    mod.prepare(target)
 
 def make_sdl(platform, env=None):
+    target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['make'])
-    mod.make(env, DIST_DIR, BUILDS)
+    mod.make(env, target)
 
 
 # ===============================================================================================================
-# USER PROJECT BUILDS
+# USER PROJECT target.builds
 # ===============================================================================================================
 def prepare_project(src, dst):
     # Copy all .py, .pyx and .pxd files
@@ -577,9 +467,10 @@ def prepare_project(src, dst):
     Popen(shlex.split(cmd), cwd = src).communicate()
         
 # ===============================================================================================================
-# PLATFORM BUILDS
+# PLATFORM target.builds
 # ===============================================================================================================
 def spawn_shell(platform):
+    target = get_target(platform)
     cmd = 'bash'
     env = os.environ
     if platform == 'android':
@@ -589,23 +480,25 @@ def spawn_shell(platform):
 
     info('Entering %s shell environment' % (platform,))
 
-    Popen(shlex.split(cmd), cwd = DIST_DIR, env=env).communicate()
+    Popen(shlex.split(cmd), cwd = target.dist, env=env).communicate()
     info('Exited from %s shell environment' % (platform,))
     
 def build_generic(options, platform, env=None):
+    target = get_target(platform)
+
     if platform in ['linux64', 'mingw32', 'osx']:
         # Android has its own skeleton set up
-        cmd = 'mkdir -p "%s"' % DIST_DIR
+        cmd = 'mkdir -p "%s"' % target.dist
         Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mkdir -p "%s"' % join(DIST_DIR,'include')
+        cmd = 'mkdir -p "%s"' % join(target.dist,'include')
         Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mkdir -p "%s"' % join(DIST_DIR,'bin')
+        cmd = 'mkdir -p "%s"' % join(target.dist,'bin')
         Popen(shlex.split(cmd), env=env).communicate()
-        cmd = 'mkdir -p "%s"' % join(DIST_DIR,'lib')
+        cmd = 'mkdir -p "%s"' % join(target.dist,'lib')
         Popen(shlex.split(cmd), env=env).communicate()
 
-    if not isdir(TMP_DIR):
-        os.makedirs(TMP_DIR)
+    if not isdir(target.tmp):
+        os.makedirs(target.tmp)
             
     # Compile SDL statically
     if 'sdl' in options.modules:
@@ -617,12 +510,12 @@ def build_generic(options, platform, env=None):
     if 'ignifuga' in options.modules:
         info('Building Ignifuga')
         prepare_ignifuga(platform)
-        ignifuga_src, glue_h, glue_c = make_ignifuga()
+        ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA)
         info('Building Python')
-        prepare_python(platform, ignifuga_src, BUILDS['PYTHON'])
+        prepare_python(platform, ignifuga_src, target.builds.PYTHON)
         make_python(platform, ignifuga_src, env)
 
-def build_project_generic(options, platform, env=None):
+def build_project_generic(options, platform, target, env=None):
     package = options.project.split('.')[-1]
     if package == 'ignifuga':
         error('Name your project something else than ignifuga please')
@@ -632,15 +525,15 @@ def build_project_generic(options, platform, env=None):
         error('Your main file can not have the same name as the project. If your project is com.mdqinc.test your main file can not be named test.py')
         exit()
 
-    platform_build = join(BUILDS['PROJECT'], platform)
+    platform_build = join(target.project, platform)
     main_file = join(platform_build, options.main)
-    cython_src = join(BUILDS['PROJECT'], platform, 'cython_src')
+    cython_src = join(target.project, platform, 'cython_src')
     info('Building %s for %s  (package: %s)' % (options.project, platform, package))
-    if not isdir(BUILDS['PROJECT']):
-        os.makedirs(BUILDS['PROJECT'])
+    if not isdir(target.project):
+        os.makedirs(target.project)
 
     # Prepare and cythonize project sources
-    prepare_project(PROJECT_ROOT, platform_build)
+    prepare_project(target.project_root, platform_build)
     cfiles, glue_h, glue_c = cythonize(platform_build, package, [options.main,])
 
     # Cythonize main file
@@ -668,7 +561,7 @@ def build_project_generic(options, platform, env=None):
         sources += cf + ' '
 
     mod = __import__('modules.project.'+platform, fromlist=['make'])
-    mod.make(options, env, DIST_DIR, BUILDS, sources, cython_src, cfiles)
+    mod.make(options, env, target, sources, cython_src, cfiles)
 
     info('Project built successfully')
 
@@ -678,20 +571,21 @@ def build_project_generic(options, platform, env=None):
 # ===============================================================================================================
 def build_linux64 (options):
     platform = 'linux64'
-    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    target = get_target(platform)
 
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Linux 64 bits')
-    if not isdir(DIST_DIR):
-        os.makedirs(DIST_DIR)
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
     env = prepare_linux64_env()
     build_generic(options, platform, env)
 
-def build_project_linux64(options):
+def build_project_linux64(options, project_root):
     platform = 'linux64'
     env = prepare_linux64_env()
-    build_project_generic(options, platform, env)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, env)
 
 
 # ===============================================================================================================
@@ -699,20 +593,21 @@ def build_project_linux64(options):
 # ===============================================================================================================
 def build_osx (options):
     platform = 'osx'
-    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    target = get_target(platform)
 
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For OS X')
-    if not isdir(DIST_DIR):
-        os.makedirs(DIST_DIR)
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
     env = prepare_osx_env()
     build_generic(options, platform, env)
 
-def build_project_osx(options):
+def build_project_osx(options, project_root):
     platform = 'osx'
     env = prepare_osx_env()
-    build_project_generic(options, platform, env)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, env)
 
 
 # ===============================================================================================================
@@ -720,14 +615,15 @@ def build_project_osx(options):
 # ===============================================================================================================
 def prepare_android_skeleton():
     """ Copy a skeleton of the final project to the dist directory """
-    if not isdir(DIST_DIR):
-        shutil.copytree(join(ROOT_DIR, 'tools', 'android_skeleton'), DIST_DIR)
-        cmd = 'find %s -name ".svn" -type d -exec rm -rf {} \;' % (DIST_DIR,)
-        Popen(shlex.split(cmd), cwd = DIST_DIR).communicate()
+    target = get_target ('android')
+    if not isdir(target.dist):
+        shutil.copytree(join(ROOT_DIR, 'tools', 'android_skeleton'), target.dist)
+        cmd = 'find %s -name ".svn" -type d -exec rm -rf {} \;' % (target.dist,)
+        Popen(shlex.split(cmd), cwd = target.dist).communicate()
     
 def build_android (options):
     platform = 'android'
-    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    target = get_target(platform)
     if options.main != None and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Android')
@@ -735,30 +631,32 @@ def build_android (options):
     prepare_android_skeleton()
     build_generic(options, platform, env)
 
-def build_project_android(options):
+def build_project_android(options, project_root):
     platform = 'android'
     env = prepare_android_env()
-    build_project_generic(options, platform, env)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, env)
 
 # ===============================================================================================================
 # Windows - Mingw32
 # ===============================================================================================================
 def build_mingw32 (options):
     platform = 'mingw32'
-    setup_variables(join(ROOT_DIR, 'dist', platform), join(ROOT_DIR, 'tmp', platform))
+    target = get_target(platform)
     check_mingw32tools()
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Windows 32 bits')
-    if not isdir(DIST_DIR):
-        os.makedirs(DIST_DIR)
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
     env = prepare_mingw32_env()
     build_generic(options, platform, env)
 
-def build_project_mingw32(options):
+def build_project_mingw32(options, project_root):
     platform = 'mingw32'
     env = prepare_mingw32_env()
-    build_project_generic(options, platform, env)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, env)
 
 # ===============================================================================================================
 # MAIN
@@ -837,7 +735,6 @@ if __name__ == '__main__':
         clean_modules(platforms, options.modules, options.forceclean)
 
     # Check the availability of host tools, build host Python if required.
-    setup_variables(join (ROOT_DIR, 'dist'), join (ROOT_DIR, 'tmp'))
     check_host_tools()
 
     for platform in platforms:
@@ -854,8 +751,5 @@ if __name__ == '__main__':
             
     info('Compiling project: ' + options.project )
 
-    
-    PROJECT_ROOT = abspath(dirname(options.main))
-    BUILDS['PROJECT'] = join(PROJECT_ROOT, 'build')
     for platform in platforms:
-        locals()["build_project_"+platform](options)
+        locals()["build_project_"+platform](options, abspath(dirname(options.main)))

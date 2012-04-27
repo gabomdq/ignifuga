@@ -9,9 +9,10 @@
 import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
-from schafer import log, error, prepare_source, make_python_freeze
+from ..log import log, error
+from schafer import prepare_source, make_python_freeze
 
-def make(options, env, DIST_DIR, BUILDS, sources, cython_src, cfiles):
+def make(options, env, target, sources, cython_src, cfiles):
     from schafer import SED_CMD, ANDROID_SDK, ANDROID_NDK
 
     # Copy/update the skeleton
@@ -21,8 +22,8 @@ def make(options, env, DIST_DIR, BUILDS, sources, cython_src, cfiles):
     for cfile in cfiles:
         local_cfiles.append(basename(cfile))
 
-    cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (DIST_DIR, android_project)
-    Popen(shlex.split(cmd), cwd = DIST_DIR).communicate()
+    cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (target.dist, android_project)
+    Popen(shlex.split(cmd), cwd = target.dist).communicate()
 
     if options.wallpaper:
         # Wallpapers use a slightly different manifest
@@ -77,6 +78,6 @@ def make(options, env, DIST_DIR, BUILDS, sources, cython_src, cfiles):
         error ('Error during compilation of the project')
         exit()
 
-    shutil.move(apk, join(BUILDS['PROJECT'], '..', options.project+'.apk'))
+    shutil.move(apk, join(target.project, '..', options.project+'.apk'))
 
     return True

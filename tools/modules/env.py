@@ -1,5 +1,43 @@
 from copy import deepcopy
 import os
+from os.path import join
+
+class Target(object):
+    pass
+
+class Builds(object):
+    pass
+
+
+def get_target(platform, project_root = '.', dist=None, tmp=None):
+    """ Set up some target system variables """
+    from schafer import ROOT_DIR
+    target = Target()
+    target.platform = platform
+    dist_dir = join (ROOT_DIR, 'dist', platform) if dist == None else dist
+    tmp_dir = join (ROOT_DIR, 'tmp', platform) if tmp == None else tmp
+    target.dist = dist_dir
+    target.tmp = tmp_dir
+    target.builds = Builds()
+    target.builds.PYTHON = join(tmp_dir, 'python')
+    target.builds.SDL = join(tmp_dir, 'sdl')
+    target.builds.SDL_IMAGE = join(tmp_dir, 'sdl_image')
+    target.builds.SDL_TTF = join(tmp_dir, 'sdl_ttf')
+    target.builds.FREETYPE = join(tmp_dir, 'freetype')
+    target.builds.PNG = join(tmp_dir, 'png')
+    target.builds.JPG = join(tmp_dir, 'jpg')
+    target.builds.ZLIB = join(tmp_dir, 'zlib')
+    target.builds.IGNIFUGA = join(tmp_dir, 'ignifuga')
+
+    target.python_headers = join(target.builds.PYTHON, 'Include')
+    target.sdl_headers = join(dist_dir, 'include', 'SDL')
+
+    target.project_root = project_root
+    target.project = join(project_root, 'build')
+
+    return target
+
+
 
 def prepare_linux64_env():
     """ Set up the environment variables for Linux64 compilation"""
@@ -61,8 +99,6 @@ def prepare_android_env():
     env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
     env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
 
-    env['DIST_DIR'] = DIST_DIR
-    env['TMP_DIR'] = TMP_DIR
     return env
 
 
@@ -72,7 +108,7 @@ def prepare_mingw32_env():
     env = deepcopy(os.environ)
     #env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "win32"
-    #env['CFLAGS'] ="-I %s" % (join(BUILDS['PYTHON'], 'PC'),)
+    #env['CFLAGS'] ="-I %s" % (join(target.builds.PYTHON, 'PC'),)
     # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
     # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
     # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should
@@ -91,6 +127,4 @@ def prepare_mingw32_env():
     env['OBJDUMP'] = "i586-mingw32msvc-objdump"
     env['RESCOMP'] = "i586-mingw32msvc-windres"
     env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
-    env['DIST_DIR'] = DIST_DIR
-    env['TMP_DIR'] = TMP_DIR
     return env

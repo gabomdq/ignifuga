@@ -9,7 +9,7 @@
 import os, shlex, shutil, re, platform, fnmatch
 from os.path import *
 from subprocess import Popen, PIPE
-from schafer import info, log, error, get_build_platform, prepare_python, HOST_DIST_DIR
+from log import info, log, error
 
 def find_cython():
     cmd = 'which cython'
@@ -89,7 +89,7 @@ def check_xcode():
 
 def check_host_tools():
     """ Check if the required host tools are present """
-    from schafer import HOSTPYTHON, HOSTPGEN, ROOT_DIR
+    from schafer import HOSTPYTHON, HOSTPGEN, ROOT_DIR, HOST_DIST_DIR, prepare_python
     system, arch, distro_name, distro_version, distro_id = get_build_platform()
     supported_platform = False
     if system == 'Linux':
@@ -288,24 +288,64 @@ def locate(pattern, root=os.curdir, skip = []):
                     break
             if yieldit:
                 yield os.path.join(path, filename)
-def get_sdl_flags(DIST_DIR):
-    cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --cflags'
+
+def get_sdl_flags(target):
+    cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
     flags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-    cmd = join(DIST_DIR, 'bin', 'sdl2-config' ) + ' --static-libs'
+    cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
     flags = flags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
     return flags
 
-def get_freetype_flags(DIST_DIR):
-    cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --cflags'
+def get_freetype_flags(target):
+    cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --cflags'
     flags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-    cmd = join(DIST_DIR, 'bin', 'freetype-config' ) + ' --libs'
+    cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --libs'
     flags = flags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
     return flags
 
-def get_png_flags(DIST_DIR):
-    cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --cflags'
+def get_png_flags(target):
+    cmd = join(target.dist, 'bin', 'libpng-config' ) + ' --static --cflags'
     flags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-    cmd = join(DIST_DIR, 'bin', 'libpng-config' ) + ' --static --ldflags'
+    cmd = join(target.dist, 'bin', 'libpng-config' ) + ' --static --ldflags'
     flags = flags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
     return flags
 
+def get_build_platform():
+    # Check the host distro
+    arch, exe = platform.architecture()
+    system = platform.system()
+    if system == 'Linux':
+        distro_name, distro_version, distro_id = platform.linux_distribution()
+    elif system == 'Darwin':
+        distro_name, distro_version, distro_id = platform.mac_ver()
+    return system, arch, distro_name, distro_version, distro_id
+
+def get_available_platforms():
+    """ Determine which build platforms are available depending on which platform we are building """
+    system, arch, distro_name, distro_version, distro_id = get_build_platform()
+
+    if system == 'Linux':
+        SED_CMD = 'sed -i '
+        if arch == '64bit':
+            AVAILABLE_PLATFORMS = ['linux64', 'mingw32', 'android']
+        else:
+            AVAILABLE_PLATFORMS = ['mingw32', 'android']
+    elif system == 'Darwin':
+        SED_CMD = 'sed -i "" '
+        AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
+
+    return AVAILABLE_PLATFORMS, SED_CMD
+
+def prepare_source(name, src, dst):
+    if not isdir(src):
+        error ("Can not find %s source code" % (name,) )
+        exit()
+
+    retval = False
+    if not isdir(dst):
+        retval = True
+
+    cmd = 'rsync -aqut --exclude .svn --exclude .hg --exclude Makefile %s/ %s' % (src, dst)
+    Popen(shlex.split(cmd), cwd = src).communicate()
+
+    return retval
