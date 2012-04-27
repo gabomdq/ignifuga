@@ -1,6 +1,6 @@
 from copy import deepcopy
 import os
-from os.path import join
+from os.path import *
 
 class Target(object):
     pass

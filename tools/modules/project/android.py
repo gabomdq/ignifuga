@@ -16,6 +16,7 @@ def make(options, env, target, sources, cython_src, cfiles):
     from schafer import SED_CMD, ANDROID_SDK, ANDROID_NDK
 
     # Copy/update the skeleton
+    platform_build = join(target.project, 'android')
     android_project = join(platform_build, 'android_project')
     jni_src = join(android_project, 'jni', 'src')
     local_cfiles = []
@@ -45,6 +46,24 @@ def make(options, env, target, sources, cython_src, cfiles):
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
     cmd = SED_CMD + "'s|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
+    if options.androidkeystore != None:
+        # Uncomment
+        cmd = SED_CMD + "'s|#key.store=|key.store=|g' %s" % (join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = SED_CMD + "'s|#key.alias=|key.alias=|g' %s" % (join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+
+        # Replace the key store and key alias
+        cmd = SED_CMD + "'s|key.store=.*|key.store=%s|g' %s" % (options.androidkeystore, join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = SED_CMD + "'s|key.alias=.*|key.alias=%s|g' %s" % (options.androidkeyalias, join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+    else:
+        # Comment out the relevant lines
+        cmd = SED_CMD + "'s|^key.store=|#key.store=|g' %s" % (join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
+        cmd = SED_CMD + "'s|^key.alias=|#key.alias=|g' %s" % (join(android_project, 'build.properties'))
+        Popen(shlex.split(cmd), cwd = jni_src).communicate()
 
     # Make the correct structure inside src
     sdlActivityDir = join(android_project, 'src', options.project.replace('.', os.sep))
@@ -70,14 +89,19 @@ def make(options, env, target, sources, cython_src, cfiles):
     # Build it
     cmd = 'ndk-build'
     Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
-    cmd = 'ant debug'
-    Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
+    if options.androidkeystore != None:
+        cmd = 'ant release'
+        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
+        apk = join(android_project, 'bin', options.project+'-release.apk')
+    else:
+        cmd = 'ant debug'
+        Popen(shlex.split(cmd), cwd = join(platform_build, 'android_project'), env=env).communicate()
+        apk = join(android_project, 'bin', options.project+'-debug.apk')
 
-    apk = join(android_project, 'bin', options.project+'-debug.apk')
+
     if not isfile(apk):
         error ('Error during compilation of the project')
         exit()
-
     shutil.move(apk, join(target.project, '..', options.project+'.apk'))
 
     return True

@@ -10,7 +10,7 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import prepare_source, ROOT_DIR, SOURCES
+from schafer import prepare_source, ROOT_DIR, SOURCES, SED_CMD
 
 def prepare(target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)

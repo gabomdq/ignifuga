@@ -10,7 +10,7 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import SED_CMD, ROOT_DIR, SOURCES
+from schafer import SED_CMD, ROOT_DIR, SOURCES, ANDROID_NDK, ANDROID_SDK
 from ..util import prepare_source
 
 def prepare(target):

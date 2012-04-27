@@ -9,8 +9,8 @@
 import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
-from log import log, error
-from schafer import prepare_source, make_python_freeze, SED_CMD
+from ..log import log, error
+from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN
 
 def make(env, target, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):

@@ -10,7 +10,7 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import prepare_source, make_python_freeze, SED_CMD
+from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, ANDROID_NDK, ANDROID_SDK
 
 def make(env, target, freeze_modules, frozen_file):
     make_python_freeze('android', freeze_modules, frozen_file)
