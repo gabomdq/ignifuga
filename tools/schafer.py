@@ -113,47 +113,9 @@ def prepare_python(platform, ignifuga_src, python_build):
         
         # Append the Ignifuga sources
         if ignifuga_src != None:
-            if platform in ['linux64', 'mingw32', 'osx']:
-                # Get some required flags
-                cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
-                sdlflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
-                sdlflags = sdlflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --cflags'
-                freetypeflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
-                cmd = join(target.dist, 'bin', 'freetype-config' ) + ' --libs'
-                freetypeflags = freetypeflags + ' ' + Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+            mod = __import__('modules.python.'+platform, fromlist=['prepare'])
+            ignifuga_module = mod.prepare(target, ignifuga_src, python_build)
 
-            if platform == 'linux64' or platform == 'osx':
-                ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
-
-            elif platform== 'android':
-                # Hardcoded for now
-                sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
-
-                # Patch some problems with cross compilation
-                cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
-                Popen(shlex.split(cmd)).communicate()
-                ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.SDL, 'libs', 'armeabi'), sdlflags)
-
-            elif platform == 'mingw32':
-                # Remove some perjudicial flags
-                sdlflags = sdlflags.replace('-mwindows', '').replace('-Dmain=SDL_main', '')
-                # Patch some problems with cross compilation
-                cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
-                Popen(shlex.split(cmd)).communicate()
-                cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(target.builds.PYTHON, 'Modules', 'signalmodule.c'),)
-                Popen(shlex.split(cmd), cwd = target.builds.PYTHON ).communicate()
-
-                # Copy some additional files in the right place
-                shutil.copy(join(target.builds.PYTHON, 'PC', 'import_nt.c'), join(target.builds.PYTHON, 'Python', 'import_nt.c'))
-                shutil.copy(join(target.builds.PYTHON, 'PC', 'dl_nt.c'), join(target.builds.PYTHON, 'Python', 'dl_nt.c'))
-                shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
-                shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
-
-                ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
-
-            
             f = open(setupfile, 'at')
             f.write(ignifuga_module)
             f.close()

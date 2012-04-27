@@ -10,7 +10,20 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, ANDROID_NDK, ANDROID_SDK
+from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, ANDROID_NDK, ANDROID_SDK, PATCHES_DIR
+from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
+
+def prepare(target, ignifuga_src, python_build):
+    # Hardcoded for now
+    sdlflags = '-I%s -I%s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
+
+    # Patch some problems with cross compilation
+    cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
+    Popen(shlex.split(cmd)).communicate()
+    ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.SDL, 'libs', 'armeabi'), sdlflags)
+
+    return ignifuga_module
+
 
 def make(env, target, freeze_modules, frozen_file):
     make_python_freeze('android', freeze_modules, frozen_file)

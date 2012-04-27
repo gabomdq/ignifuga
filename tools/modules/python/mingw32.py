@@ -10,7 +10,30 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN
+from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, PATCHES_DIR
+from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
+
+
+def prepare(target, ignifuga_src, python_build):
+    # Get some required flags
+    sdlflags = get_sdl_flags(target).replace('-mwindows', '').replace('-Dmain=SDL_main', '')
+    freetypeflags = get_freetype_flags(target)
+    # Patch some problems with cross compilation
+    cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
+    Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + '"s|Windows.h|windows.h|g" %s' % (join(target.builds.PYTHON, 'Modules', 'signalmodule.c'),)
+    Popen(shlex.split(cmd), cwd = target.builds.PYTHON ).communicate()
+
+    # Copy some additional files in the right place
+    shutil.copy(join(target.builds.PYTHON, 'PC', 'import_nt.c'), join(target.builds.PYTHON, 'Python', 'import_nt.c'))
+    shutil.copy(join(target.builds.PYTHON, 'PC', 'dl_nt.c'), join(target.builds.PYTHON, 'Python', 'dl_nt.c'))
+    shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
+    shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
+
+    ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
+
+    return ignifuga_module
+
 
 def make(env, target, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):

@@ -11,6 +11,14 @@ from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, make_python_freeze, SED_CMD
+from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
+
+def prepare(target, ignifuga_src, python_build):
+    # Get some required flags
+    sdlflags = get_sdl_flags(target)
+    freetypeflags = get_freetype_flags(target)
+    ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+    return ignifuga_module
 
 def make(env, target, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
