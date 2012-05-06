@@ -13,7 +13,7 @@ from ..log import log, error
 from schafer import SOURCES, SED_CMD
 from ..util import prepare_source
 
-def prepare(target):
+def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE)
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
@@ -53,6 +53,12 @@ def make(env, target):
     # Remove dynamic libraries to avoid confusions with the linker
     cmd = 'find %s -name "*.so*" -delete' % join(target.dist, 'lib')
     Popen(shlex.split(cmd), cwd = join(target.dist, 'lib'), env=env).communicate()
+
+    if isfile(join(target.dist, 'lib', 'libpng.a')):
+        log('libpng built successfully')
+    else:
+        error('Problem building libpng')
+        exit()
 
     # Build libjpeg
     if isfile(join(target.dist, 'lib', 'libjpeg.a')):

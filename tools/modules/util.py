@@ -126,11 +126,11 @@ def check_host_tools():
         info('Building Python for the host')
         python_build = join(ROOT_DIR, 'tmp', 'python_host')
         if system == 'Linux' and arch == '64bit':
-            prepare_python('linux64', None, python_build)
+            prepare_python('linux64', None, python_build, os.environ)
             cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         elif system == 'Darwin' and arch == '64bit':
-            prepare_python('osx', None, python_build)
+            prepare_python('osx', None, python_build, os.environ)
             cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         cmd = 'make V=0 install -k -j4'
@@ -332,7 +332,7 @@ def get_available_platforms():
             AVAILABLE_PLATFORMS = ['mingw32', 'android']
     elif system == 'Darwin':
         SED_CMD = 'sed -i "" '
-        AVAILABLE_PLATFORMS = ['osx', 'android', 'iosv6', 'iosv7']
+        AVAILABLE_PLATFORMS = ['osx', 'android', 'ios']
 
     return AVAILABLE_PLATFORMS, SED_CMD
 

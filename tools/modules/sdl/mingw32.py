@@ -12,7 +12,7 @@ from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, ROOT_DIR, SOURCES, SED_CMD
 
-def prepare(target):
+def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE)
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
@@ -125,7 +125,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libfreetype.a')):
         os.remove(join(target.dist, 'lib', 'libfreetype.a'))
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
-        env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
+        #cflags = env['CFLAGS'] + ' -std=gnu99'
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0'

@@ -49,11 +49,30 @@ def prepare_linux64_env():
 
 
 def prepare_osx_env():
-    """ Set up the environment variables for Linux64 compilation"""
+    """ Set up the environment variables for OS X compilation"""
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk'
+    return env
+
+def prepare_ios_env(sdk='5.0', target='3.2'):
+    """ Set up the environment variables for iOS compilation"""
+    env = deepcopy(os.environ)
+
+    env['DEVROOT'] = '/Developer/Platforms/iPhoneOS.platform/Developer'
+    env['SDKROOT'] = env['DEVROOT'] + '/SDKs/iPhoneOS%s.sdk' % sdk
+    env['CFLAGS'] = env['CXXFLAGS'] = "-g -O2 -pipe -no-cpp-precomp -isysroot %s -miphoneos-version-min=%s -I%s/usr/include/" % (env['SDKROOT'], target, env['SDKROOT'])
+    env['CXXCPP'] = env['CPP'] = env['DEVROOT'] + "/usr/bin/llvm-cpp-4.2"
+    env['CXX'] = env['DEVROOT'] + "/usr/bin/llvm-g++-4.2"
+    env['CC'] = env['DEVROOT'] + "/usr/bin/llvm-gcc-4.2"
+    env['LD'] = env['DEVROOT'] + "/usr/bin/ld"
+    env['AR'] = env['DEVROOT'] + "/usr/bin/ar"
+    env['AS'] = env['DEVROOT'] + "/usr/bin/ls"
+    env['NM'] = env['DEVROOT'] + "/usr/bin/nm"
+    env['RANLIB'] = env['DEVROOT'] + "/usr/bin/ranlib"
+    env['STRIP'] = env['DEVROOT'] + "/usr/bin/strip"
+    env['LDFLAGS'] = "-L%s/usr/lib/ -isysroot %s -miphoneos-version-min=%s" % (env['SDKROOT'], env['SDKROOT'], target)
     return env
 
 

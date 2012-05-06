@@ -93,7 +93,7 @@ def check_ignifuga_libraries(platform):
 # PYTHON BUILDING - Requires Ignifuga building!
 # ===============================================================================================================
 
-def prepare_python(platform, ignifuga_src, python_build):
+def prepare_python(platform, ignifuga_src, python_build, env):
     target = get_target(platform)
     if not isdir(target.tmp):
         os.makedirs(target.tmp)
@@ -114,7 +114,7 @@ def prepare_python(platform, ignifuga_src, python_build):
         # Append the Ignifuga sources
         if ignifuga_src != None:
             mod = __import__('modules.python.'+platform, fromlist=['prepare'])
-            ignifuga_module = mod.prepare(target, ignifuga_src, python_build)
+            ignifuga_module = mod.prepare(env, target, ignifuga_src, python_build)
 
             f = open(setupfile, 'at')
             f.write(ignifuga_module)
@@ -409,27 +409,18 @@ def cythonize(build_dir, package_name, skip=[]):
 # ===============================================================================================================
 # SDL BUILDING
 # ===============================================================================================================
-def prepare_sdl(platform):
+def prepare_sdl(platform, env=None):
     target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['prepare'])
-    mod.prepare(target)
+    mod.prepare(env, target)
 
 def make_sdl(platform, env=None):
     target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['make'])
     mod.make(env, target)
 
-
 # ===============================================================================================================
-# USER PROJECT target.builds
-# ===============================================================================================================
-def prepare_project(src, dst):
-    # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude .hg --exclude build --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (src, dst)
-    Popen(shlex.split(cmd), cwd = src).communicate()
-        
-# ===============================================================================================================
-# PLATFORM target.builds
+# PLATFORM BUILDS
 # ===============================================================================================================
 def spawn_shell(platform):
     target = get_target(platform)
@@ -465,7 +456,7 @@ def build_generic(options, platform, env=None):
     # Compile SDL statically
     if 'sdl' in options.modules:
         info('Building SDL')
-        prepare_sdl(platform)
+        prepare_sdl(platform, env)
         make_sdl(platform, env)
 
     # Compile Ignifuga then Python statically
@@ -474,8 +465,16 @@ def build_generic(options, platform, env=None):
         prepare_ignifuga(platform)
         ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA)
         info('Building Python')
-        prepare_python(platform, ignifuga_src, target.builds.PYTHON)
+        prepare_python(platform, ignifuga_src, target.builds.PYTHON, env)
         make_python(platform, ignifuga_src, env)
+
+# ===============================================================================================================
+# USER PROJECT BUILDS
+# ===============================================================================================================
+def prepare_project(src, dst):
+    # Copy all .py, .pyx and .pxd files
+    cmd = 'rsync -aqPm --exclude .svn --exclude .hg --exclude build --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (src, dst)
+    Popen(shlex.split(cmd), cwd = src).communicate()
 
 def build_project_generic(options, platform, target, env=None):
     package = options.project.split('.')[-1]
@@ -568,6 +567,27 @@ def build_osx (options):
 def build_project_osx(options, project_root):
     platform = 'osx'
     env = prepare_osx_env()
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, env)
+
+# ===============================================================================================================
+# iOS
+# ===============================================================================================================
+def build_ios (options):
+    platform = 'ios'
+    target = get_target(platform)
+
+    if options.main and check_ignifuga_libraries(platform):
+        return
+    info('Building Ignifuga For iOS')
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
+    env = prepare_ios_env(options.iossdk, options.iostarget)
+    build_generic(options, platform, env)
+
+def build_project_ios(options, project_root):
+    platform = 'ios'
+    env = prepare_ios_env(options.iossdk, options.iostarget)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -664,6 +684,12 @@ if __name__ == '__main__':
     parser.add_option("--android-keyalias",
         default="", dest="androidkeyalias",
         help="Android key alias used to sign the package ")
+    parser.add_option("--ios-sdk",
+        default="5.0", dest="iossdk",
+        help="Version of the iOS SDK to use for compiling")
+    parser.add_option("--ios-target",
+        default="3.2", dest="iostarget",
+        help="Minimum iOS version that will be required to run the project")
 
     (options, args) = parser.parse_args()
 
@@ -699,7 +725,6 @@ if __name__ == '__main__':
     else:
         options.modules = [options.module,]
 
-    
     if options.clean or options.forceclean:
         clean_modules(platforms, options.modules, options.forceclean)
 

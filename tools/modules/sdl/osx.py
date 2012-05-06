@@ -11,9 +11,8 @@ from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, SED_CMD, SOURCES
-from ..env import prepare_osx_env
 
-def prepare(target):
+def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_i386')
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_x86_64')
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+'_i386')
@@ -25,7 +24,6 @@ def prepare(target):
     if not isfile(join(target.builds.PNG, 'Makefile')):
         shutil.copy(join(target.builds.PNG, 'scripts', 'makefile.darwin'), join(target.builds.PNG, 'Makefile'))
         # Force libpng to build universally
-        env = prepare_osx_env()
         cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['CFLAGS'] if 'CFLAGS' in env else '', join(target.builds.PNG, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PNG).communicate()
         cmd = SED_CMD + '-e "s|LDFLAGS=|LDFLAGS= %s -arch i386 -arch x86_64 |g" %s' % (env['LDFLAGS'] if 'LDFLAGS' in env else '', join(target.builds.PNG, 'Makefile'))
@@ -72,6 +70,11 @@ def make(env, target):
     # Remove dynamic libraries to avoid confusions with the linker
     cmd = 'rm *.dylib'
     Popen(shlex.split(cmd), cwd = join(target.dist, 'lib')).communicate()
+    if isfile(join(target.dist, 'lib', 'libpng.a')):
+        log('libpng built successfully')
+    else:
+        error('Problem building libpng')
+        exit()
 
     # Build libjpeg
     if isfile(join(target.dist, 'lib', 'libjpeg.a')):

@@ -13,7 +13,7 @@ from ..log import log, error
 from schafer import SED_CMD, ROOT_DIR, SOURCES, ANDROID_NDK, ANDROID_SDK
 from ..util import prepare_source
 
-def prepare(target):
+def prepare(env, target):
     patch_target = not isdir(target.builds.SDL) # Keep count if we are starting from scratch to avoid rebuilding excessively too many files
     prepare_source('SDL Android Skeleton', join(SOURCES['SDL'], 'android-project'), target.builds.SDL)
     if patch_target:
@@ -44,7 +44,7 @@ def prepare(target):
 def make(env, target):
     # Build freetype
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
-        env['CFLAGS'] = env['CFLAGS'] + ' -std=gnu99'
+        #cflags = env['CFLAGS'] + ' -std=gnu99'
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (ANDROID_NDK,target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0'

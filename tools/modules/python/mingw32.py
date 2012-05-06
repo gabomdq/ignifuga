@@ -14,7 +14,7 @@ from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOS
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 
 
-def prepare(target, ignifuga_src, python_build):
+def prepare(env, target, ignifuga_src, python_build):
     # Get some required flags
     sdlflags = get_sdl_flags(target).replace('-mwindows', '').replace('-Dmain=SDL_main', '')
     freetypeflags = get_freetype_flags(target)
