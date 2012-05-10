@@ -186,7 +186,7 @@ def make_python_freeze(platform, modules, frozen_file):
                 cmd = 'patch -p0 -i %s %s' % (join(PATCHES_DIR, 'site.py.diff'), basename(newf))
                 Popen(shlex.split(cmd), cwd=dirname(newf)).communicate()
             elif mod == 'platform':
-                # Patch USER_BASE, etc
+                # Add Android platform detection
                 cmd = 'patch -p0 -i %s %s' % (join(PATCHES_DIR, 'platform.py.diff'), basename(newf))
                 Popen(shlex.split(cmd), cwd=dirname(newf)).communicate()
             
