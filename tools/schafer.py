@@ -697,7 +697,7 @@ if __name__ == '__main__':
         default=None, dest="iossdk",
         help="Version of the iOS SDK to use for compiling, if none provided an automagic search will be performed for the latest SDK available")
     parser.add_option("--ios-target",
-        default="3.2", dest="iostarget",
+        default="3.0", dest="iostarget",
         help="Minimum iOS version that will be required to run the project")
     parser.add_option("--ios-codesign",
         default=None, dest="ioscodesign",

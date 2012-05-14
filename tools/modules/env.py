@@ -61,7 +61,7 @@ def prepare_osx_env():
 XCODE_ROOT = None
 BEST_IOS_SDK = None
 
-def prepare_ios_env(sdk=None, target='3.2'):
+def prepare_ios_env(sdk=None, target='3.0'):
     """ Set up the environment variables for iOS compilation"""
     env = deepcopy(os.environ)
     global XCODE_ROOT, BEST_IOS_SDK

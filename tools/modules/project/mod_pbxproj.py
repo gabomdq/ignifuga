@@ -187,7 +187,7 @@ class PBXFileReference(PBXType):
             #print 'please add extension and Xcode type to PBXFileReference.types'
             print 'Assuming it is a resource file'
             f_type = 'somefile'+ext
-            build_phase = 'PBXResourcesBuildPhase'
+            self.build_phase = 'PBXResourcesBuildPhase'
 
         return f_type
 

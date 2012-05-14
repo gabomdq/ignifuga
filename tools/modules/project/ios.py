@@ -46,12 +46,15 @@ def make(options, env, target, sources, cython_src, cfiles):
         cmd = SED_CMD + "'s|\[\[CODESIGN_DEVELOPER\]\]|%s|g' %s" % (options.ioscodesign, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
         Popen(shlex.split(cmd)).communicate()
 
+        cmd = SED_CMD + "'s|\[\[DEPLOY_TARGET\]\]|%s|g' %s" % (options.iostarget, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+        Popen(shlex.split(cmd)).communicate()
+
         project = XcodeProject.Load(join(ios_project, 'ios.xcodeproj', 'project.pbxproj' ))
         for cf in cfiles:
             project.add_file(cf)
 
         for asset in options.assets:
-            project.add_folder(abspath(join(target.project_root, asset)))
+            project.add_file(abspath(join(target.project_root, asset)))
 
         project.add_header_search_paths(join(target.dist, 'include'), False)
         project.add_header_search_paths(join(target.dist, 'include', 'SDL2'), False)
