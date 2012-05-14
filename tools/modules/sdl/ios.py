@@ -71,11 +71,6 @@ def make(env, target):
     # Build libjpeg
     if isfile(join(target.dist, 'lib', 'libjpeg.a')):
         os.remove(join(target.dist, 'lib', 'libjpeg.a'))
-    # Under some circumstances we have to create this directories by hand
-    if not isdir(join(target.dist, 'include')):
-        os.makedirs(join(target.dist, 'include'))
-    if not isdir(join(target.dist, 'lib')):
-        os.makedirs(join(target.dist, 'lib'))
 
     if not isfile(join(target.builds.JPG, 'Makefile')):
         cmd = './configure --host=arm-apple-darwin --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc %s %s" LIBTOOL= --disable-shared --enable-static --prefix="%s"' % (universal_cflags, env['CFLAGS'], universal_cflags, env['LDFLAGS'], target.dist)

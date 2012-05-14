@@ -77,8 +77,11 @@ def clean_modules(platforms, modules, everything=False):
 
 def check_ignifuga_libraries(platform):
     target = get_target(platform)
-    if platform in ['linux64', 'mingw32', 'osx']:
-        if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
+    if platform in ['linux64', 'mingw32', 'osx', 'ios']:
+        if isfile(join(target.dist, 'lib', 'libpython2.7.a')) and \
+           isfile(join(target.dist, 'lib', 'libSDL2.a')) and \
+           isfile(join(target.dist, 'lib', 'libSDL2_image.a')) and \
+           isfile(join(target.dist, 'lib', 'libSDL2_ttf.a')):
             return True
     elif platform == 'android':
         if isfile(join(target.dist, 'jni', 'python', 'libpython2.7.so')) and \
@@ -86,7 +89,6 @@ def check_ignifuga_libraries(platform):
         isfile(join(target.dist, 'jni', 'SDL_image', 'libSDL2_image.so')) and \
         isfile(join(target.dist, 'jni', 'SDL_ttf', 'libSDL2_ttf.so')):
             return True
-
     return False
 
 # ===============================================================================================================
@@ -440,7 +442,7 @@ def build_generic(options, platform, env=None):
     target = get_target(platform)
 
     if platform in ['linux64', 'mingw32', 'osx']:
-        # Android has its own skeleton set up
+        # Android/iOS has its own skeleton set up
         cmd = 'mkdir -p "%s"' % target.dist
         Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'mkdir -p "%s"' % join(target.dist,'include')
@@ -573,6 +575,14 @@ def build_project_osx(options, project_root):
 # ===============================================================================================================
 # iOS
 # ===============================================================================================================
+def prepare_ios_skeleton():
+    """ Copy a skeleton of the final project to the dist directory """
+    target = get_target ('ios')
+    if not isdir(target.dist):
+        shutil.copytree(join(ROOT_DIR, 'tools', 'ios_skeleton'), target.dist)
+        cmd = 'find %s -name ".svn" -type d -exec rm -rf {} \;' % (target.dist,)
+        Popen(shlex.split(cmd), cwd = target.dist).communicate()
+
 def build_ios (options):
     platform = 'ios'
     target = get_target(platform)
@@ -580,9 +590,8 @@ def build_ios (options):
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For iOS')
-    if not isdir(target.dist):
-        os.makedirs(target.dist)
     env = prepare_ios_env(options.iossdk, options.iostarget)
+    prepare_ios_skeleton()
     build_generic(options, platform, env)
 
 def build_project_ios(options, project_root):
@@ -685,11 +694,14 @@ if __name__ == '__main__':
         default="", dest="androidkeyalias",
         help="Android key alias used to sign the package ")
     parser.add_option("--ios-sdk",
-        default="5.0", dest="iossdk",
-        help="Version of the iOS SDK to use for compiling")
+        default=None, dest="iossdk",
+        help="Version of the iOS SDK to use for compiling, if none provided an automagic search will be performed for the latest SDK available")
     parser.add_option("--ios-target",
         default="3.2", dest="iostarget",
         help="Minimum iOS version that will be required to run the project")
+    parser.add_option("--ios-codesign",
+        default=None, dest="ioscodesign",
+        help="Code Sign Authority For Signing Apps for iOS (required only for project building) ")
 
     (options, args) = parser.parse_args()
 

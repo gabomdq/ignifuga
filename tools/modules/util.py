@@ -69,7 +69,7 @@ def check_xcode():
     # Check SDKs
     cmd = 'xcodebuild -showsdks'
     output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
-    sdks = ['macosx10.6', 'macosx10.7', 'iphoneos5.0', 'iphonesimulator5.0', None]
+    sdks = ['macosx10.6', 'macosx10.7', 'iphoneos5', 'iphonesimulator5', None]
 
     for line in output:
 
@@ -87,6 +87,35 @@ def check_xcode():
 
     return True
 
+def find_xcode():
+    # Figure out where the XCode developer root is
+    if check_tool('xcode-select', False) == None:
+        error('Can not detect XCode, please install it')
+        exit()
+
+    cmd = 'xcode-select --print-path'
+    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
+    if isdir(output[0]):
+        return output[0]
+    else:
+        error("Can not find XCode's location")
+        exit()
+
+def find_ios_sdk(major=5):
+    if check_tool('xcodebuild', False) == None:
+        error('Can not detect XCode, please install it')
+        exit()
+
+    # Check SDKs
+    cmd = 'xcodebuild -showsdks'
+    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
+    for line in output:
+        if 'iphoneos' in line:
+            v = re.search("iphoneos(\d+)\.(.*)", line)
+            if v is not None:
+                if v.group(1) >= major:
+                    return v.group(1)+'.'+v.group(2)
+
 def check_host_tools():
     """ Check if the required host tools are present """
     from schafer import HOSTPYTHON, HOSTPGEN, ROOT_DIR, HOST_DIST_DIR, prepare_python
@@ -99,11 +128,11 @@ def check_host_tools():
                     supported_platform = True
     elif system == 'Darwin':
         if arch == '64bit':
-            if distro_name == '10.7':
+            if distro_name.startswith('10.7'):
                 supported_platform = True
 
     if not supported_platform:
-        error('Warning: Unsupported host platform/architecture. Proceed with caution. No really, this thing may blow up any minute now')
+        error('Warning: Unsupported host platform/architecture %s %s %s. Proceed with caution. No really, this thing may blow up any minute now' % (system, arch, distro_name))
 
     if find_cython() == None:
         error("Can not find Cython, run with -D to install dependencies automatically")

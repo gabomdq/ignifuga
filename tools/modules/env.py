@@ -1,6 +1,8 @@
 from copy import deepcopy
 import os
 from os.path import *
+from log import error
+from util import find_xcode, find_ios_sdk
 
 class Target(object):
     pass
@@ -56,11 +58,24 @@ def prepare_osx_env():
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk'
     return env
 
-def prepare_ios_env(sdk='5.0', target='3.2'):
+XCODE_ROOT = None
+BEST_IOS_SDK = None
+
+def prepare_ios_env(sdk=None, target='3.2'):
     """ Set up the environment variables for iOS compilation"""
     env = deepcopy(os.environ)
+    global XCODE_ROOT, BEST_IOS_SDK
 
-    env['DEVROOT'] = '/Developer/Platforms/iPhoneOS.platform/Developer'
+    if XCODE_ROOT is None:
+        XCODE_ROOT = find_xcode()
+
+    if BEST_IOS_SDK is None:
+        BEST_IOS_SDK = find_ios_sdk()
+
+    if sdk is None:
+        sdk = BEST_IOS_SDK
+
+    env['DEVROOT'] = join(XCODE_ROOT, 'Platforms/iPhoneOS.platform/Developer')
     env['SDKROOT'] = env['DEVROOT'] + '/SDKs/iPhoneOS%s.sdk' % sdk
     env['CFLAGS'] = env['CXXFLAGS'] = "-g -O2 -pipe -no-cpp-precomp -isysroot %s -miphoneos-version-min=%s -I%s/usr/include/" % (env['SDKROOT'], target, env['SDKROOT'])
     env['CXXCPP'] = env['CPP'] = env['DEVROOT'] + "/usr/bin/llvm-cpp-4.2"
