@@ -4,6 +4,10 @@ from os.path import *
 from log import error
 from util import find_xcode, find_ios_sdk
 
+XCODE_ROOT = None
+BEST_IOS_SDK = None
+OSX_SDK = None
+
 class Target(object):
     pass
 
@@ -52,14 +56,22 @@ def prepare_linux64_env():
 
 def prepare_osx_env():
     """ Set up the environment variables for OS X compilation"""
+    global XCODE_ROOT, OSX_SDK
+
+    if XCODE_ROOT is None:
+        XCODE_ROOT = find_xcode()
+
+    if OSX_SDK is None:
+        OSX_SDK = '%s/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk' % XCODE_ROOT
+        if not isdir(OSX_SDK):
+            error('Could not locate OS X SDK at %s' % OSX_SDK)
+            exit()
+
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
-    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot /Developer/SDKs/MacOSX10.6.sdk'
+    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot %s' % OSX_SDK
     return env
-
-XCODE_ROOT = None
-BEST_IOS_SDK = None
 
 def prepare_ios_env(sdk=None, target='3.0'):
     """ Set up the environment variables for iOS compilation"""
