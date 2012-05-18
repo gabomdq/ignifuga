@@ -126,7 +126,7 @@ def prepare_android_env():
         env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
 
     if not isdir(env['JAVA_HOME']) or  not isfile(join(env['JAVA_HOME'], 'bin', 'java')):
-        error('Can not locate JAVA at %s' % (env['JAVA_HOME'],))
+        error('Can not locate JAVA at %s . Please set the JAVA_HOME environment variable accordingly' % (env['JAVA_HOME'],))
         exit()
 
     env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])

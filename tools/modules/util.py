@@ -124,7 +124,7 @@ def check_host_tools():
     if system == 'Linux':
         if arch == '64bit':
             if distro_name == 'Ubuntu':
-                if distro_id in ['natty', 'oneiric']:
+                if distro_id in ['natty', 'oneiric', 'precise']:
                     supported_platform = True
     elif system == 'Darwin':
         if arch == '64bit':
@@ -205,6 +205,7 @@ def install_host_tools():
     Platforms supported:
     * Ubuntu 64 Natty 11.04
     * Ubuntu 64 Oneiric 11.10
+    * Ubuntu 64 Precise 11.10
     * OS X Lion 64
     """
     system, arch, distro_name, distro_version, distro_id = get_build_platform()

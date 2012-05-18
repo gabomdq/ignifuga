@@ -25,10 +25,10 @@ from modules.util import *
 AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
 
 CYTHON_GIT = 'https://github.com/cython/cython.git'
-ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r7b-linux-x86.tar.bz2',
-                   'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r7b-darwin-x86.tar.bz2'}
-ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r16-linux.tgz',
-                   'Darwin': 'http://dl.google.com/android/android-sdk_r16-macosx.zip' }
+ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r8-linux-x86.tar.bz2',
+                   'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r8-darwin-x86.tar.bz2'}
+ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r18-linux.tgz',
+                   'Darwin': 'http://dl.google.com/android/android-sdk_r18-macosx.zip' }
 ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
 ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
 
