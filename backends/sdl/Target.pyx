@@ -64,6 +64,7 @@ cdef class Target (TargetBase):
 
         #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
         self.renderer = SDL_CreateRenderer(self.window, -1, 0)
+        SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "1")
         self.updateSize()
         
         #renderer = cast(self.renderer, POINTER(SDL_Renderer))

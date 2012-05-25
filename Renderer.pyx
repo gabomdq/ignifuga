@@ -188,6 +188,8 @@ cdef class Renderer:
         def __get__(self):
             """ Return the scrolling of the scene in scene coordinates"""
             return self._scroll_x, self._scroll_y
+        def __set__(self, value):
+            self.scrollTo(value[0], value[1])
 
     property scale:
         def __get__(self):
@@ -206,12 +208,37 @@ cdef class Renderer:
         """ Check that a given time lapse has passed """
         return self.frameTimestamp - lastTime > lapse
     
-    cpdef setNativeResolution(self, double w=-1.0, double h=-1.0, bool keep_aspect=True):
+    cpdef setNativeResolution(self, double w=-1.0, double h=-1.0, bool keep_aspect=True, bool autoscale=True):
         """ This function receives the scene native resolution. Based on it, it sets the scaling factor to the screen to fit the scene """
         self._native_res_w = w
         self._native_res_h = h
         self._keep_aspect = keep_aspect
-        self._calculateScale(w,h,self.target.width, self.target.height, keep_aspect)
+        if autoscale:
+            self._calculateScale(w,h,self.target.width, self.target.height, keep_aspect)
+        else:
+            self._calculateScale(self.target.width,self.target.height,self.target.width, self.target.height, keep_aspect)
+
+    cpdef centerScene(self):
+        """ Scroll the scene so it's centered on the screen"""
+        self.centerOnScenePoint(self._native_size_w/2.0, self._native_size_h/2.0)
+
+    cpdef centerOnScenePoint(self, double sx, double sy):
+        """ Center scene around the given scene point"""
+        cdef int ssx, ssy
+        ssx,ssy = self.sceneToScreen(sx,sy)
+        self.centerOnScreenPoint(ssx,ssy)
+
+    cpdef centerOnScreenPoint(self, int sx, int sy):
+        """ Center scene around the given screen point"""
+        self.scrollTo(sx-self.target.width/2,sy-self.target.height/2)
+
+    cpdef tuple screenToScene(self, int sx, int sy):
+        """ Scale a point in screen coordinates to scene coordinates """
+        return <double>(sx+self._scroll_x)/self._scale_x,<double>(sy+self._scroll_y)/self._scale_y
+
+    cpdef tuple sceneToScreen(self, double sx, double sy):
+        """ Scale a point in scene coordinates to screen coordinates """
+        return (sx*self._scale_x)-self._scroll_x,(sy*self._scale_y)-self._scroll_y
 
     cpdef setSceneSize(self, int w, int h):
         """ This function receives the scene size. Based on it, it controls the scrolling allowed """
@@ -237,54 +264,57 @@ cdef class Renderer:
 
     cpdef windowResized(self):
         """ Tell the target to update it's size """
-        self.target.updateSize()
-
-        # TODO: handle switching of scrolling properly
-        self._scroll_x = 0
-        self._scroll_y = 0
-        Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
-
-        # Adjust scaling
         screen_w = self.target.width
         screen_h = self.target.height
-        self._calculateScale(self._native_res_w, self._native_res_h, screen_w, screen_h, self._keep_aspect)
+        self.target.updateSize()
+        #debug("windowResized: from %dx%d to %dx%d" %(screen_w, screen_h, self.target.width, self.target.height))
+
+        if screen_w != self.target.width or screen_h != self.target.height:
+            new_sx = <int>(self._scroll_x * self.target.width/screen_w if screen_w != 0 else 0)
+            new_sy = <int>(self._scroll_y * self.target.height/screen_h if screen_h != 0 else 0)
+            # Adjust scaling
+            self._calculateScale(self._native_res_w, self._native_res_h, self.target.width, self.target.height, self._keep_aspect)
+            # Always scroll after adjusting scale!
+            #debug("windowResized: requesting new scroll point %dx%d" %(new_sx,new_sy))
+            self.scrollTo(new_sx, new_sy)
 
     cpdef scrollBy(self, int deltax, int deltay):
-        """ Scroll the screen by deltax,deltay. Scrolling is done in screen coordinates,
-        but as the parameters are a difference, they can be in scene or screen coordinates.
-        """
-        screen_w = self.target.width
-        screen_h = self.target.height
-        cdef int max_w = self._native_size_w*self._scale_x - screen_w
-        cdef int max_h = self._native_size_h*self._scale_y - screen_h
-        
+        """ Scroll the screen by deltax,deltay. deltax/y are in screen coordinates"""
         cdef int sx = self._scroll_x - deltax
+        cdef int sy = self._scroll_y - deltay
+
+        self.scrollTo(sx,sy)
+
+    cpdef scrollTo(self, int sx, int sy):
+        """ sx,sy are screen coordinates
+        They can range from 0 to the screen scaled max size of the scene minus the screen size
+        """
+        cdef int max_w, max_h
+        max_w = self._native_size_w*self._scale_x - self.target.width
+        max_h = self._native_size_h*self._scale_y - self.target.height
+        #debug("GOT A REQUEST TO SCROLL TO %dx%d" % (sx,sy))
+
         if sx < 0:
             sx = 0
         elif sx > max_w:
             sx = max_w
 
-        cdef int sy = self._scroll_y - deltay
         if sy < 0:
             sy = 0
         elif sy > max_h:
             sy = max_h
 
-        self._scroll_x = sx
-        self._scroll_y = sy
-        Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
-
-    cpdef scrollTo(self, int x, int y):
-        #STUB
-        pass
+        if self._scroll_x != sx or self._scroll_y != sy:
+            #debug("SCROLLING TO %dx%d" % (sx,sy))
+            self._scroll_x = sx
+            self._scroll_y = sy
+            Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
 
     cpdef scaleBy(self, int delta):
         """ delta is a value in pixel area (width*height)"""
-        
-        cdef double factor = <double>1.0 + <double> delta / <double> (self.target.width*self.target.height)
+        cdef double factor = <double> delta / <double> (self.target.width*self.target.height)
+        self.scaleByFactor(1.0+factor)
 
-        self.scaleByFactor(factor)
-        
     cpdef scaleByFactor(self, double factor):
         """ Apply a scaling factor"""
         cdef double scale_x = self._scale_x * factor

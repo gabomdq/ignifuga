@@ -102,11 +102,15 @@ SPLASH_SCENE = {
     "resolution": {
         "width": 1920,
         "height": 1200,
-        "keep_aspect": True
     },
+    "keepAspect": True,
+    "autoScale": False,
+    "autoCenter": True,
+    "userCanScroll": False,
+    "userCanZoom": False,
     "size": {
-        "width": 1920,
-        "height": 1200
+        "width": 3840,
+        "height": 2400
     },
     "entities": {
         "splash": {
@@ -114,6 +118,8 @@ SPLASH_SCENE = {
                 "type": "Sprite",
                 "file": u"embedded:splash",
                 "z": 0,
+                "x": 960,
+                "y": 600,
                 "interactive": False
             },
             {
@@ -122,7 +128,6 @@ SPLASH_SCENE = {
                 "duration": 2.0,
                 "runNext": {
                     "duration":1.0,
-                    "relative":True,
                     "alpha":0.0,
                     "onStop": "Gilbert().startFirstScene()"
                 }
@@ -207,7 +212,7 @@ class Gilbert:
         # The only dictionaries that keeps strong references to the entities
         self.scenes = {}
         # A pointer to the current scene stored in self.scenes
-        self.scene = {}
+        self.scene = None
         # A pointer to the current scene entities
         self.entities = {}
         # These dictionaries keep weakrefs via WeakSet, contain the current scene entities
@@ -221,6 +226,7 @@ class Gilbert:
         self._touches = {}
         self._touchCaptured = False
         self._touchCaptor = None
+        self._lastEvent = None
 
         
         self.renderer = _Renderer(Target())
@@ -464,12 +470,12 @@ class Gilbert:
                     event.deltay = event.y - lastTouch.y
 
             # Walk the entities, see if the event matches one of them and inform it of the event
-            scale_x, scale_y = self.renderer.scale
-            # Scroll is in scene coordinates
-            scroll_x, scroll_y = self.renderer.scroll
+#            scale_x, scale_y = self.renderer.scale
+#            # Scroll is in scene coordinates
+#            scroll_x, scroll_y = self.renderer.scroll
             
-            event.scene_x = int((event.x+ scroll_x)/scale_x)
-            event.scene_y = int((event.y+ scroll_y)/scale_y)
+            event.scene_x, event.scene_y = self.renderer.screenToScene(event.x, event.y)
+            self._lastEvent = event
 
             if not self._touchCaptured:
                 zindexs = self.entitiesByZ.keys()
@@ -485,7 +491,7 @@ class Gilbert:
                             self._touchCaptured = True
                         if not continuePropagation:
                             break
-            elif self._touchCaptor != None:
+            elif self._touchCaptor is not None:
                 continuePropagation, captureEvent = self._touchCaptor.event(event)
                 if not captureEvent:
                     self._touchCaptured = False
@@ -493,20 +499,28 @@ class Gilbert:
 
             if continuePropagation and self._touchCaptor == None:
                 if event.deltax != None and event.deltay != None and event.type != Event.TYPE.touchdown:
-                    if event.stream == 0 and event.stream in self._touches and len(self._touches)==1:
+                    if self.scene and self.scene.userCanScroll and event.stream == 0 and event.stream in self._touches and len(self._touches)==1:
                         # Handle scrolling
                         self.renderer.scrollBy(event.deltax, event.deltay)
                         self._touchCaptured = True
                         self._touchCaptor = None
 
-                    if len(self._touches) == 2 and (event.stream == 0 or event.stream == 1) and 0 in self._touches and 1 in self._touches:
+                    if self.scene and self.scene.userCanZoom and len(self._touches) == 2 and (event.stream == 0 or event.stream == 1) and 0 in self._touches and 1 in self._touches:
                         # Handle zooming
                         prevArea = (self._touches[0].x-self._touches[1].x)**2 + (self._touches[0].y-self._touches[1].y)**2
                         if event.stream == 0:
-                            currArea = (event.x-self._touches[1].x)**2 + (event.y-self._touches[1].y)**2
+                            prevTouch = self._touches[1]
                         else:
-                            currArea = (self._touches[0].x-event.x)**2 + (self._touches[0].y-event.y)**2
+                            prevTouch = self._touches[0]
+
+                        currArea = (event.x-prevTouch.x)**2 +(event.y-prevTouch.y)**2
+                        zoomCenterX = (event.x + prevTouch.x)/2
+                        zoomCenterY = (event.y + prevTouch.y)/2
+                        cx,cy = self.renderer.screenToScene(zoomCenterX, zoomCenterY)
                         self.renderer.scaleBy(currArea-prevArea)
+                        sx,sy = self.renderer.sceneToScreen(cx,cy)
+
+                        self.renderer.scrollBy(zoomCenterX-sx, zoomCenterY-sy)
                         self._touchCaptured = True
                         self._touchCaptor = None
 
@@ -536,10 +550,21 @@ class Gilbert:
                         break
 
             if continuePropagation:
-                if event.type == Event.TYPE.zoomin:
-                    self.renderer.scaleByFactor(1.2)
-                elif event.type == Event.TYPE.zoomout:
-                    self.renderer.scaleByFactor(0.8)
+                if self.scene and self.scene.userCanZoom:
+                    if event.type == Event.TYPE.zoomin:
+                        if self._lastEvent:
+                            cx,cy = self.renderer.screenToScene(self._lastEvent.x, self._lastEvent.y)
+                        self.renderer.scaleByFactor(1.2)
+                        if self._lastEvent:
+                            sx,sy = self.renderer.sceneToScreen(cx,cy)
+                            self.renderer.scrollBy(self._lastEvent.x-sx, self._lastEvent.y-sy)
+                    elif event.type == Event.TYPE.zoomout:
+                        if self._lastEvent:
+                            cx,cy = self.renderer.screenToScene(self._lastEvent.x, self._lastEvent.y)
+                        self.renderer.scaleByFactor(0.8)
+                        if self._lastEvent:
+                            sx,sy = self.renderer.sceneToScreen(cx,cy)
+                            self.renderer.scrollBy(self._lastEvent.x-sx, self._lastEvent.y-sy)
                     
     def _storeEvent(self, event):
         """ Store a touch/mouse event for a stream, to be used for future reference"""
@@ -656,7 +681,7 @@ class Gilbert:
         # Really remove nodes and data
         gc.collect()
 
-        self.scene = {}
+        self.scene = None
         self.entities = {}
         self.entitiesByZ = {}
         self.entitiesByTag = {}
@@ -670,6 +695,7 @@ class Gilbert:
     def changeScene(self, scene_id):
         debug("Switching scene to: %s " % scene_id)
         self.resetScene()
+        self.renderer.scrollTo(0,0)
         return self.startScene(scene_id)
 
     def startEntity(self, entity):

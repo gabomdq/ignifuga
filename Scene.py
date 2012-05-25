@@ -26,6 +26,10 @@ class Scene(object):
             'entities': {},
             '_resolution': {'width': None, 'height': None},
             '_keepAspect': True,
+            '_autoScale': True,
+            '_autoCenter': False,
+            '_userCanScroll': True,
+            '_userCanZoom': True,
             '_size': {'width': None, 'height': None}
         })
 
@@ -51,17 +55,47 @@ class Scene(object):
             self._keepAspect = value
 
     @property
+    def autoScale(self):
+        return self._autoScale
+    @autoScale.setter
+    def autoScale(self, value):
+        self._autoScale = value
+
+    @property
     def size(self):
         return self._size
     @size.setter
     def size(self, value):
         self._size = value
-        
+
+    @property
+    def autoCenter(self):
+        return self._autoCenter
+    @autoCenter.setter
+    def autoCenter(self, value):
+        self._autoCenter = value
+
+    @property
+    def userCanScroll(self):
+        return self._userCanScroll
+    @userCanScroll.setter
+    def userCanScroll(self, value):
+        self._userCanScroll = value
+
+    @property
+    def userCanZoom(self):
+        return self._userCanZoom
+    @userCanZoom.setter
+    def userCanZoom(self, value):
+        self._userCanZoom = value
+
     def init(self):
         """ Initialize the required external data """
         # Do our initialization
-        Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect)
+        Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale)
         Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
+        if self._autoCenter:
+            Gilbert().renderer.centerScene()
 
 
     def _loadDefaults(self, data):

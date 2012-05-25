@@ -363,6 +363,8 @@ cdef extern from "SDL.h":
     cdef int SDL_SetTextureColorMod(SDL_Texture * texture, Uint8 r, Uint8 g, Uint8 b)
     cdef int SDL_SetTextureAlphaMod(SDL_Texture * texture, Uint8 alpha)
     cdef char * SDL_GetError()
+    cdef SDL_bool SDL_SetHint(char *name, char *value)
+    cdef Uint8 SDL_GetMouseState(int* x,int* y)
 
 
 cdef extern from "SDL_image.h":

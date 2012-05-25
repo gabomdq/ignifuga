@@ -32,43 +32,43 @@ def make(options, env, target, sources, cython_src, cfiles):
     for cfile in cfiles:
         local_cfiles.append(basename(cfile))
 
-    if not isdir(ios_project):
-        cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (target.dist, ios_project)
-        Popen(shlex.split(cmd), cwd = target.dist).communicate()
-        # Modify the skeleton to suit the project
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
-        Popen(shlex.split(cmd)).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'ios.xcscheme'))
-        Popen(shlex.split(cmd)).communicate()
-        cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'xcschememanagement.plist'))
-        Popen(shlex.split(cmd)).communicate()
+    #if not isdir(ios_project):
+    cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (target.dist, ios_project)
+    Popen(shlex.split(cmd), cwd = target.dist).communicate()
+    # Modify the skeleton to suit the project
+    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+    Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'ios.xcscheme'))
+    Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'xcschememanagement.plist'))
+    Popen(shlex.split(cmd)).communicate()
 
-        cmd = SED_CMD + "'s|\[\[CODESIGN_DEVELOPER\]\]|%s|g' %s" % (options.ioscodesign, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
-        Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + "'s|\[\[CODESIGN_DEVELOPER\]\]|%s|g' %s" % (options.ioscodesign, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+    Popen(shlex.split(cmd)).communicate()
 
-        cmd = SED_CMD + "'s|\[\[DEPLOY_TARGET\]\]|%s|g' %s" % (options.iostarget, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
-        Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + "'s|\[\[DEPLOY_TARGET\]\]|%s|g' %s" % (options.iostarget, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+    Popen(shlex.split(cmd)).communicate()
 
-        project = XcodeProject.Load(join(ios_project, 'ios.xcodeproj', 'project.pbxproj' ))
-        for cf in cfiles:
-            project.add_file(cf)
+    project = XcodeProject.Load(join(ios_project, 'ios.xcodeproj', 'project.pbxproj' ))
+    for cf in cfiles:
+        project.add_file(cf)
 
-        for asset in options.assets:
-            project.add_file(abspath(join(target.project_root, asset)))
+    for asset in options.assets:
+        project.add_file(abspath(join(target.project_root, asset)))
 
-        project.add_header_search_paths(join(target.dist, 'include'), False)
-        project.add_header_search_paths(join(target.dist, 'include', 'SDL2'), False)
-        project.add_header_search_paths(join(target.dist, 'include', 'python2.7'), False)
-        project.add_library_search_paths(join(target.dist, 'lib'), False)
+    project.add_header_search_paths(join(target.dist, 'include'), False)
+    project.add_header_search_paths(join(target.dist, 'include', 'SDL2'), False)
+    project.add_header_search_paths(join(target.dist, 'include', 'python2.7'), False)
+    project.add_library_search_paths(join(target.dist, 'lib'), False)
 
-        project.save()
+    project.save()
 
-        shutil.move(join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'ios.xcscheme'),join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', project_name+'.xcscheme'))
-        shutil.move(join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad'), join(ios_project, 'ios.xcodeproj', 'xcuserdata', env['USER']+'.xcuserdatad'))
-        shutil.move(join(ios_project, 'ios.xcodeproj'), join(ios_project, project_name+'.xcodeproj'))
-        shutil.move(join(ios_project, 'ios', 'ios-Info.plist'), join(ios_project, 'ios', project_name+'-Info.plist'))
-        shutil.move(join(ios_project, 'ios', 'ios-Prefix.pch'), join(ios_project, 'ios', project_name+'-Prefix.pch'))
-        shutil.move(join(ios_project, 'ios'), join(ios_project, project_name))
+    shutil.move(join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'ios.xcscheme'),join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', project_name+'.xcscheme'))
+    shutil.move(join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad'), join(ios_project, 'ios.xcodeproj', 'xcuserdata', env['USER']+'.xcuserdatad'))
+    shutil.move(join(ios_project, 'ios.xcodeproj'), join(ios_project, project_name+'.xcodeproj'))
+    shutil.move(join(ios_project, 'ios', 'ios-Info.plist'), join(ios_project, 'ios', project_name+'-Info.plist'))
+    shutil.move(join(ios_project, 'ios', 'ios-Prefix.pch'), join(ios_project, 'ios', project_name+'-Prefix.pch'))
+    shutil.move(join(ios_project, 'ios'), join(ios_project, project_name))
 
     app = join(ios_project, 'build/Release-iphoneos', project_name+'.app')
     ipa = join(target.project_root, project_name+'.ipa')

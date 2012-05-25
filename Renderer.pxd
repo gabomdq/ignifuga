@@ -31,7 +31,7 @@ cdef class Renderer:
 
     cpdef update(self)
     #cpdef dirty(self, int x, int y, int w, int h)
-    cpdef setNativeResolution(self, double w=*, double h=*, bool keep_aspect=*)
+    cpdef setNativeResolution(self, double w=*, double h=*, bool keep_aspect=*, bool autoscale=*)
     cpdef setSceneSize(self, int w, int h)
     cpdef _calculateScale(self, double scene_w, double scene_h, int screen_w, int screen_h, bool keep_aspect=*)
     cpdef windowResized(self)
@@ -39,3 +39,8 @@ cdef class Renderer:
     cpdef scrollTo(self, int x, int y)
     cpdef scaleBy(self, int delta)
     cpdef scaleByFactor(self, double factor)
+    cpdef centerScene(self)
+    cpdef centerOnScenePoint(self, double sx, double sy)
+    cpdef centerOnScreenPoint(self, int sx, int sy)
+    cpdef tuple screenToScene(self, int sx, int sy)
+    cpdef tuple sceneToScreen(self, double sx, double sy)
