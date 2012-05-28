@@ -11,6 +11,7 @@ cdef extern from "SDL.h":
     ctypedef signed long long Sint64
     ctypedef signed short Sint16
     ctypedef unsigned short Uint16
+    ctypedef void *SDL_GLContext
     
      
     ctypedef enum:
@@ -365,6 +366,7 @@ cdef extern from "SDL.h":
     cdef char * SDL_GetError()
     cdef SDL_bool SDL_SetHint(char *name, char *value)
     cdef Uint8 SDL_GetMouseState(int* x,int* y)
+    cdef SDL_GLContext SDL_GL_CreateContext(SDL_Window* window)
 
 
 cdef extern from "SDL_image.h":

@@ -63,6 +63,7 @@ cdef class GameLoop(GameLoopBase):
         cdef SDL_MouseWheelEvent *mwev      
         cdef SDL_WindowEvent *winev
         cdef SDL_TouchFingerEvent *fev
+        cdef Target target
         
         if sdlev.type == SDL_QUIT:
             Gilbert().endLoop()
@@ -106,12 +107,26 @@ cdef class GameLoop(GameLoopBase):
             if winev.event == SDL_WINDOWEVENT_SIZE_CHANGED or winev.event==SDL_WINDOWEVENT_RESIZED:
                 Gilbert().renderer.windowResized()
                 self._screen_w, self._screen_h = Gilbert().renderer.screenSize
+                debug('New Window Size stored: %dx%d' % (self._screen_w, self._screen_h))
             elif winev.event == SDL_WINDOWEVENT_MOVED:
                 debug('Window moved to %s, %s' % (winev.data1, winev.data2))
             elif winev.event == SDL_WINDOWEVENT_SHOWN:
+                debug('Window shown')
                 self.paused = False
             elif winev.event == SDL_WINDOWEVENT_HIDDEN:
+                debug('Window hidden')
                 self.paused = True
+            elif winev.event == SDL_WINDOWEVENT_RESTORED:
+                debug('Window is being restored')
+                t = Gilbert().renderer.target
+                target = <Target> t
+                result = SDL_GL_CreateContext(target.window)
+                self.paused = False
+                debug('Window restored')
+                
+            elif winev.event == SDL_WINDOWEVENT_MINIMIZED:
+                self.paused = True
+                debug('Window minimized')
 
             
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):

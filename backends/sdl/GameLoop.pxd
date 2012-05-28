@@ -8,6 +8,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.backends.sdl.SDL cimport *
+from ignifuga.backends.sdl.Target cimport Target
 from ignifuga.Gilbert import Gilbert, Event
 from ignifuga.backends.GameLoopBase cimport GameLoopBase
 
