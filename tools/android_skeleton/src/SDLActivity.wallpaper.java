@@ -123,7 +123,7 @@ public class SDLActivity extends WallpaperService {
 
     protected void onResume(){
         //Log.v("SDL", "SDLActivity onResume");
-        SDLActivity.nativeResume();
+        // Don't call SDLActivity.nativeResume(); here, it will be called via SDLSurface::surfaceChanged->SDLActivity::startApp
     }
 
     @Override
@@ -367,8 +367,6 @@ public class SDLActivity extends WallpaperService {
             mHolder = holder;
             //Log.v("SDL", "surfaceCreated() " + holder);
             mHolder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
-            createEGLSurface();
-
             enableSensor(Sensor.TYPE_ACCELEROMETER, true);
         }
 
@@ -529,11 +527,13 @@ public class SDLActivity extends WallpaperService {
 
                 if (mEGLContext == null) createEGLContext();
 
-                if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
-                    Log.e("SDL", "Couldn't make context current");
-                    createEGLContext();
+                if (egl.eglGetCurrentContext() != SDLActivity.mEGLContext) {
                     if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
-                        return false;
+                        Log.e("SDL", "Couldn't make context current");
+                        createEGLContext();
+                        if (!egl.eglMakeCurrent(mEGLDisplay, surface, surface, mEGLContext)) {
+                            return false;
+                        }
                     }
                 }
                 mEGLSurface = surface;
