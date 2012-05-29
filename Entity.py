@@ -11,7 +11,7 @@ from ignifuga.Gilbert import Event, Gilbert, Signal
 from ignifuga.Log import error
 from ignifuga.components.Component import Component
 
-import weakref
+import weakref,traceback
 
 
 
@@ -110,7 +110,7 @@ class Entity(object):
             component = components.pop(0)
             try:
                 self._components[component].init(**data)
-            except:
+            except Exception, ex:
                 # Something failed, try it again later
                 if component not in failcount:
                     failcount[component] = 1
@@ -120,6 +120,8 @@ class Entity(object):
                     components.append(component)
                 else:
                     error('Failed initializing component %s' % component)
+                    #error("EXCEPTION: %s\n %s\n %s" %(ex, ex.args, traceback.format_exc()))
+                    error(traceback.format_exc())
         return self
 
     def register(self):

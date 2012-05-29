@@ -32,7 +32,7 @@ import sys
 class Sprite(Viewable):
     """ Sprite component class, viewable, potentially animated
     """
-    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward']
+    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, loop=-1, **data):
 
         # Default values
@@ -40,6 +40,7 @@ class Sprite(Viewable):
             'file': None,
             '_spriteData': None,
             '_atlas': None,
+            '_canvas': None,
             'sprite': None,
             'loopMax': loop if loop >= 0 else None,
             'loop': 0,
@@ -47,7 +48,9 @@ class Sprite(Viewable):
             'onLoop': None,
             'onStop': None,
             'remainActiveOnStop': False,
-            'forward': True
+            'forward': True,
+            '_blur': 0.0,
+            '_canvasBlur': None
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
@@ -91,6 +94,8 @@ class Sprite(Viewable):
                                 self.active = False
                                 self.loop = 0
                                 self.frame = 0
+                        if self._blur > 0:
+                            self._doBluring()
                 else:
                     if self.sprite.prevFrame():
                         if self.sprite.frame == self.sprite.frameCount - 1:
@@ -102,7 +107,10 @@ class Sprite(Viewable):
                                 self.active = False
                                 self.loop = 0
                                 self.frame = self.sprite.frameCount - 1
-
+                        if self._blur > 0:
+                            self._doBluring()
+        elif self._blur > 0 and self._blur != self._canvasBlur:
+            self._doBluring()
 
     def _updateSize(self):
         # Update our "public" width,height
@@ -141,7 +149,9 @@ class Sprite(Viewable):
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
     def canvas(self):
-        if self.sprite != None:
+        if self._canvas != None:
+            return self._canvas
+        elif self.sprite != None:
             return self.sprite.canvas
         elif self._atlas != None:
             return self._atlas
@@ -178,6 +188,64 @@ class Sprite(Viewable):
             self.sprite.frame = frame
             if frame == 0:
                 self._started = False
+    @property
+    def blur(self):
+        return self._blur
+
+    @blur.setter
+    def blur(self, value):
+        """ Set the blur amount, this is actually an integer value that equals the pixel displacement used to simulate bluring"""
+        if value <= 0:
+            # Remove the temporal canvas
+            self._canvas = None
+            self._canvasBlur = None
+            value = 0
+        else:
+            # Create a temporal canvas
+            value = int(value)
+        self._blur = value
+
+    def _doBluring(self):
+        """ Take the current canvas and "blur it" by doing a few blits out of center"""
+        if self._blur > 0:
+            if self._canvas is None:
+                self._canvas = Canvas()(self._width_pre,self._height_pre, isRenderTarget = True)
+
+            # Determine the source for the bluring
+            if self.sprite is not None:
+                source = self.sprite.canvas
+            elif self._atlas is not None:
+                source = self._atlas
+            else:
+                return
+
+            source.mod(1.0,1.0,1.0,1.0)
+            self._canvas.blitCanvas(source, 0, 0, self._canvas.width, self._canvas.height, 0,0,self._canvas.width,self._canvas.height, self._canvas.BLENDMODE_NONE)
+            source.mod(1.0,1.0,1.0,0.2)
+            b = int (self._blur / 2)
+            w = self._canvas.width-b
+            h = self._canvas.height-b
+            self._canvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._canvas.BLENDMODE_BLEND)
+            b = self._blur
+            w = self._canvas.width-b
+            h = self._canvas.height-b
+            source.mod(1.0,1.0,1.0,0.1)
+            self._canvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._canvas.BLENDMODE_BLEND)
+            self._canvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._canvas.BLENDMODE_BLEND)
+            # Up the alpha to 1.0
+            source.mod(0.0,0.0,0.0,1.0)
+            self._canvas.blitCanvas(source, 0, 0, self._canvas.width, self._canvas.height, 0,0,self._canvas.width,self._canvas.height, self._canvas.BLENDMODE_ADD)
+
+            source.mod(self._red, self._green, self._blue, self._alpha)
+            self._updateColorModulation()
+
+            # Preserve the value used for bluring to save time in case it's not modified for the next cycle
+            self._canvasBlur = self._blur
 
     @property
     def frameCount(self):
