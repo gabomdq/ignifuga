@@ -11,6 +11,7 @@ from ignifuga.Rect import Rect
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
 import sys, pickle, os, weakref, gc, platform, copy, base64
+from optparse import OptionParser
 
 class BACKENDS:
     sdl = 'sdl'
@@ -170,7 +171,15 @@ class Gilbert:
     def init(self, backend, scenesFile, firstScene):
         self.backend = backend
         debug ('Initializing Gilbert Overlord')
-        
+
+        usage = "game [options]"
+        parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
+        parser.add_option("-d", "--display", dest="display", default=0,help="Display (default: 0)")
+        parser.add_option("--width", dest="width", default=None,help="Resolution Width")
+        parser.add_option("--height", dest="height", default=None,help="Resolution Height")
+        parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
+        (options, args) = parser.parse_args()
+
         # Set up dynamic imports
         global GameLoop
         global DataManager
@@ -229,7 +238,7 @@ class Gilbert:
         self._lastEvent = None
 
         
-        self.renderer = _Renderer(Target())
+        self.renderer = _Renderer(Target(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display))
         self.dataManager = DataManager()
 
         if not self.loadState():

@@ -118,9 +118,9 @@ cdef class GameLoop(GameLoopBase):
                 self.paused = True
             elif winev.event == SDL_WINDOWEVENT_RESTORED:
                 debug('Window is being restored')
-                t = Gilbert().renderer.target
-                target = <Target> t
-                result = SDL_GL_CreateContext(target.window)
+                #t = Gilbert().renderer.target
+                #target = <Target> t
+                #result = SDL_GL_CreateContext(target.window)
                 self.paused = False
                 debug('Window restored')
                 

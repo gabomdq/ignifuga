@@ -10,48 +10,80 @@
 
 from ignifuga.Log import debug, info, error
 from ignifuga.Gilbert import Gilbert, Event
-import sys, platform
+import sys, platform, re
 
 SDL_WINDOWPOS_CENTERED_MASK = 0x2FFF0000
 SDL_WINDOWPOS_UNDEFINED_MASK = 0x1FFF0000
 
+def processNvidiaMetamode(metamode):
+    m = re.search(' (?P<screen1>[^:]+): .* @(?P<w1>[0-9]+)x(?P<h1>[0-9]+) \+(?P<x1>[0-9]+)\+(?P<y1>[0-9]+).* (?P<screen2>[^:]+): .* @(?P<w2>[0-9]+)x(?P<h2>[0-9]+) \+(?P<x2>[0-9]+)\+(?P<y2>[0-9]+)', metamode)
+    if m is None:
+        m = re.search(' (?P<screen1>[^:]+): .* @(?P<w1>[0-9]+)x(?P<h1>[0-9]+) \+(?P<x1>[0-9]+)\+(?P<y1>[0-9]+)', metamode)
+        if m is None:
+            return 0,[]
+        else:
+            return 1, [{'name': m.group('screen1'), 'width': m.group('w1'), 'height': m.group('h1'), 'left': m.group('x1'), 'top': m.group('y1')}]
+    return 2, [
+            {'name': m.group('screen1'), 'width': m.group('w1'), 'height': m.group('h1'), 'left': m.group('x1'), 'top': m.group('y1')},
+            {'name': m.group('screen2'), 'width': m.group('w2'), 'height': m.group('h2'), 'left': m.group('x2'), 'top': m.group('y2')}
+            ]
+
 cdef class Target (TargetBase):
-    def __init__ (self, width=1280, height=800, fullscreen = True, **kwargs):
+    def __init__ (self, width=None, height=None, fullscreen = True, **kwargs):
         # Create target window and renderer
         self._fullscreen = fullscreen
         cdef SDL_DisplayMode dm
-        cdef int display = 0
+        cdef int display = 0, x, y
+        cdef char *metamode
         if 'display' in kwargs:
-            display = kwargs[display]
-            
+            display = int(kwargs['display'])
+
+        x = SDL_WINDOWPOS_UNDEFINED_MASK | display
+        y = SDL_WINDOWPOS_UNDEFINED_MASK | display
+
         SDL_GetDesktopDisplayMode(display, &dm)
 
-        debug("Desktop mode is %dx%d" % (dm.w, dm.h))
         self.platform = Gilbert().platform
-        
-        if self.platform in ['win32',]:
+        if self.platform == 'linux':
+            metamode = <char *>malloc(4096)
+            if SDL_NVIDIA_CurrentMetamode(metamode, 4096) == 0:
+                # Display is 0 here as both displays are glued together by Twinview
+                SDL_GetDesktopDisplayMode(0, &dm)
+                screens, nvmodes = processNvidiaMetamode(metamode)
+                if display < screens:
+                    if width is None:
+                        width = int(nvmodes[display]['width'])
+                    if height is None:
+                        height = int(nvmodes[display]['height'])
+                    x = int(nvmodes[display]['left'])
+                    y = int(nvmodes[display]['top'])
+
+            free(metamode)
+
+
+        debug("Display: %d,  desktop mode is %dx%d" % (display, dm.w, dm.h))
+
+        if width is None:
+            width = dm.w
+        else:
+            width=int(width)
+        if height is None:
+            height = dm.h
+        else:
+            height=int(height)
+
+        debug("WIDTH: %d HEIGHT: %d X: %d Y: %d" % (width, height, x, y))
+        if self.platform in ['win32', 'darwin', 'linux']:
             if fullscreen:
                 self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display,
-                            dm.w, dm.h, SDL_WINDOW_FULLSCREEN)
+                            x, y,
+                            width, height, SDL_WINDOW_FULLSCREEN)
             else:
                 self.window = SDL_CreateWindow("Ignifuga",
                             SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
                             width, height, SDL_WINDOW_RESIZABLE)
-        elif self.platform in ['linux',]:
-            if fullscreen:
-#                self.window = SDL_CreateWindow("Ignifuga",
-#                            SDL_WINDOWPOS_UNDEFINED_MASK | display, SDL_WINDOWPOS_UNDEFINED_MASK | display,
-#                            dm.w, dm.h, SDL_WINDOW_FULLSCREEN)
-                self.window = SDL_CreateWindow("Ignifuga",
-                    SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
-                    width, height, SDL_WINDOW_FULLSCREEN)
-            else:
-                self.window = SDL_CreateWindow("Ignifuga",
-                            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
-                            width, height, SDL_WINDOW_RESIZABLE)
         else:
-            # Android doesn't care what we tell it to do, it creates a full screen window anyway
+            # Android and iOS don't care what we tell them to do, they create a full screen window anyway
             self.window = SDL_CreateWindow("Ignifuga",
                             SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
                             width, height, SDL_WINDOW_FULLSCREEN)

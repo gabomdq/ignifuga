@@ -527,3 +527,6 @@ cdef extern from "stdlib.h":
     void* malloc(size_t)
     void free(void*)
     void *memcpy(void *dst, void *src, long n)
+
+cdef extern from "SDL_ignifuga.h":
+    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)

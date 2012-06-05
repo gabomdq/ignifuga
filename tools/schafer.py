@@ -136,7 +136,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
     # Modules required by Python itself
     freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8']
     # Modules required by Ignifuga in addition to the above
-    freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref']
+    freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref', 'optparse', 'textwrap']
     # For profiling
     freeze_modules += ['cProfile', 'runpy', 'pkgutil']
 
