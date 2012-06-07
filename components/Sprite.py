@@ -70,6 +70,7 @@ class Sprite(Viewable):
                     self.sprite.frame = self.sprite.frameCount - 1
             else:
                 self.sprite = None
+        self._updateColorModulation()
 
         self._updateSize()
         super(Sprite, self).init(**data)

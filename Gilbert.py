@@ -237,6 +237,8 @@ class Gilbert:
         self._touchCaptor = None
         self._lastEvent = None
 
+        self._freezeRenderer = False
+
         
         self.renderer = _Renderer(Target(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display))
         self.dataManager = DataManager()
@@ -328,22 +330,26 @@ class Gilbert:
 
         for entity_ref in remove_entities:
             del self.loading[entity_ref]
+            if not self.loading:
+                self._freezeRenderer  = False
 
 
         # Update objects
         remove_entities = []
         for entity_ref in self.running.keys():
-            task1, req1, data1,task2,req2,data2 = self.running[entity_ref]
-            if task1 != None:
-                task1, req1, data1 = self._processTask(task1, req1, data1, now, wrapup)
+            # This check may seem overkill, but there's situations where the ref may have been removed from self.running!
+            if entity_ref in self.running:
+                task1, req1, data1,task2,req2,data2 = self.running[entity_ref]
+                if task1 != None:
+                    task1, req1, data1 = self._processTask(task1, req1, data1, now, wrapup)
 
-            if task2 != None:
-                task2, req2, data2 = self._processTask(task2, req2, data2, now, wrapup)
+                if task2 != None:
+                    task2, req2, data2 = self._processTask(task2, req2, data2, now, wrapup)
 
-            if task1 != None or task2 != None:
-                self.running[entity_ref] = (task1, req1, data1,task2, req2, data2)
-            else:
-                remove_entities.append(entity_ref)
+                if task1 != None or task2 != None:
+                    self.running[entity_ref] = (task1, req1, data1,task2, req2, data2)
+                else:
+                    remove_entities.append(entity_ref)
 
         for entity_ref in remove_entities:
             del self.running[entity_ref]
@@ -419,7 +425,8 @@ class Gilbert:
 
     def renderScene(self):
         # Render a new scene
-        self.renderer.update()
+        if not self._freezeRenderer:
+            self.renderer.update()
 
     def refreshEntityZ(self, entity):
         """ Change the entity's z index ordering """
@@ -667,6 +674,7 @@ class Gilbert:
         # Make sure all entities finished loading and running
         debug('Waiting for entities to finish loading/running')
         tries = 0
+        self._freezeRenderer = True
         while self.loading or self.running:
             self.update(wrapup=True)
             tries += 1
@@ -698,7 +706,7 @@ class Gilbert:
         self.running = {}
 
         # Clean up cache
-        self.dataManager.cleanup()
+        # Do not clean the cache here, there may be useful data for other scenes -> self.dataManager.cleanup()
         gc.collect()
 
     def changeScene(self, scene_id):
