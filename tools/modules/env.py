@@ -70,7 +70,7 @@ def prepare_osx_env():
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
-    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 -isysroot %s' % OSX_SDK
+    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 --sysroot=%s' % OSX_SDK
     return env
 
 def prepare_ios_env(sdk=None, target='3.0'):
