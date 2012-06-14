@@ -23,11 +23,50 @@ class Action(Component):
     duration: The duration of the action
     relative: If true, the final value is that of target+initial value, if false, the final value is the target value
     increase: A function that affects the function. Possible values: 'linear', 'square'
+    targets: The targets where the action will be applied. If not provided the action applies to its entity.
+             If the action is owned by an entity, targets can be a list with None (to mark the owner entity), a Component instance or a component id
+             If the action is owned by a scene, targets can be a list with None (to mark the owner scene), a component or entity instance, or an entity or component id (ie entity.component)
     """
-    def __init__(self, id=None, entity=None, active=True, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
+    def __init__(self, id=None, entity=None, active=True, targets=None, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
     #def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, *args, **kwargs):
 
         self._tasks = data
+        self._targets = []
+        if targets is None:
+            self._targets = [entity,]
+        else:
+            from ignifuga.Entity import Entity
+            from ignifuga.Scene import Scene
+            if isinstance(entity, Entity):
+                # Targets can be other components owned by the entity (passed by id or by object) or the entity itself if target=None
+                for target in targets:
+                    if target is None:
+                        self._targets.append(entity)
+                    elif isinstance(target, Component) and target.entity == entity:
+                        self._targets.append(target)
+                    elif isinstance(target, str) or isinstance(target, unicode):
+                        component = entity.getComponent(str(target))
+                        if component is not None:
+                            self._targets.append(component)
+
+            elif isinstance(entity, Scene):
+                # Targets can be other entities or components (by id or by object), None for the scene
+                for target in targets:
+                    if target is None:
+                        self._targets.append(entity)
+                    elif isinstance(target, Component) or isinstance(target, Entity):
+                        self._targets.append(target)
+                    elif isinstance(target, str) or isinstance(target, unicode):
+                        target_parts = str(target).split('.')
+                        target_entity = entity.getEntity(target_parts[0])
+                        if target_entity != None:
+                            if len(target_parts) == 2:
+                                component = target_entity.getComponent(target_parts[1])
+                                if component is not None:
+                                    self._targets.append(component)
+                            else:
+                                self._targets.append(target_entity)
+
         self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
         self._loopMax = loop if loop >= 0 else None
@@ -47,9 +86,13 @@ class Action(Component):
         # Process runWith and runNext
         if runWith != None:
             for rw in runWith:
+                if 'targets' not in rw:
+                    rw['targets'] = targets
                 self._runWith.append(Action(root=False, entity=entity, **rw))
 
         if runNext != None:
+            if 'targets' not in runNext:
+                runNext['targets'] = targets
             self._runNext = Action(root=False, entity=entity, **runNext)
 
     @Component.active.setter
@@ -112,12 +155,13 @@ class Action(Component):
             self._onLoop = onLoop
 
         if not self._running and not self._done and self._entity != None:
-            if self._entity != None:
-                self._tasksStatus = {}
+            self._tasksStatus = {}
+            for target in self._targets:
+                self._tasksStatus[target] = {}
                 for task in self._tasks:
-                    self._tasksStatus[task] = {
+                    self._tasksStatus[target][task] = {
                         'targetValue': self._tasks[task],
-                        'initValue': getattr(self._entity, task)
+                        'initValue': getattr(target, task)
                     }
             self._running = True
             for a in self._runWith:
@@ -216,22 +260,24 @@ class Action(Component):
         """ Increase parameters by delta time (in seconds, elapsed since the start of the action) """
         if dt < self._duration:
             step = self._modifyStep(dt/self._duration)
-            for task in self._tasksStatus:
-                init = self._tasksStatus[task]['initValue']
-                target = self._tasksStatus[task]['targetValue']
-                if self._relative:
-                    setattr(self._entity, task, init + (target*step))
-                else:
-                    setattr(self._entity, task, init+(target-init)*step)
+            for target in self._tasksStatus:
+                for task in self._tasksStatus[target]:
+                    init = self._tasksStatus[target][task]['initValue']
+                    dest = self._tasksStatus[target][task]['targetValue']
+                    if self._relative:
+                        setattr(target, task, init + (dest*step))
+                    else:
+                        setattr(target, task, init+(dest-init)*step)
         else:
             # The action should stop, set everything at their final value
-            for task in self._tasksStatus:
-                init = self._tasksStatus[task]['initValue']
-                target = self._tasksStatus[task]['targetValue']
-                if self._relative:
-                    setattr(self._entity, task, init+target)
-                else:
-                    setattr(self._entity, task, target)
+            for target in self._tasksStatus:
+                for task in self._tasksStatus[target]:
+                    init = self._tasksStatus[target][task]['initValue']
+                    dest = self._tasksStatus[target][task]['targetValue']
+                    if self._relative:
+                        setattr(target, task, init+dest)
+                    else:
+                        setattr(target, task, dest)
                     
             self._done = True
             
@@ -321,7 +367,7 @@ class Action(Component):
 
     def __repr__(self):
         retval = ''
-        retval += "|Action with ID: %s -> %s Target: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self._entity.id if self._entity != None else '',self._duration, self._loopMax, self._root, self._running)
+        retval += "|Action with ID: %s -> %s Targets: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self.targets,self._duration, self._loopMax, self._root, self._running)
         if len(self._runWith) > 0:
             retval += "|Runs With:\n"
             for a in self._runWith:

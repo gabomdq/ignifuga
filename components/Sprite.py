@@ -32,15 +32,16 @@ import sys
 class Sprite(Viewable):
     """ Sprite component class, viewable, potentially animated
     """
-    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur']
+    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur', 'overlays', 'addOverlay', 'removeOverlay', 'clearOverlays']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, loop=-1, **data):
 
         # Default values
         self._loadDefaults({
             'file': None,
             '_spriteData': None,
-            '_atlas': None,
-            '_canvas': None,
+            '_atlas': None,         # The "source" image where the sprite info comes from
+            '_tmpcanvas': None,     # An internal canvas where we perform composition of overlays and do bluring
+            '_canvas': None,        # A pointer to the external "face" of the sprite, it can point to self._atlas, self._tmpcanvas or self.sprite.canvas
             'sprite': None,
             'loopMax': loop if loop >= 0 else None,
             'loop': 0,
@@ -50,7 +51,8 @@ class Sprite(Viewable):
             'remainActiveOnStop': False,
             'forward': True,
             '_blur': 0.0,
-            '_canvasBlur': None
+            '_lastBlurAmount': None,
+            '_overlays': {}
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
@@ -65,11 +67,13 @@ class Sprite(Viewable):
             if self._atlas.spriteData != None:
                 self._spriteData = self._atlas.spriteData
                 self.sprite = _Sprite(self._spriteData, self._atlas, self.frequency)
+                self._canvas = self.sprite.canvas
                 self._updateColorModulation()
                 if not self.forward:
                     self.sprite.frame = self.sprite.frameCount - 1
             else:
                 self.sprite = None
+                self._canvas = self._atlas
         self._updateColorModulation()
 
         self._updateSize()
@@ -78,6 +82,13 @@ class Sprite(Viewable):
     def update(self, **data):
         """ Initialize the required external data """
         super(Sprite, self).update(**data)
+
+        # Update overlayed sprites that are marked inactive as they won't be updated by the entity
+        for overlay in self._overlays.itervalues():
+            (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
+            if not sprite.active:
+                sprite.update(**data)
+
         if self.sprite != None:
             if self.sprite.frame == 0 and self.loop == 0 and not self._started:
                 self._started = True
@@ -95,8 +106,8 @@ class Sprite(Viewable):
                                 self.active = False
                                 self.loop = 0
                                 self.frame = 0
-                        if self._blur > 0:
-                            self._doBluring()
+                        if self._overlays or self._blur > 0:
+                            self._doCompositing()
                 else:
                     if self.sprite.prevFrame():
                         if self.sprite.frame == self.sprite.frameCount - 1:
@@ -108,10 +119,10 @@ class Sprite(Viewable):
                                 self.active = False
                                 self.loop = 0
                                 self.frame = self.sprite.frameCount - 1
-                        if self._blur > 0:
-                            self._doBluring()
-        elif self._blur > 0 and self._blur != self._canvasBlur:
-            self._doBluring()
+                        if self._overlays or self._blur > 0:
+                            self._doCompositing()
+        elif self._overlays or (self._blur > 0 and self._blur != self._lastBlurAmount):
+            self._doCompositing()
 
     def _updateSize(self):
         # Update our "public" width,height
@@ -147,17 +158,18 @@ class Sprite(Viewable):
         elif self._atlas != None:
             self._height_src = self._atlas.height
 
-    # The current full image frame (not the animation atlas, but the consolidated final viewable image)
+    # The current composed full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
     def canvas(self):
-        if self._canvas != None:
-            return self._canvas
-        elif self.sprite != None:
-            return self.sprite.canvas
-        elif self._atlas != None:
-            return self._atlas
-        else:
-            return None
+#        if self._tmpcanvas != None:
+#            return self._tmpcanvas
+#        elif self.sprite != None:
+#            return self.sprite.canvas
+#        elif self._atlas != None:
+#            return self._atlas
+#        else:
+#            return None
+        return self._canvas
 
     @Viewable.red.setter
     def red(self, value):
@@ -198,55 +210,94 @@ class Sprite(Viewable):
         """ Set the blur amount, this is actually an integer value that equals the pixel displacement used to simulate bluring"""
         if value <= 0:
             # Remove the temporal canvas
-            self._canvas = None
-            self._canvasBlur = None
+            self._tmpcanvas = None
+            self._lastBlurAmount = None
             value = 0
         else:
             # Create a temporal canvas
             value = int(value)
         self._blur = value
 
-    def _doBluring(self):
-        """ Take the current canvas and "blur it" by doing a few blits out of center"""
-        if self._blur > 0:
-            if self._canvas is None:
-                self._canvas = Canvas()(self._width_pre,self._height_pre, isRenderTarget = True)
+    def _doCompositing(self):
+        """ Compose the external facing image from the atlas or source sprite, tag the overlays on and apply blurring"""
+        use_tmpcanvas = False
+        if self._tmpcanvas is None and self._width_pre > 0 and self._height_pre > 0:
+            self._tmpcanvas = Canvas()(self._width_pre,self._height_pre, isRenderTarget = True)
 
-            # Determine the source for the bluring
+        if self._tmpcanvas is not None:
             if self.sprite is not None:
                 source = self.sprite.canvas
             elif self._atlas is not None:
                 source = self._atlas
             else:
-                return
+                source = None
 
-            source.mod(1.0,1.0,1.0,1.0)
-            self._canvas.blitCanvas(source, 0, 0, self._canvas.width, self._canvas.height, 0,0,self._canvas.width,self._canvas.height, self._canvas.BLENDMODE_NONE)
+            if source is not None:
+                if self._overlays:
+                    use_tmpcanvas = True
+                    source.mod(1.0,1.0,1.0,1.0)
+                    self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_NONE)
+                    for z in self._overlays.iterkeys():
+                        (id,x,y,op,_r,_g,_b,_a,sprite) = self._overlays[z]
+                        w = sprite.width
+                        h = sprite.height
+                        canvas = sprite.canvas
+                        if canvas is not None:
+                            r = canvas.r
+                            g = canvas.g
+                            b = canvas.b
+                            a = canvas.a
+                            canvas.mod(_r if _r is not None else r, _g if _g is not None else g, _b if _b is not None else b, _a if _a is not None else a)
+                            self._tmpcanvas.blitCanvas(canvas,0,0,w,h,x,y,w,h,op)
+                            canvas.mod(r,g,b,a)
+
+                if self._blur > 0 and self._blur != self._lastBlurAmount:
+                    use_tmpcanvas = self._doBluring(source, not use_tmpcanvas) or use_tmpcanvas
+
+                source.mod(self._red, self._green, self._blue, self._alpha)
+                self._updateColorModulation()
+
+        if use_tmpcanvas:
+            self._canvas = self._tmpcanvas
+        else:
+            self._tmpcanvas = None
+            if self.sprite is not None:
+                self._canvas = self.sprite.canvas
+            elif self._atlas is not None:
+                self._canvas = self._atlas
+            else:
+                self._canvas = None
+
+    def _doBluring(self, source, start_clean = False):
+        """ Take the current canvas and "blur it" by doing a few blits out of center"""
+        if self._blur > 0:
+            if start_clean:
+                source.mod(1.0,1.0,1.0,1.0)
+                self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_NONE)
             source.mod(1.0,1.0,1.0,0.2)
             b = int (self._blur / 2)
-            w = self._canvas.width-b
-            h = self._canvas.height-b
-            self._canvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._canvas.BLENDMODE_BLEND)
+            w = self._tmpcanvas.width-b
+            h = self._tmpcanvas.height-b
+            self._tmpcanvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             b = self._blur
-            w = self._canvas.width-b
-            h = self._canvas.height-b
+            w = self._tmpcanvas.width-b
+            h = self._tmpcanvas.height-b
             source.mod(1.0,1.0,1.0,0.1)
-            self._canvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._canvas.BLENDMODE_BLEND)
-            self._canvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._canvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
+            self._tmpcanvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             # Up the alpha to 1.0
             source.mod(0.0,0.0,0.0,1.0)
-            self._canvas.blitCanvas(source, 0, 0, self._canvas.width, self._canvas.height, 0,0,self._canvas.width,self._canvas.height, self._canvas.BLENDMODE_ADD)
-
-            source.mod(self._red, self._green, self._blue, self._alpha)
-            self._updateColorModulation()
+            self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_ADD)
 
             # Preserve the value used for bluring to save time in case it's not modified for the next cycle
-            self._canvasBlur = self._blur
+            self._lastBlurAmount = self._blur
+            return True
+        return False
 
     @property
     def frameCount(self):
@@ -268,6 +319,56 @@ class Sprite(Viewable):
             return True
         return False
 
+    def addOverlay(self, id, x=0, y=0, z=0, r=1.0, g=1.0, b=1.0, a=1.0, op=4, update=False):
+        """ Add a sprite with component id, that will be overlayed at using the z order in the x,y using operation op and modulated with r,g,b,a
+        op: SDL_BLENDMODE_NONE = 0x00000000
+            SDL_BLENDMODE_BLEND = 0x00000001
+            SDL_BLENDMODE_ADD = 0x00000002
+            SDL_BLENDMODE_MOD = 0x00000004
+        update: If True, the compositing will be updated after adding the overlay
+        If an overlay of the same z exists, it'll be replaced
+        If any of r,g,b,a are None, then that channel will be not modulated and the overlayed sprite setting will be used instead
+        """
+        if self.entity is not None:
+            sprite = self.entity.getComponent(id)
+            if sprite is not None and isinstance(sprite, Sprite):
+                self._overlays[z] = (id,x,y,op,r,b,g,a,sprite)
+                if update:
+                    self._doCompositing()
+                return True
+        return False
+
+    def removeOverlay(self, zindex, update=False):
+        """ Remove an overlay by index"""
+        try:
+            del self._overlays[zindex]
+            if update:
+                self._doCompositing()
+            return retval
+        except:
+            return None
+
+    def clearOverlays(self, update=False):
+        self._overlays = {}
+        if update:
+            self._doCompositing()
+
+    @property
+    def overlays(self):
+        return self._overlays
+
+    @overlays.setter
+    def overlays(self, overlays):
+        """ Overlays should have the format [(id, x, y, z, r, g, a, op), (id, x, y, z, r, g, a, op), ...]
+        See addOverlay for the meaning of these parameters
+        """
+        self._overlays = {}
+
+        for overlay in overlays:
+            id,x,y,z,r,g,b,a,op = overlay
+            self.addOverlay(id,int(x),int(y),int(z),float(r) if r is not None else None,float(g) if g is not None else None,float(b) if b is not None else None,float(a) if a is not None else None,int(op))
+
+        self._doCompositing()
 
     def __getstate__(self):
         odict = self.__dict__.copy()
@@ -508,4 +609,3 @@ class _Sprite(object):
     def setColorMod(self, r,g,b,a):
         if self._canvas != None:
             self._canvas.mod(r,g,b,a)
-

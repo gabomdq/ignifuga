@@ -291,7 +291,7 @@ class Gilbert:
                         if isinstance(ref, dict):
                             debug("    DICT: %s" % ref.keys())
                         elif isinstance(ref, list):
-                            debug("    LIST: %s" % len(ref), " items")
+                            debug("    LIST: %s items" % len(ref))
                         elif isinstance(ref, tuple):
                             debug("    TUPLE: %s" % ref)
                         else:

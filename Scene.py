@@ -40,6 +40,13 @@ class Scene(object):
                 if entity != None:
                     self.entities[entity_id] = entity
 
+    def getEntity(self, id):
+        """ Retrieve an entity with a given id, return None if no entity by that id is found"""
+        if id in self.entities:
+            return self.entities[id]
+
+        return None
+
     @property
     def resolution(self):
         return self._resolution

@@ -24,7 +24,23 @@ cdef class CanvasBase (object):
     property hw:
         def __get__(self):
             return self._hw
-    
+
+    property r:
+        def __get__(self):
+            return self._r
+
+    property g:
+        def __get__(self):
+            return self._g
+
+    property b:
+        def __get__(self):
+            return self._b
+
+    property a:
+        def __get__(self):
+            return self._a
+
     cpdef blitCanvas(self, CanvasBase canvas, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
         raise Exception('method not implemented')
 

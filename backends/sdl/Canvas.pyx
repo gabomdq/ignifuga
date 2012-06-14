@@ -194,11 +194,6 @@ cdef class Canvas (CanvasBase):
 
     cpdef mod(self, float r, float g, float b, float a):
         """ Apply color modulation to the texture """
-        self._r = r
-        self._g = g
-        self._b = b
-        self._a = a
-        
         # Due to current limitations in SDL Color modulation functionality, modulation is always in the range 0 <= r <= 1.0, ie you can not increase a color channel, only modulate it downwards (r can not be >=1.0)
         cdef Uint8 R,G,B,A
 
@@ -210,6 +205,11 @@ cdef class Canvas (CanvasBase):
         if b > 1.0: b = 1.0
         if a < 0.0: a = 0.0
         if a > 1.0: a = 1.0
+
+        self._r = r
+        self._g = g
+        self._b = b
+        self._a = a
 
         R = <Uint8> (r * 255)
         G = <Uint8> (g * 255)
