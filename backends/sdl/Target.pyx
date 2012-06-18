@@ -38,27 +38,36 @@ cdef class Target (TargetBase):
         if 'display' in kwargs:
             display = int(kwargs['display'])
 
+        ndisplays = SDL_GetNumVideoDisplays()
+        if display > ndisplays-1:
+            display = 0
         x = SDL_WINDOWPOS_UNDEFINED_MASK | display
         y = SDL_WINDOWPOS_UNDEFINED_MASK | display
 
+#        debug ("NUM VIDEO DISPLAYS: %d" % ndisplays)
+#        for d in range(0, ndisplays):
+#            nmodes = SDL_GetNumDisplayModes(d)
+#            for nm in range(0, nmodes):
+#                SDL_GetDisplayMode(d, nm, &dm)
+#                debug("Display: %d,  Mode %d resolution %dx%d" % (d, nm, dm.w, dm.h))
+
         SDL_GetDesktopDisplayMode(display, &dm)
-
         self.platform = Gilbert().platform
-        if self.platform == 'linux':
-            metamode = <char *>malloc(4096)
-            if SDL_NVIDIA_CurrentMetamode(metamode, 4096) == 0:
-                # Display is 0 here as both displays are glued together by Twinview
-                SDL_GetDesktopDisplayMode(0, &dm)
-                screens, nvmodes = processNvidiaMetamode(metamode)
-                if display < screens:
-                    if width is None:
-                        width = int(nvmodes[display]['width'])
-                    if height is None:
-                        height = int(nvmodes[display]['height'])
-                    x = int(nvmodes[display]['left'])
-                    y = int(nvmodes[display]['top'])
-
-            free(metamode)
+#        if self.platform == 'linux':
+#            metamode = <char *>malloc(4096)
+#            if SDL_NVIDIA_CurrentMetamode(metamode, 4096) == 0:
+#                # Display is 0 here as both displays are glued together by Twinview
+#                SDL_GetDesktopDisplayMode(0, &dm)
+#                screens, nvmodes = processNvidiaMetamode(metamode)
+#                if display < screens:
+#                    if width is None:
+#                        width = int(nvmodes[display]['width'])
+#                    if height is None:
+#                        height = int(nvmodes[display]['height'])
+#                    x = int(nvmodes[display]['left'])
+#                    y = int(nvmodes[display]['top'])
+#
+#            free(metamode)
 
 
         debug("Display: %d,  desktop mode is %dx%d" % (display, dm.w, dm.h))
@@ -87,7 +96,6 @@ cdef class Target (TargetBase):
             self.window = SDL_CreateWindow("Ignifuga",
                             SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
                             width, height, SDL_WINDOW_FULLSCREEN)
-
         if self.window == NULL:
             error("COULD NOT CREATE SDL WINDOW")
             error(SDL_GetError())
@@ -96,6 +104,12 @@ cdef class Target (TargetBase):
 
         #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
         self.renderer = SDL_CreateRenderer(self.window, -1, 0)
+        if self.renderer == NULL:
+            error("COULD NOT CREATE RENDERER")
+            error(SDL_GetError())
+            sys.exit(1)
+            return
+
         SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "1")
         self.updateSize()
         
@@ -103,7 +117,6 @@ cdef class Target (TargetBase):
         #self._width = renderer.contents.viewport.w
         #self._height = renderer.contents.viewport.h
         #print "Window size: ", self._width, self._height
-
         SDL_GetRendererInfo(self.renderer, &self.render_info)
 
         #if bytes(self.render_info.name) in ['opengles', 'opengles2', 'direct3d']:

@@ -240,8 +240,6 @@ cdef extern from "SDL.h":
         Sint16 dy
         Uint16 pressure
 
-
-
     cdef struct SDL_KeyboardEvent:
         pass
     cdef struct SDL_TextEditingEvent:
@@ -367,6 +365,9 @@ cdef extern from "SDL.h":
     cdef SDL_bool SDL_SetHint(char *name, char *value)
     cdef Uint8 SDL_GetMouseState(int* x,int* y)
     cdef SDL_GLContext SDL_GL_CreateContext(SDL_Window* window)
+    cdef int SDL_GetNumVideoDisplays()
+    cdef int SDL_GetNumDisplayModes(int displayIndex)
+    cdef int SDL_GetDisplayMode(int displayIndex, int index, SDL_DisplayMode * mode)
 
 
 cdef extern from "SDL_image.h":
@@ -528,5 +529,6 @@ cdef extern from "stdlib.h":
     void free(void*)
     void *memcpy(void *dst, void *src, long n)
 
-cdef extern from "SDL_ignifuga.h":
-    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)
+#cdef extern from "SDL_ignifuga.h":
+#    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)
+
