@@ -116,7 +116,7 @@ public class SDLActivity extends WallpaperService {
 
     }
 
-    protected void onPause(){
+    /*protected void onPause(){
         //Log.v("SDL", "SDLActivity onPause");
         SDLActivity.nativePause();
     }
@@ -124,7 +124,7 @@ public class SDLActivity extends WallpaperService {
     protected void onResume(){
         //Log.v("SDL", "SDLActivity onResume");
         // Don't call SDLActivity.nativeResume(); here, it will be called via SDLSurface::surfaceChanged->SDLActivity::startApp
-    }
+    }*/
 
     @Override
     public Engine onCreateEngine() {

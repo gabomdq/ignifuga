@@ -45,9 +45,7 @@ def make(env, target):
     # Build freetype
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         cflags = env['CFLAGS'] + ' -std=gnu99'
-
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" CFLAGS="%s" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (cflags, ANDROID_NDK,target.dist)
-        print cmd
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0'
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
@@ -61,6 +59,7 @@ def make(env, target):
 
 
     cmd = 'ndk-build'
+    env['CFLAGS'] = env['CFLAGS'] + ' -DSDL_ANDROID_BLOCK_ON_PAUSE=1'
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
     # Copy some files to the skeleton directory
     if isdir(join(target.dist, 'jni', 'SDL', 'include')):

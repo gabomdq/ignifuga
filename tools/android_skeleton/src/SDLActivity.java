@@ -108,7 +108,7 @@ public class SDLActivity extends Activity {
     }
 
     // Events
-    protected void onPause() {
+    /*protected void onPause() {
         Log.v("SDL", "onPause()");
         super.onPause();
         SDLActivity.nativePause();
@@ -118,7 +118,7 @@ public class SDLActivity extends Activity {
         Log.v("SDL", "onResume()");
         super.onResume();
         // Don't call SDLActivity.nativeResume(); here, it will be called via SDLSurface::surfaceChanged->SDLActivity::startApp
-    }
+    }*/
 
     protected void onDestroy() {
         super.onDestroy();

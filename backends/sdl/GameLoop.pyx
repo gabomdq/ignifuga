@@ -23,8 +23,10 @@ cdef class GameLoop(GameLoopBase):
 
         overlord = Gilbert()
         target = overlord.renderer.target
-        if overlord.platform in ['android', 'iphone']:
+        if overlord.platform in ['iphone',]:
             # Special loop for single app mobile platforms that slows down when not active
+            # TODO: Is this really required for iPhone?
+            # Note: Android does not need this anymore, I've enabled a blocking option in Android_PumpEvents
             while not self.quit:
                 now = SDL_GetTicks()
                 overlord.update(now/1000.0)
