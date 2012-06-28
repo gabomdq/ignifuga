@@ -105,7 +105,7 @@ SPLASH_SCENE = {
         "height": 1200,
     },
     "keepAspect": True,
-    "autoScale": False,
+    "autoScale": True,
     "autoCenter": True,
     "userCanScroll": False,
     "userCanZoom": False,
@@ -114,7 +114,7 @@ SPLASH_SCENE = {
         "height": 2400
     },
     "entities": {
-        "splash": {
+        "splashimg": {
             "components": [{
                 "type": "Sprite",
                 "file": u"embedded:splash",
@@ -357,6 +357,11 @@ class Gilbert:
     def _processTask(self, task, req, data, now, wrapup, init=False):
         if req == None:
             req, data = task.wakeup({'now': now})
+            if init and req == REQUESTS.done and data is None:
+                # There was a problem with initialization, let's try again
+                task = Task(task.entity, task.entity().init, parent=Task.getcurrent())
+                return task, None, None
+
         if req == REQUESTS.done:
             if init:
                 # Entity is ready, start the update loop for it
@@ -646,7 +651,7 @@ class Gilbert:
         if scene_id in self.scenes:
             self.scene = self.scenes[scene_id]
             self.entities = self.scene.entities
-            self.scene.init()
+            self.scene.sceneInit()
             for entity in self.entities.itervalues():
                 self.startEntity(entity)
 

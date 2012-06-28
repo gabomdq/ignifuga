@@ -12,14 +12,8 @@ from ignifuga.Entity import Entity
 from ignifuga.Task import *
 from ignifuga.Gilbert import Gilbert
 
-class Scene(object):
+class Scene(Entity):
     def __init__(self, **data):
-
-        #Load data
-        for key,value in data.iteritems():
-            if key != 'entities':
-                setattr(self, key, value)
-
         # Default values
         self._loadDefaults({
             'id': hash(self),
@@ -32,6 +26,16 @@ class Scene(object):
             '_userCanZoom': True,
             '_size': {'width': None, 'height': None}
         })
+        # Add the Scene entity
+        self.entities[self.id] = self
+
+        super(Scene, self).__init__(**data)
+
+
+        #Load data
+        for key,value in data.iteritems():
+            if key != 'entities':
+                setattr(self, key, value)
 
         # Build entities
         if 'entities' in data:
@@ -46,6 +50,19 @@ class Scene(object):
             return self.entities[id]
 
         return None
+
+    def sceneInit(self):
+        Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale)
+        Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
+        if self._autoCenter:
+            Gilbert().renderer.centerScene()
+
+        #print "SCENEINIT ", self.id, self.entities
+
+#    def init(self,data={}):
+#        """ Initialize the required external data """
+#        super(Scene, self).init(data)
+#        print "SCENE ", self.id, self.entities
 
     @property
     def resolution(self):
@@ -96,17 +113,6 @@ class Scene(object):
     def userCanZoom(self, value):
         self._userCanZoom = value
 
-    def init(self):
-        """ Initialize the required external data """
-        # Do our initialization
-        Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale)
-        Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
-        if self._autoCenter:
-            Gilbert().renderer.centerScene()
-
-
-    def _loadDefaults(self, data):
-        """ Load data into the instance if said data doesn't exist """
-        for key,value in data.iteritems():
-            if not hasattr(self, key):
-                setattr(self, key, value)
+    def __repr__(self):
+        return 'Scene with ID: %s, Resolution %dx%d, KeepAspect: %s, AutoScale: %s, AutoCenter: %s, Size: %dx%d' % \
+        (self.id,self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale, self._autoCenter, self._size['width'], self._size['height'])

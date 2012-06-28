@@ -28,45 +28,12 @@ class Action(Component):
              If the action is owned by a scene, targets can be a list with None (to mark the owner scene), a component or entity instance, or an entity or component id (ie entity.component)
     """
     def __init__(self, id=None, entity=None, active=True, targets=None, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
-    #def __init__(self, id=None, duration=0.0, relative=False, increase='linear', stopCallback=None, loop=1, persistent=False, *args, **kwargs):
-
+        # Store some parameters for use in the actual initialization
+        self._initParams = {
+            'targets': targets,
+        }
         self._tasks = data
         self._targets = []
-        if targets is None:
-            self._targets = [entity,]
-        else:
-            from ignifuga.Entity import Entity
-            from ignifuga.Scene import Scene
-            if isinstance(entity, Entity):
-                # Targets can be other components owned by the entity (passed by id or by object) or the entity itself if target=None
-                for target in targets:
-                    if target is None:
-                        self._targets.append(entity)
-                    elif isinstance(target, Component) and target.entity == entity:
-                        self._targets.append(target)
-                    elif isinstance(target, str) or isinstance(target, unicode):
-                        component = entity.getComponent(str(target))
-                        if component is not None:
-                            self._targets.append(component)
-
-            elif isinstance(entity, Scene):
-                # Targets can be other entities or components (by id or by object), None for the scene
-                for target in targets:
-                    if target is None:
-                        self._targets.append(entity)
-                    elif isinstance(target, Component) or isinstance(target, Entity):
-                        self._targets.append(target)
-                    elif isinstance(target, str) or isinstance(target, unicode):
-                        target_parts = str(target).split('.')
-                        target_entity = entity.getEntity(target_parts[0])
-                        if target_entity != None:
-                            if len(target_parts) == 2:
-                                component = target_entity.getComponent(target_parts[1])
-                                if component is not None:
-                                    self._targets.append(component)
-                            else:
-                                self._targets.append(target_entity)
-
         self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
         self._loopMax = loop if loop >= 0 else None
@@ -80,31 +47,94 @@ class Action(Component):
         self._persistent = persistent
         self._running = False
         self._root = root
-        self.reset()
-        super(Action, self).__init__(id, entity, active, frequency, **data)
 
         # Process runWith and runNext
         if runWith != None:
             for rw in runWith:
                 if 'targets' not in rw:
                     rw['targets'] = targets
-                self._runWith.append(Action(root=False, entity=entity, **rw))
+                action = Action(root=False, entity=entity, active=False, **rw)
+                self._runWith.append(action)
 
         if runNext != None:
             if 'targets' not in runNext:
                 runNext['targets'] = targets
-            self._runNext = Action(root=False, entity=entity, **runNext)
+            self._runNext = Action(root=False, entity=entity, active=False, **runNext)
+
+        self.reset()
+        super(Action, self).__init__(id, entity, active, frequency, **data)
+
+
+    def init(self, **kwargs):
+        targets = self._initParams['targets']
+
+        if targets is None:
+            self._targets = [self.entity,]
+        else:
+            from ignifuga.Entity import Entity
+            from ignifuga.Scene import Scene
+            if isinstance(self.entity, Scene):
+                # Targets can be other entities or components (by id or by object), None for the scene
+                for target in targets:
+                    if target is None:
+                        self._targets.append(self.entity)
+                    elif isinstance(target, Component) or isinstance(target, Entity):
+                        self._targets.append(target)
+                    elif isinstance(target, str) or isinstance(target, unicode):
+                        target_parts = str(target).split('.')
+                        target_entity = self.entity.getEntity(target_parts[0])
+                        if target_entity != None:
+                            if len(target_parts) == 2:
+                                component = target_entity.getComponent(target_parts[1])
+                                if component is not None:
+                                    self._targets.append(component)
+                                else:
+                                    raise Exception('Action target %s not found' % target)
+                            else:
+                                self._targets.append(target_entity)
+                        else:
+                            raise Exception('Action target %s (Entity %s) not found' % (target, target_parts[0]))
+                    else:
+                        raise Exception('Action target %s not found' % target)
+            elif isinstance(self.entity, Entity):
+                # Targets can be other components owned by the entity (passed by id or by object) or the entity itself if target=None
+                for target in targets:
+                    if target is None:
+                        self._targets.append(self.entity)
+                    elif isinstance(target, Component) and target.entity == self.entity:
+                        self._targets.append(target)
+                    elif isinstance(target, str) or isinstance(target, unicode):
+                        component = self.entity.getComponent(str(target))
+                        if component is not None:
+                            self._targets.append(component)
+                        else:
+                            raise Exception('Action target %s not found' % target)
+                    else:
+                        raise Exception('Action target %s not found' % target)
+
+        # Process runWith and runNext
+        for action in self._runWith:
+            action.init(**kwargs)
+
+        if self._runNext is not None:
+            self._runNext.init(**kwargs)
+
+        super(Action, self).init(**kwargs)
 
     @Component.active.setter
     def active(self, active):
-        if active == self._active or self._entity == None:
-            return
-        if active and not self._running:
-            self.start()
-        elif not active and self._running:
-            self.stop()
+        if self._root:
+            if active == self._active or self._entity == None:
+                return
+            if active and not self._running:
+                self.start()
+            elif not active and self._running:
+                self.stop()
 
-        Component.active.fset(self, active)
+            Component.active.fset(self, active)
+        else:
+            self._active = False
+            Component.active.fset(self, False)
 
     @Component.entity.setter
     def entity(self, entity):
@@ -175,6 +205,11 @@ class Action(Component):
         self._running = False   # Indicates if the action chain is running
         self._done = False      # Indicates if the current action is finished
         self._dt = 0            # Indicates total elapsed time since start
+        for action in self._runWith:
+            action.reset()
+
+        if self._runNext is not None:
+            self._runNext.reset()
 
     def stop(self):
         """ Stop the action chain """
@@ -367,7 +402,7 @@ class Action(Component):
 
     def __repr__(self):
         retval = ''
-        retval += "|Action with ID: %s -> %s Targets: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self.targets,self._duration, self._loopMax, self._root, self._running)
+        retval += "|Action with ID: %s -> %s Active: %s Targets: %s Duration: %s Loop: %s Root: %s Running: %s\n" % (self.id, self._tasks, self.active, self._targets,self._duration, self._loopMax, self._root, self._running)
         if len(self._runWith) > 0:
             retval += "|Runs With:\n"
             for a in self._runWith:

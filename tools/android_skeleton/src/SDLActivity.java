@@ -64,6 +64,9 @@ import java.lang.*;
 */
 public class SDLActivity extends Activity {
 
+    // Keep track of the paused state
+    public static boolean mIsPaused;
+
     // Main components
     private static SDLActivity mSingleton;
     private static SDLSurface mSurface;
@@ -100,6 +103,9 @@ public class SDLActivity extends Activity {
         
         // So we can call stuff from static callbacks
         mSingleton = this;
+
+        // Keep track of the paused state
+        mIsPaused = false;
 
         // Set up the surface
         mSurface = new SDLSurface(getApplication());
@@ -200,7 +206,14 @@ public class SDLActivity extends Activity {
             mSDLThread.start();
         }
         else {
-            SDLActivity.nativeResume();
+            /*
+             * Some Android variants may send multiple surfaceChanged events, so we don't need to resume every time
+             * every time we get one of those events, only if it comes after surfaceDestroyed
+             */
+            if (mIsPaused) {
+                SDLActivity.nativeResume();
+                SDLActivity.mIsPaused = false;
+            }
         }
     }
 
@@ -474,7 +487,10 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     // Called when we lose the surface
     public void surfaceDestroyed(SurfaceHolder holder) {
         Log.v("SDL", "surfaceDestroyed()");
-        SDLActivity.nativePause();
+        if (!SDLActivity.mIsPaused) {
+            SDLActivity.mIsPaused = true;
+            SDLActivity.nativePause();
+        }
         enableSensor(Sensor.TYPE_ACCELEROMETER, false);
     }
 

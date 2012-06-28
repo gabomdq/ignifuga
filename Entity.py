@@ -47,6 +47,7 @@ class Entity(object):
         self._properties = {}
         self.tags = []
         self.signalQueue = []
+        self._initFailCount = 0
 
         """
         Preprocess kwargs
@@ -119,14 +120,18 @@ class Entity(object):
                 if failcount[component] < 10:
                     components.append(component)
                 else:
-                    error('Failed initializing component %s' % component)
-                    #error("EXCEPTION: %s\n %s\n %s" %(ex, ex.args, traceback.format_exc()))
-                    error(traceback.format_exc())
+                    error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
+                    self._initFailCount+=1
+                    if self._initFailCount > 10:
+                        error('Ignoring Entity %s, could not initialize it because of component %s' % (self.id, component))
+                        error(traceback.format_exc())
+                        return self
+                    return None
         return self
 
-    def register(self):
-        """ Register Entity with the Overlord """
-        Gilbert().registerNode(self)
+#    def register(self):
+#        """ Register Entity with the Overlord """
+#        Gilbert().registerNode(self)
 
     def unregister(self):
         """ Unregister Entity with the Overlord """
@@ -138,6 +143,12 @@ class Entity(object):
     ###########################################################################
     # Persistence, serialization related functions
     ###########################################################################
+    def _loadDefaults(self, data):
+        """ Load data into the instance if said data doesn't exist """
+        for key,value in data.iteritems():
+            if not hasattr(self, key):
+                setattr(self, key, value)
+
     def load(self, data):
         """ Load components from given data
         data has the format may be:
@@ -416,3 +427,6 @@ class Entity(object):
             return setattr(self._properties[name], name, value)
         super(Entity, self).__setattr__(name, value)
 
+
+    def __repr__(self):
+        return 'Entity with ID: %s' % (self.id,)
