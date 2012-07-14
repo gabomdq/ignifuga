@@ -11,6 +11,7 @@ from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, ROOT_DIR, SOURCES, SED_CMD
+import multiprocessing
 
 def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
@@ -26,13 +27,14 @@ def prepare(env, target):
     shutil.copy(join(ROOT_DIR, 'external', 'Makefile.libpng.mingw32'), join(target.builds.PNG, 'Makefile'))
 
 def make(env, target):
+    ncpu = multiprocessing.cpu_count()
     # Build zlib
     if isfile(join(target.dist, 'lib', 'libz.a')):
         os.remove(join(target.dist, 'lib', 'libz.a'))
     if not isfile(join(target.builds.ZLIB, 'Makefile')):
         cmd = './configure --static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
@@ -70,7 +72,7 @@ def make(env, target):
         cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(target.builds.JPG, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
     cmd = 'make V=0 install-lib'
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
@@ -96,7 +98,7 @@ def make(env, target):
 
 
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
@@ -111,7 +113,7 @@ def make(env, target):
     if not isfile(join(target.builds.SDL_IMAGE, 'Makefile')):
         cmd = './configure --enable-silent-rules LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(target.dist, 'lib'), join(target.dist, 'include'), target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
@@ -128,7 +130,7 @@ def make(env, target):
         #cflags = env['CFLAGS'] + ' -std=gnu99'
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
@@ -148,7 +150,7 @@ def make(env, target):
     if not isfile(join(target.builds.SDL_TTF, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (target.dist, target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
     cmd = 'make V=0 install-libSDL2_ttfincludeHEADERS'
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()

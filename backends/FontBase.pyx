@@ -8,5 +8,7 @@
 # Data Manager Base
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# xcython: profile=True
+
 cdef class FontBase (object):
     pass

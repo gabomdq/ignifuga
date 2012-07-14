@@ -17,3 +17,8 @@ cdef class Rect(object):
     cpdef bool fits(self, Rect other)
     cpdef scale(self, double scale_x=*, double scale_y=*)
     cpdef list cutout(self, Rect other)
+
+
+cpdef Rect rectFromRect(Rect r)
+cpdef Rect rectFromXYWH(double x, double y, double w, double h)
+cpdef Rect rectFromWH( double w, double h)

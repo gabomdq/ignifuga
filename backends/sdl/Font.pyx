@@ -7,6 +7,9 @@
 # Ignifuga Game Engine
 # SDL Font wrapper
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
+
+# xcython: profile=True
+
 from ignifuga.Log import *
 
 cdef class Font(FontBase):

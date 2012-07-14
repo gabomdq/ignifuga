@@ -134,11 +134,11 @@ def prepare_python(platform, ignifuga_src, python_build, env):
 
 def make_python(platform, ignifuga_src, env=os.environ):
     # Modules required by Python itself
-    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8']
+    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii']
     # Modules required by Ignifuga in addition to the above
     freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref', 'optparse', 'textwrap']
     # For profiling
-    freeze_modules += ['cProfile', 'runpy', 'pkgutil']
+    freeze_modules += ['cProfile', 'runpy', 'pkgutil', 'pstats', 'functools']
 
     target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])
@@ -251,7 +251,7 @@ compileall.compile_dir("%s")
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
     target = get_target(platform)
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
 
 def make_glue(package, glue_h, glue_c):
@@ -296,12 +296,12 @@ def cythonize(build_dir, package_name, skip=[]):
     for f in files:
         if f[len(build_dir):] not in skip and f[len(build_dir)+1:] not in skip:
             mf = getctime(f)
-            cf = splitext(f)[0] + '.c'
+            cf = splitext(f)[0] + '.cpp'
             if not isfile(cf) or getctime(cf) < mf:
                 ccf = join(build_dir, 'cython_src', cf.replace(os.sep, '+')[len(build_dir)+1:])
                 if not isfile(ccf) or getctime(ccf) < mf:
                     log('Cythonizing %s' % basename(f))
-                    cmd = 'cython "%s"' % f
+                    cmd = 'cython --cplus "%s"' % f
                     p = Popen(shlex.split(cmd), cwd = build_dir)
                     p.communicate()
                     if p.returncode != 0:
@@ -337,7 +337,7 @@ def cythonize(build_dir, package_name, skip=[]):
     packages = [package_name,]
     for f in cfiles:
         filename = basename(f)
-        package = filename.replace('+', '.').replace('.c', '')
+        package = filename.replace('+', '.').replace('.cpp', '')
         
         # The last part of the package is the current module
         module = package.split('.')[-1]
@@ -398,7 +398,7 @@ def cythonize(build_dir, package_name, skip=[]):
     f.close()
     cfiles.append(join(cython_src, package_name+'_glue.c'))
 
-    for f in locate('*.c', build_dir, [cython_src, join(build_dir, 'android_project')]):
+    for f in locate('*.cpp', build_dir, [cython_src, join(build_dir, 'android_project')]):
         if f not in cfiles:
             d = f[len(build_dir)+1:].replace(os.sep, '+')
             cfile = join(cython_src, d)
@@ -501,13 +501,13 @@ def build_project_generic(options, platform, target, env=None):
 
     # Cythonize main file
     main_file_ct = getctime(main_file)
-    main_file_c = join(cython_src, splitext(options.main)[0] + '.c')
+    main_file_c = join(cython_src, splitext(options.main)[0] + '.cpp')
     cfiles.append(main_file_c)
 
     if not isfile(main_file_c) or getctime(main_file_c) < main_file_ct:
         log('Cythonizing main file %s' % main_file)
-        cmd = 'cython --embed %s' % main_file
-        mfc = join(platform_build, splitext(main_file)[0] + '.c')
+        cmd = 'cython --embed --cplus %s' % main_file
+        mfc = join(platform_build, splitext(main_file)[0] + '.cpp')
         Popen(shlex.split(cmd), cwd = platform_build).communicate()
         if not isfile(mfc):
             error ('Could not cythonize main file')

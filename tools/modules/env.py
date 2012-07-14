@@ -3,6 +3,7 @@ import os
 from os.path import *
 from log import error
 from util import find_xcode, find_ios_sdk
+import multiprocessing
 
 XCODE_ROOT = None
 BEST_IOS_SDK = None
@@ -143,7 +144,7 @@ def prepare_android_env():
     env['AR'] = "arm-linux-androideabi-ar"
     env['RANLIB'] = "arm-linux-androideabi-ranlib"
     env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
-    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+    env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
 
     return env
 
@@ -172,5 +173,5 @@ def prepare_mingw32_env():
     env['DLLTOOL'] = "i586-mingw32msvc-dlltool"
     env['OBJDUMP'] = "i586-mingw32msvc-objdump"
     env['RESCOMP'] = "i586-mingw32msvc-windres"
-    env['MAKE'] = 'make V=0 -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+    env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     return env

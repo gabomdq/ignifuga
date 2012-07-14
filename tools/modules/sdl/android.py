@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import SED_CMD, ROOT_DIR, SOURCES, ANDROID_NDK, ANDROID_SDK
 from ..util import prepare_source
+import multiprocessing
 
 def prepare(env, target):
     patch_target = not isdir(target.builds.SDL) # Keep count if we are starting from scratch to avoid rebuilding excessively too many files
@@ -42,12 +43,13 @@ def prepare(env, target):
         shutil.copy(join(ROOT_DIR, 'external', 'Android.mk.freetype'), join(target.builds.SDL, 'jni', 'freetype', 'Android.mk'))
 
 def make(env, target):
+    ncpu = multiprocessing.cpu_count()
     # Build freetype
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         cflags = env['CFLAGS'] + ' -std=gnu99'
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" CFLAGS="%s" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (cflags, ANDROID_NDK,target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     if isfile(join(target.builds.FREETYPE, 'objs', '.libs', 'libfreetype.a')):
         cmd = 'rsync -aqut --exclude .svn --exclude .hg %s/ %s' % (join(target.builds.FREETYPE, 'include'), join(target.builds.SDL, 'jni', 'freetype', 'include'))

@@ -3,6 +3,7 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
+# xcython: profile=True
 
 from libc.stdlib cimport free, malloc
 

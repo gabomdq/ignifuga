@@ -8,10 +8,11 @@
 # SDL 2D Canvas
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# xcython: profile=True
+
 from ignifuga.Log import debug, info, error
-from ignifuga.Gilbert import Gilbert, Event, Renderer as getRenderer
-from ignifuga.Renderer cimport Renderer
-from ignifuga.backends.sdl.Target cimport Target
+from ignifuga.Gilbert import Gilbert, Event, getRenderer
+from ignifuga.backends.sdl.Renderer cimport Renderer
 from ignifuga.Log import *
 from sys import exit
 from SDL cimport *
@@ -32,7 +33,8 @@ cdef class Canvas (CanvasBase):
         cdef SDL_Surface *ss = NULL
         cdef char *bindata
         cdef bytes embedded_data
-        self._sdlRenderer = (<Target>getRenderer().target).renderer
+        renderer = getRenderer()
+        self._sdlRenderer = (<Renderer>renderer).renderer
         self._srcURL = srcURL
         self._isRenderTarget = isRenderTarget
         self._fontURL = None
@@ -67,9 +69,9 @@ cdef class Canvas (CanvasBase):
             self._hw = hw
             
             if width is None:
-                width = Renderer().target.width
+                width = Renderer()._width
             if height is None:
-                height = Renderer().target.height
+                height = Renderer()._height
                 
             self._width = width
             self._height = height
@@ -98,14 +100,14 @@ cdef class Canvas (CanvasBase):
             SDL_FreeSurface(self._surfacesw)
 
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
-        cdef Canvas canvas
+        #cdef Canvas canvas
 
-        canvas = <Canvas>canvasbase
+        #canvas = <Canvas>canvasbase
 
         if sw == -1:
-            sw = canvas._width
+            sw = canvasbase._width
         if sh == -1:
-            sh = canvas._height
+            sh = canvasbase._height
         
         if dw == -1:
             dw = sw
@@ -115,10 +117,10 @@ cdef class Canvas (CanvasBase):
         
         if self._isRenderTarget and self._hw and canvas._hw:
             # Both canvas are hardware based, and we can render on this canvas from another canvas
-            return self.blitCanvasHW(canvas,dx,dy,dw,dh,sx,sy,sw,sh, blend)
+            return self.blitCanvasHW(<Canvas>canvasbase,dx,dy,dw,dh,sx,sy,sw,sh, blend)
         else:
             # At least one of the canvas is software based
-            return self.blitCanvasSW(canvas,dx,dy,dw,dh,sx,sy,sw,sh, blend)
+            return self.blitCanvasSW(<Canvas>canvasbase,dx,dy,dw,dh,sx,sy,sw,sh, blend)
             
             
     cdef blitCanvasSW(self, Canvas canvas, int dx, int dy, int dw, int dh, int sx, int sy, int sw, int sh, int blend):

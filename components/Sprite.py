@@ -8,7 +8,6 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from Viewable import Viewable
-from ignifuga.Gilbert import REQUESTS
 from ignifuga.Task import *
 from ignifuga.Gilbert import Gilbert
 import sys
@@ -24,7 +23,7 @@ except:
 
 from base64 import b64decode
 #from zlib import decompress
-from ignifuga.Rect import Rect
+from ignifuga.Rect import *
 from ignifuga.Log import error
 import sys
 
@@ -32,7 +31,7 @@ import sys
 class Sprite(Viewable):
     """ Sprite component class, viewable, potentially animated
     """
-    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur', 'overlays', 'addOverlay', 'removeOverlay', 'clearOverlays']
+    PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur', 'overlays', 'addOverlay', 'removeOverlay', 'clearOverlays', 'updateRenderer']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, loop=-1, **data):
 
         # Default values
@@ -52,12 +51,15 @@ class Sprite(Viewable):
             'forward': True,
             '_blur': 0.0,
             '_lastBlurAmount': None,
-            '_overlays': {}
+            '_overlays': {},
+            '_rendererSpriteId': None
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
 
         self._started = True
+        self._dirty = True
+        self.renderer = Gilbert().renderer
 
     def init(self, **data):
         """ Initialize the required external data """
@@ -75,19 +77,29 @@ class Sprite(Viewable):
                 self.sprite = None
                 self._canvas = self._atlas
         self._updateColorModulation()
-
         self._updateSize()
+
+        self.show()
         super(Sprite, self).init(**data)
 
-    def update(self, **data):
+    def free(self, **kwargs):
+        self.hide()
+        super(Sprite, self).free(**kwargs)
+
+    def update(self, now, **data):
         """ Initialize the required external data """
-        super(Sprite, self).update(**data)
+        super(Sprite, self).update(now, **data)
+
+        if self._canvas == self._atlas:
+            # This is a single image non animated sprite, we return with the STOP instruction so the update loop is not called
+            STOP()
+            return
 
         # Update overlayed sprites that are marked inactive as they won't be updated by the entity
         for overlay in self._overlays.itervalues():
             (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
             if not sprite.active:
-                sprite.update(**data)
+                sprite.update(now, **data)
 
         if self.sprite != None:
             if self.sprite.frame == 0 and self.loop == 0 and not self._started:
@@ -124,6 +136,10 @@ class Sprite(Viewable):
         elif self._overlays or (self._blur > 0 and self._blur != self._lastBlurAmount):
             self._doCompositing()
 
+        if self._dirty:
+            self._updateRendererDst()
+            self._dirty = False
+
     def _updateSize(self):
         # Update our "public" width,height
         if self._width != None:
@@ -157,6 +173,27 @@ class Sprite(Viewable):
             self._height_src = self.sprite.height
         elif self._atlas != None:
             self._height_src = self._atlas.height
+
+        self.updateRenderer()
+
+    def _updateRendererDst(self):
+        if self._rendererSpriteId:
+            self.renderer.spriteDst(self._rendererSpriteId,
+            self._x, self._y, self._width_pre, self._height_pre,
+            self._angle,
+            self._center[0] if self._center != None else self._width_pre / 2,
+            self._center[1] if self._center != None else self._height_pre / 2,
+            (1 if self.fliph else 0) + (2 if self.flipv else 0))
+            self._dirty = False
+
+    def updateRenderer(self):
+        if self._canvas == self._atlas:
+            # No animation loop, directly update renderer
+            self._updateRendererDst()
+            self._dirty = False
+        else:
+            # Mark as dirty so we update on the next update
+            self._dirty = True
 
     # The current composed full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
@@ -217,6 +254,35 @@ class Sprite(Viewable):
             # Create a temporal canvas
             value = int(value)
         self._blur = value
+
+    @Viewable.x.setter
+    def x(self, new_x):
+        Viewable.x.fset(self, new_x)
+        self.updateRenderer()
+
+    @Viewable.y.setter
+    def y(self, new_y):
+        Viewable.y.fset(self, new_y)
+        self.updateRenderer()
+
+    @Viewable.z.setter
+    def z(self, new_z):
+        oldz = self._z
+        Viewable.z.fset(self, new_z)
+        if self._rendererSpriteId and oldz != self._z:
+            self.renderer.spriteZ(self._rendererSpriteId,self._z)
+
+    @Viewable.angle.setter
+    def angle(self, new_angle):
+        Viewable.angle.fset(self, new_angle)
+        self.updateRenderer()
+
+    @Viewable.center.setter
+    def center(self, new_center):
+        Viewable.center.fset(self, new_center)
+        self.updateRenderer()
+
+    #TODO: updateRenderDst on flipv, fliph
 
     def _doCompositing(self):
         """ Compose the external facing image from the atlas or source sprite, tag the overlays on and apply blurring"""
@@ -378,6 +444,41 @@ class Sprite(Viewable):
         del odict['_spriteData']
         return odict
 
+    def show(self):
+        if self._rendererSpriteId is None:
+            self._rendererSpriteId = self.renderer.addSprite(self._canvas,
+                self._z,
+                0, 0, self._width_src, self._height_src,
+                self._x, self._y, self._width_pre, self._height_pre,
+                self._angle,
+                self._center[0] if self._center != None else self._width_pre / 2,
+                self._center[1] if self._center != None else self._height_pre / 2,
+                (1 if self.fliph else 0) + (2 if self.flipv else 0))
+
+    def hide(self):
+        if self._rendererSpriteId:
+            self.renderer.removeSprite(self._rendererSpriteId)
+            self._rendererSpriteId = None
+
+    @Viewable.active.setter
+    def active(self, active):
+        if active != self._active:
+            Viewable.active.fset(self, active)
+            if self.entity != None and self._active:
+                self.show()
+            else:
+                self.hide()
+
+    @Viewable.visible.setter
+    def visible(self, value):
+        if value != self._visible:
+            self._visible = value
+            if self._visible:
+                self.show()
+            else:
+                self.hide()
+
+
 class _Sprite(object):
     """ Internal sprite implementation with animation"""
     def __init__(self, data, srcCanvas, rate=30):
@@ -433,7 +534,7 @@ class _Sprite(object):
             self._hitmap = None
 
         self._rate = rate
-        self._lapse = 1.0/self._rate
+        self._lapse = 1000/self._rate
         self._lastUpdate = 0.0
         self._colormod = (1.0, 1.0, 1.0, 1.0)
         self.renderer = Renderer()
@@ -531,8 +632,8 @@ class _Sprite(object):
                         newareas = []
                         for a in keyframeareas:
                             sx,sy,dx,dy,w,h = a
-                            r = Rect((dx,dy,w,h))
-                            dr = Rect((ddx,ddy,dw,dh))
+                            r = rectFromXYWH(dx,dy,w,h)
+                            dr = rectFromXYWH(ddx,ddy,dw,dh)
                             #print "intersecting ", r, " with ", dr, " results in ", r.cutout(dr)
                             for cr in r.cutout(dr):
                                 newareas.append((cr.left-dx+sx, cr.top-dy+sy, cr.left, cr.top, cr.width, cr.height))

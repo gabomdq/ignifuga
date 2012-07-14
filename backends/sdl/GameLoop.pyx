@@ -7,6 +7,10 @@
 # Game Loop
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# xcython: profile=True
+# cython: boundscheck=False
+# cython: wraparound=False
+
 from ignifuga.Gilbert import Gilbert, Event
 from ignifuga.Log import debug
 import time, sys
@@ -14,24 +18,26 @@ import time, sys
 cdef class GameLoop(GameLoopBase):
     def __init__(self, fps = 30.0):
         super(GameLoop, self).__init__(fps)
-        self._screen_w, self._screen_h = Gilbert().renderer.screenSize
+        self.renderer = <Renderer>Gilbert().renderer
+        self._screen_w, self._screen_h = self.renderer.screenSize
         self.paused = False
+
 
     cpdef run(self):
         cdef SDL_Event ev
         cdef Uint32 now
+        cdef double remainingTime
 
         overlord = Gilbert()
-        target = overlord.renderer.target
         if overlord.platform in ['iphone',]:
             # Special loop for single app mobile platforms that slows down when not active
             # TODO: Is this really required for iPhone?
             # Note: Android does not need this anymore, I've enabled a blocking option in Android_PumpEvents
             while not self.quit:
                 now = SDL_GetTicks()
-                overlord.update(now/1000.0)
+                self.update(now)
                 if not self.paused:
-                    overlord.renderScene()
+                    self.renderer.update(now)
 
                 while SDL_PollEvent(&ev):
                     self.handleSDLEvent(&ev)
@@ -48,14 +54,19 @@ cdef class GameLoop(GameLoopBase):
             # Regular loop, draws all the time independently of shown/hidden status
             while not self.quit:
                 now = SDL_GetTicks()
-                overlord.update(now/1000.0)
-                overlord.renderScene()
+                self.update(now)
+#                print "UPDATE: ", SDL_GetTicks() - now
+#                now = SDL_GetTicks()
+                if not self.freezeRenderer:
+                    self.renderer.update(now)
+#                print "RENDESCENE: ", SDL_GetTicks() - now
 
                 while SDL_PollEvent(&ev):
                     self.handleSDLEvent(&ev)
 
                 # Sleep for the remainder of the alloted frame time, if there's time left
-                remainingTime = self._interval  - (SDL_GetTicks()-now)
+                self.frame_time = SDL_GetTicks()-now
+                remainingTime = self._interval  - self.frame_time
                 if remainingTime > 0:
                     SDL_Delay( <Uint32>(remainingTime+0.5) )
 
@@ -65,8 +76,7 @@ cdef class GameLoop(GameLoopBase):
         cdef SDL_MouseWheelEvent *mwev      
         cdef SDL_WindowEvent *winev
         cdef SDL_TouchFingerEvent *fev
-        cdef Target target
-        
+
         if sdlev.type == SDL_QUIT:
             Gilbert().endLoop()
         elif sdlev.type == SDL_MOUSEMOTION:
@@ -120,9 +130,6 @@ cdef class GameLoop(GameLoopBase):
                 self.paused = True
             elif winev.event == SDL_WINDOWEVENT_RESTORED:
                 debug('Window is being restored')
-                #t = Gilbert().renderer.target
-                #target = <Target> t
-                #result = SDL_GL_CreateContext(target.window)
                 self.paused = False
                 debug('Window restored')
                 
@@ -136,4 +143,5 @@ cdef class GameLoop(GameLoopBase):
         fev.x = fev.x * self._screen_w / 32768
         fev.y = fev.y * self._screen_h / 32768
 
-        
+
+

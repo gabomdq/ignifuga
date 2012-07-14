@@ -10,6 +10,7 @@
 from ignifuga.Gilbert import Event, Gilbert, Signal
 from ignifuga.Log import error
 from ignifuga.components.Component import Component
+from Task import *
 
 import weakref,traceback
 
@@ -41,6 +42,7 @@ class Entity(object):
         # Initialize internal fields
         self.id = None
         self._released = False
+        self._initialized = False
         self._components = {}
         self._componentsByTag = {}
         self._componentsBySignal = {}
@@ -48,6 +50,7 @@ class Entity(object):
         self.tags = []
         self.signalQueue = []
         self._initFailCount = 0
+        self._initialComponents = []
 
         """
         Preprocess kwargs
@@ -94,23 +97,27 @@ class Entity(object):
         if self._released:
             error("Node %s released more than once" % self.id)
 
+        for component in self._components.itervalues():
+            component.free()
+
         self._components = {}
         self._componentsByTag = {}
         self._componentsBySignal = {}
         self._properties = {}
         self._released = True
+        self._initialComponents = []
 
     def __str__(self):
         return "Entity with ID %s" % (self.id,)
 
-    def init(self,data):
+    def init(self,**data):
         """ Initialize the required external data """
-        components = self._components.keys()
+        components = self._initialComponents
         failcount = {}
         while components:
             component = components.pop(0)
             try:
-                self._components[component].init(**data)
+                component.init(**data)
             except Exception, ex:
                 # Something failed, try it again later
                 if component not in failcount:
@@ -121,13 +128,17 @@ class Entity(object):
                     components.append(component)
                 else:
                     error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
+                    error(traceback.format_exc())
                     self._initFailCount+=1
                     if self._initFailCount > 10:
                         error('Ignoring Entity %s, could not initialize it because of component %s' % (self.id, component))
                         error(traceback.format_exc())
-                        return self
-                    return None
-        return self
+                        return DONE()
+                    ERROR()
+                    return
+
+        self._initialized = True
+
 
 #    def register(self):
 #        """ Register Entity with the Overlord """
@@ -135,7 +146,7 @@ class Entity(object):
 
     def unregister(self):
         """ Unregister Entity with the Overlord """
-        Gilbert().stopEntity(self)
+        Gilbert().gameLoop.stopEntity(self)
         # Break dependency cycles
         if not self._released:
             self.__free__()
@@ -162,11 +173,11 @@ class Entity(object):
                 for c_id, c_data in data['components'].iteritems():
                     c_data['id'] = c_id
                     c_data['entity'] = self
-                    Component.create(**c_data)
+                    self._initialComponents.append(Component.create(**c_data))
             elif isinstance(data['components'], list):
                 for c_data in data['components']:
                     c_data['entity'] = self
-                    Component.create(**c_data)
+                    self._initialComponents.append(Component.create(**c_data))
 
     def __getstate__(self):
         odict = self.__dict__.copy()
@@ -248,9 +259,13 @@ class Entity(object):
 
         self.refreshTags()
 
+
     def addProperties(self, component):
         """ Adopt the component public properties"""
         for property in component.properties:
+            if hasattr(self, property):
+                setattr(component, property, getattr(self, property))
+                delattr(self, property)
             self._properties[property] = component
 
     def removeProperties(self, component):
@@ -296,11 +311,13 @@ class Entity(object):
     ###########################################################################
     # Update functions
     ###########################################################################
-    def update(self, data):
+    def update(self, now, **data):
         """ Public customizable update function """
-        pass
 
-    def _update(self, data):
+        # By default we don't need an entity update loop
+        STOP()
+
+    def _update(self, now, **data):
         """ Internal update function, updates components, etc, runs IN PARALLEL with update """
         # Dispatch signals
         for signal in self.signalQueue:
@@ -308,10 +325,10 @@ class Entity(object):
 
         self.signalQueue = []
 
-        # Run the active components update loop
-        for component in self._components.itervalues():
-            if component.active:
-                component.update(**data)
+#        # Run the active components update loop
+#        for component in self._components.itervalues():
+#            if component.active:
+#                component.update(now, **data)
 
     # Events from the overlord
     def event(self, event):

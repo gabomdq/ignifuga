@@ -33,7 +33,6 @@ class Component(object):
         return None
 
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
-        self.overlord = Gilbert()
         self._id = id if id != None else hash(self)
         self._entity = None
         self._active = False
@@ -75,15 +74,17 @@ class Component(object):
     def active(self, active):
         if active != self._active:
             self._active = active
-            if self.entity != None:
+            if self._entity != None:
                 if self._active:
                     #self.entity.addTags(self.entityTags)
                     #self.entity.addProperties(self)
                     self.entity.add(self)
+                    Gilbert().gameLoop.startComponent(self)
                 else:
                     #self.entity.refreshTags()
                     #self.entity.removeProperties(self)
                     self.entity.remove(self)
+                    Gilbert().gameLoop.stopComponent(self)
 
     @property
     def entity(self):
@@ -111,7 +112,8 @@ class Component(object):
             error('Entity %s already has a component with id %s' % (entity, self._id))
 
         self._entity = entity
-        entity.add(self)
+        if self._active:
+            entity.add(self)
 
     @property
     def period(self):
@@ -133,6 +135,10 @@ class Component(object):
 
     def init(self, **kwargs):
         self.active = self._initiallyActive
+
+    def free(self, **kwargs):
+        """ Release component data here """
+        pass
 
     def update(self, now, **kwargs):
         """ Update the component"""

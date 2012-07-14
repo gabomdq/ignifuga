@@ -12,7 +12,7 @@ from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, PATCHES_DIR
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
-
+import multiprocessing
 
 def prepare(env, target, ignifuga_src, python_build):
     # Get some required flags
@@ -67,7 +67,7 @@ def make(env, target, freeze_modules, frozen_file):
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
         os.remove(join(target.dist, 'lib', 'libpython2.7.a'))
 
-    cmd = 'make V=0 install -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes'  % (HOSTPYTHON, HOSTPGEN)
+    cmd = 'make V=0 install -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes'  % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
 
     # Check success

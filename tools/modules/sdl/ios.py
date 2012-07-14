@@ -11,6 +11,7 @@ from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, SED_CMD, SOURCES
+import multiprocessing
 
 def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_armv6')
@@ -32,6 +33,7 @@ def prepare(env, target):
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+'_armv7', 'Makefile') )
 
 def make(env, target):
+    ncpu = multiprocessing.cpu_count()
     universal_cflags = '-arch armv6 -arch armv7'
     # Build all libraries in universal mode (armv6 and armv7)
     # Build zlib
@@ -43,7 +45,7 @@ def make(env, target):
         # Force zlib to build universally
         cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS=%s %s |g" %s' % (universal_cflags, env['CFLAGS'], (join(target.builds.ZLIB, 'Makefile')))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
@@ -57,7 +59,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         os.remove(join(target.dist, 'lib', 'libpng.a'))
 
-    cmd = 'make V=0 prefix="%s"' % (target.dist,)
+    cmd = 'make -j%d V=0 prefix="%s"' % (ncpu, target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
     cmd = 'make V=0 install PREFIX="%s"' % (target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
@@ -83,7 +85,7 @@ def make(env, target):
         cmd = SED_CMD + '-e "s|^A = la|A = a|g" %s' % (join(target.builds.JPG, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
 
-    cmd = 'make libjpeg.a V=0'
+    cmd = 'make -j%d libjpeg.a V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
     cmd = 'make V=0 install-lib'
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
@@ -138,7 +140,7 @@ def make(env, target):
         cflags = env['CFLAGS'] + '-pipe -mdynamic-no-pic -std=c99 -Wno-trigraphs -fpascal-strings -Wreturn-type -Wunused-variable -fmessage-length=0 -fvisibility=hidden'
         cmd = './configure --host=arm-apple-darwin CFLAGS="-arch armv6 %s" LDFLAGS="-static-libgcc -arch armv6" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (cflags,target.dist,target.dist)
         Popen(shlex.split(cmd), cwd = freetype_build_armv6, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = freetype_build_armv6, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = freetype_build_armv6, env=env).communicate()
@@ -161,7 +163,7 @@ def make(env, target):
         cmd = SED_CMD + '-e "s|^EXTRA_LDFLAGS.*|EXTRA_LDFLAGS=-lm|g" %s' % (join(sdl_build_armv6, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_build_armv6, env=env).communicate()
     
-    cmd = 'make V=0 '
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_build_armv6, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_build_armv6, env=env).communicate()
@@ -179,7 +181,7 @@ def make(env, target):
         # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = SED_CMD + '-e "s|.*showimage.*||g" %s' % (join(sdl_image_build_armv6, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_image_build_armv6, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_image_build_armv6, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_image_build_armv6, env=env).communicate()
@@ -199,7 +201,7 @@ def make(env, target):
         # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_armv6, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv6, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv6, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv6, env=env).communicate()
@@ -233,7 +235,7 @@ def make(env, target):
         cmd = './configure --host=arm-apple-darwin CFLAGS="-arch armv7 %s" LDFLAGS="-static-libgcc -arch armv7" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (cflags,target.dist,target.dist)
         Popen(shlex.split(cmd), cwd = freetype_build_armv7, env=env).communicate()
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = freetype_build_armv7, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = freetype_build_armv7, env=env).communicate()
@@ -257,7 +259,7 @@ def make(env, target):
         Popen(shlex.split(cmd), cwd = sdl_build_armv7, env=env).communicate()
 
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_build_armv7, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_build_armv7, env=env).communicate()
@@ -275,7 +277,7 @@ def make(env, target):
         # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = SED_CMD + '-e "s|.*showimage.*||g" %s' % (join(sdl_image_build_armv7, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_image_build_armv7, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_image_build_armv7, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_image_build_armv7, env=env).communicate()
@@ -295,7 +297,7 @@ def make(env, target):
         # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = SED_CMD + '-e "s|.*showfont.*||g" %s' % (join(sdl_ttf_build_armv7, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv7, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv7, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_armv7, env=env).communicate()

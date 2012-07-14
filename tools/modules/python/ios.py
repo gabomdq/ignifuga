@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOSTPGEN, ANDROID_NDK, ANDROID_SDK, PATCHES_DIR
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
+import multiprocessing
 
 def prepare(env, target, ignifuga_src, python_build):
     # Hardcoded for now as SDL doesn't give us the proper dependencies with sdl2-config
@@ -46,7 +47,7 @@ def make(env, target, freeze_modules, frozen_file):
     if isfile(join(target.builds.PYTHON,'setup.py')):
         os.unlink(join(target.builds.PYTHON,'setup.py'))
 
-    cmd = 'make V=0 install -k -j4 HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-apple-darwin CROSS_COMPILE_TARGET=yes' % (HOSTPYTHON, HOSTPGEN)
+    cmd = 'make V=0 install -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-apple-darwin CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
 
     # Check success

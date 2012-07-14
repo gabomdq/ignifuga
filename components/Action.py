@@ -32,12 +32,13 @@ class Action(Component):
         self._initParams = {
             'targets': targets,
         }
+
         self._tasks = data
         self._targets = []
         self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
         self._loopMax = loop if loop >= 0 else None
-        self._duration = float(duration)
+        self._duration = float(duration*1000)
         self._loop = 0
         self._relative = relative
         self._increase = increase.lower()
@@ -126,15 +127,18 @@ class Action(Component):
         if self._root:
             if active == self._active or self._entity == None:
                 return
+            self._active = active
             if active and not self._running:
                 self.start()
             elif not active and self._running:
                 self.stop()
-
-            Component.active.fset(self, active)
-        else:
-            self._active = False
-            Component.active.fset(self, False)
+            if self._active:
+                self.entity.add(self)
+            else:
+                self.entity.remove(self)
+        elif self._active:
+                self._active = False
+                self.entity.remove(self)
 
     @Component.entity.setter
     def entity(self, entity):
@@ -196,8 +200,8 @@ class Action(Component):
             self._running = True
             for a in self._runWith:
                 a.start()
-
             self.run(self._onStart)
+            Gilbert().gameLoop.startComponent(self)
     
     def reset(self):
         """ Reset the internal status """
@@ -222,9 +226,10 @@ class Action(Component):
 
             # The associated entity doesnt need to get a callback, it polls the action status on each update
             self.run(self._onStop)
+            Gilbert().gameLoop.stopComponent(self)
 
-    def update(self, now=0):
-        """ Update the action, dt is float specifying elapsed seconds """
+    def update(self, now, **kwargs):
+        """ Update the action, now is a integer in milliseconds, dt is float specifying elapsed seconds """
         if self._running:
             if not self._done:
                 if self._startTime != None:
@@ -289,6 +294,7 @@ class Action(Component):
 #                        else:
 #                            exec self._onStop
                     self.reset()
+
 
             
     def _step(self, dt):

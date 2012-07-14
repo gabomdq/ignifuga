@@ -9,7 +9,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from Viewable import Viewable
-from ignifuga.Gilbert import Gilbert, REQUESTS, Canvas
+from ignifuga.Gilbert import Gilbert, Canvas
 from ignifuga.Task import *
 import sys
 

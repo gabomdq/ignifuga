@@ -27,7 +27,7 @@ class Scene(Entity):
             '_size': {'width': None, 'height': None}
         })
         # Add the Scene entity
-        self.entities[self.id] = self
+        #self.entities[self.id] = self
 
         super(Scene, self).__init__(**data)
 
@@ -56,8 +56,6 @@ class Scene(Entity):
         Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
         if self._autoCenter:
             Gilbert().renderer.centerScene()
-
-        #print "SCENEINIT ", self.id, self.entities
 
 #    def init(self,data={}):
 #        """ Initialize the required external data """

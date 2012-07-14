@@ -8,12 +8,15 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.backends.sdl.SDL cimport *
-from ignifuga.backends.sdl.Target cimport Target
 from ignifuga.Gilbert import Gilbert, Event
 from ignifuga.backends.GameLoopBase cimport GameLoopBase
+from ignifuga.backends.sdl.Renderer cimport Renderer
 
 cdef class GameLoop(GameLoopBase):
     cdef int _screen_w, _screen_h
+    cdef Renderer renderer
     cpdef run(self)
     cdef handleSDLEvent(self, SDL_Event *sdlev)
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev)
+
+

@@ -11,6 +11,7 @@ from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import prepare_source, SED_CMD, SOURCES
+import multiprocessing
 
 def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_i386')
@@ -38,6 +39,7 @@ def prepare(env, target):
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
 
 def make(env, target):
+    ncpu = multiprocessing.cpu_count()
     universal_cflags = '-arch i386 -arch x86_64'
     # Build all libraries in universal mode (i386 and x86_64)
     # Build zlib
@@ -49,7 +51,7 @@ def make(env, target):
         # Force zlib to build universally
         cmd = SED_CMD + '-e "s|CFLAGS=|CFLAGS=%s %s |g" %s' % (universal_cflags, env['CFLAGS'], (join(target.builds.ZLIB, 'Makefile')))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
@@ -63,7 +65,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         os.remove(join(target.dist, 'lib', 'libpng.a'))
 
-    cmd = 'make V=0 prefix="%s"' % (target.dist,)
+    cmd = 'make -j%d V=0 prefix="%s"' % (ncpu, target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
     cmd = 'make V=0 install prefix="%s"' % (target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
@@ -91,7 +93,7 @@ def make(env, target):
         cmd = SED_CMD + '-e "s|^A = la|A = a|g" %s' % (join(target.builds.JPG, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
     cmd = 'make V=0 install-lib'
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
@@ -111,7 +113,7 @@ def make(env, target):
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         cmd = './configure --enable-silent-rules CFLAGS="%s %s" LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (universal_cflags, env['CFLAGS'],target.dist,target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
@@ -169,7 +171,7 @@ def make(env, target):
         # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = SED_CMD + '-e "s|.*showimage.*||g" %s' % (join(sdl_image_build_i386, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
@@ -183,7 +185,7 @@ def make(env, target):
         # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         #cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(sdl_ttf_build_i386, 'Makefile'),)
         #Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_i386, env=env).communicate()
@@ -219,7 +221,7 @@ def make(env, target):
         cmd = './configure --enable-silent-rules CFLAGS="%s -m64" LDFLAGS="-m64 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], target.dist)
         Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
 
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_build_x86_64, env=env).communicate()
@@ -235,7 +237,7 @@ def make(env, target):
         # There's a bug (http://bugzilla.libsdl.org/show_bug.cgi?id=1429) in showimage compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         #cmd = 'sed -e "s|.*showimage.*||g" -i "" %s' % (join(sdl_image_build_x86_64, 'Makefile'),)
         #Popen(shlex.split(cmd), cwd = sdl_image_build_i386, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_image_build_x86_64, env=env).communicate()
@@ -249,7 +251,7 @@ def make(env, target):
         # There's a bug in showfont compilation that prevents it from working, at least up to 2012-02-23, we just remove it as we don't need it
         cmd = SED_CMD + '-e "s|.*showfont.*||g" %s' % (join(sdl_ttf_build_x86_64, 'Makefile'),)
         Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = sdl_ttf_build_x86_64, env=env).communicate()

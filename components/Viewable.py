@@ -8,7 +8,7 @@
 # Graphic component, common base for text and sprite components
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import REQUESTS, Gilbert, Event, Signal
+from ignifuga.Gilbert import Gilbert, Event, Signal
 from ignifuga.Task import *
 from ignifuga.components.Component import Component
 import sys
@@ -24,8 +24,6 @@ def rotate2d(degrees,point,origin):
     #newx = (x*cos(radians(degrees))) - (y*sin(radians(degrees))) + origin[0]
     #newy = (x*sin(radians(degrees))) + (y*cos(radians(degrees))) + origin[1]
     return x,y
-
-    return newx,newy
 
 class Viewable(Component):
     """ Basic "viewable" class (though it has not content itself!)
@@ -84,12 +82,10 @@ class Viewable(Component):
                     self.entity.subscribe(self, Signal.touches)
                     self.entity.subscribe(self, Signal.zoom)
                     self.entity.subscribe(self, Signal.scroll)
-                    Gilbert().refreshEntityZ(self.entity) # If self.visible == False, it will not be really shown
                 else:
                     self.entity.unsubscribe(self, Signal.touches)
                     self.entity.unsubscribe(self, Signal.zoom)
                     self.entity.unsubscribe(self, Signal.scroll)
-                    Gilbert().hideEntity(self.entity)
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
@@ -158,8 +154,8 @@ class Viewable(Component):
 
         if new_z != self._z:
             self._z = new_z
-            if self.entity != None and self.active: # If active==false, it's probable that the .z property for the entity is not set!
-                Gilbert().refreshEntityZ(self.entity)
+#            if self.entity != None and self.active: # If active==false, it's probable that the .z property for the entity is not set!
+#                Gilbert().refreshEntityZ(self.entity)
 
 
     @property
@@ -223,12 +219,7 @@ class Viewable(Component):
 
     @visible.setter
     def visible(self, value):
-        if value != self._visible:
-            self._visible = value
-            if self._visible:
-                self.overlord.refreshEntityZ(self.entity)
-            else:
-                self.overlord.hideEntity(self.entity)
+        self._visible = value
 
     @property
     def width(self):

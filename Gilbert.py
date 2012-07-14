@@ -7,7 +7,7 @@
 # Main Singleton
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Rect import Rect
+#from ignifuga.Rect import *
 from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
 import sys, pickle, os, weakref, gc, platform, copy, base64
@@ -15,19 +15,17 @@ from optparse import OptionParser
 
 class BACKENDS:
     sdl = 'sdl'
-    
-class REQUESTS:
-    loadImage = 'loadImage'
-#    loadSprite = 'loadSprite'
-    #dirtyRects = 'dirtyRects'
-    done = 'done'
-    skip = 'skip'
-    stop = 'stop'
-    nativeResolution = 'nativeResolution'
-    iterate = 'iterate'
-    sceneSize = 'sceneSize'
 
-from Task import Task
+# This needs to match the values defined in GameLoopBase.pxd
+
+REQUEST_NONE = 0x00000000
+REQUEST_DONE = 0x00000001
+REQUEST_SKIP = 0x00000002
+REQUEST_STOP = 0x00000004
+REQUEST_LOADIMAGE = 0x0000008
+REQUEST_ERROR = 0x80000000
+
+#from Task import Task
     
 class Event:
     class TYPE:
@@ -88,7 +86,7 @@ class Signal(object):
     zoom = 'zoom'
     scroll = 'scroll'
 
-def Renderer():
+def getRenderer():
     return Gilbert().renderer
 
 def Canvas():
@@ -149,7 +147,7 @@ EMBEDDED_IMAGES = {
 GameLoop = None
 DataManager = None
 _Canvas = None
-Target = None
+Renderer = None
 
 class GilbertPickler(pickle.Pickler):
     def memoize(self, obj):
@@ -168,7 +166,12 @@ class Gilbert:
     def __init__(self):
         pass
     
-    def init(self, backend, scenesFile, firstScene):
+    def init(self, backend, firstScene, scenesFile=None):
+        """
+        backend: 'sdl'
+        firstScene: The first scene ID (a string) in which case it'll be loaded from scenesFile or a Scene object
+        scenesFile: A File where to load scenes from
+        """
         self.backend = backend
         debug ('Initializing Gilbert Overlord')
 
@@ -184,7 +187,7 @@ class Gilbert:
         global GameLoop
         global DataManager
         global _Canvas
-        global Target
+        global Renderer
 
         self.platform = sys.platform
         if self.platform.startswith('linux'):
@@ -207,12 +210,12 @@ class Gilbert:
             from backends.sdl.GameLoop import GameLoop as gameloop
             from backends.sdl.DataManager import DataManager as datamanager
             from backends.sdl.Canvas import Canvas as canvas
-            from backends.sdl.Target import Target as target
+            from backends.sdl.Renderer import Renderer as renderer
             initializeBackend()
             GameLoop = gameloop
             DataManager = datamanager
             _Canvas = canvas
-            Target = target
+            Renderer = renderer
             debug('Backend %s initialized' % (backend,))
         else:
             error('Unknown backend %s. Aborting' % (backend,))
@@ -226,11 +229,11 @@ class Gilbert:
         self.entities = {}
         # These dictionaries keep weakrefs via WeakSet, contain the current scene entities
         self.entitiesByTag = {}
-        self.entitiesByZ = {}
+        self.entitiesByZ = []
 
         # These keep weakrefs in the key and via Task
-        self.loading = {}
-        self.running = {}
+        #self.loading = {}
+        #self.running = {}
 
         self._touches = {}
         self._touchCaptured = False
@@ -239,20 +242,26 @@ class Gilbert:
 
         self._freezeRenderer = False
 
-        
-        self.renderer = _Renderer(Target(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display))
+        self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display)
         self.dataManager = DataManager()
+        self.gameLoop = GameLoop()
 
         if not self.loadState():
             debug('Failed loading previous state')
-            scenes = self.dataManager.loadJsonFile(scenesFile)
-            self.loadScenes(scenes)
+            if scenesFile is not None:
+                self.loadScenesFromFile(scenesFile)
+
+            if isinstance(firstScene, Scene):
+                self.scenes[firstScene.id] = firstScene
+                self._firstScene = firstScene.id
+            else:
+                self._firstScene = firstScene
 ########################################################################################################################
 # SPLASH SCENE CODE
 # ANY MODIFICATION OF THE SCENE DEFINITION AND RELATED CODE AND ARTWORK RENDERS THE LICENSE TO USE THIS ENGINE VOID.
 ########################################################################################################################
-            self._firstScene = firstScene
             self.loadScene('splash', copy.deepcopy(SPLASH_SCENE))
+            #self.startFirstScene()
             if not self.startScene('splash'):
                 error('Could not load splash scene')
                 return
@@ -267,7 +276,6 @@ class Gilbert:
 
     def startLoop(self):
         """Set up the game loop"""
-        self.gameLoop = GameLoop()
         self.gameLoop.run()
 
         # Engine is exiting from here onwards
@@ -307,162 +315,37 @@ class Gilbert:
         """ End the game loop, free stuff """
         self.gameLoop.quit = True
 
-    def update(self, now=0, wrapup=False):
-        """ Update everything, then render the scene
-        now is the current time, specified in seconds
-        wrapup = True forces the update loop to be broken, all running entities eventually stop running
-        """
-        # Call the pre update so we can tally how long the whole frame processing took (logic+render)
-        if not wrapup:
-            self.renderer.preUpdate(now)
 
-        # Initialize objects
-        remove_entities = []
-        for entity_ref in self.loading.iterkeys():
-            task, req, data = self.loading[entity_ref]
-            if task != None:
-                task, req, data = self._processTask(task, req, data, now, wrapup, True)
-
-            if task != None:
-                self.loading[entity_ref] = (task, req, data)
-            else:
-                remove_entities.append(entity_ref)
-
-        for entity_ref in remove_entities:
-            del self.loading[entity_ref]
-            if not self.loading:
-                self._freezeRenderer  = False
-
-
-        # Update objects
-        remove_entities = []
-        for entity_ref in self.running.keys():
-            # This check may seem overkill, but there's situations where the ref may have been removed from self.running!
-            if entity_ref in self.running:
-                task1, req1, data1,task2,req2,data2 = self.running[entity_ref]
-                if task1 != None:
-                    task1, req1, data1 = self._processTask(task1, req1, data1, now, wrapup)
-
-                if task2 != None:
-                    task2, req2, data2 = self._processTask(task2, req2, data2, now, wrapup)
-
-                if task1 != None or task2 != None:
-                    self.running[entity_ref] = (task1, req1, data1,task2, req2, data2)
-                else:
-                    remove_entities.append(entity_ref)
-
-        for entity_ref in remove_entities:
-            del self.running[entity_ref]
-
-    def _processTask(self, task, req, data, now, wrapup, init=False):
-        if req == None:
-            req, data = task.wakeup({'now': now})
-            if init and req == REQUESTS.done and data is None:
-                # There was a problem with initialization, let's try again
-                task = Task(task.entity, task.entity().init, parent=Task.getcurrent())
-                return task, None, None
-
-        if req == REQUESTS.done:
-            if init:
-                # Entity is ready, start the update loop for it
-                if not wrapup:
-                    # Fire up the task to update the entity and the entity components
-                    task1 = Task(task.entity, task.entity().update, parent=Task.getcurrent())
-                    req1, data1 = task1.wakeup({'now': now})
-                    task2 = Task(task.entity, task.entity()._update, parent=Task.getcurrent())
-                    req2, data2 = task2.wakeup({'now': now})
-                    self.running[task.entity] = (task1, req, data1,task2, req2, data2)
-                    return (None,None,None)
-            else:
-                if wrapup:
-                    return None,None,None
-                else:
-                    # Restart the update loop
-                    task = Task(task.entity, task.runnable, parent=Task.getcurrent())
-                    req, data = task.wakeup({'now': now})
-                    return (task, req, data)
-        elif req == REQUESTS.skip:
-            # Normal operation continues
-            return (task, None, None)
-        elif req == REQUESTS.stop:
-            # Stop entity from updating
-            return None,None,None
-        elif req == REQUESTS.loadImage:
-            # Load an image
-            if data.has_key('url') and data['url'] != None:
-                # Try to load an image
-                img = self.dataManager.getImage(data['url'])
-                if img == None:
-                    return (task, req, data)
-                else:
-                    req, data = task.wakeup(img)
-                    return (task, req, data)
-            else:
-                # URL is invalid, just keep going
-                return (task, None, None)
-#            elif req == REQUESTS.loadSprite:
-#                # Load a sprite definition
-#                if data.has_key('url') and data['url'] != None:
-#                    # Try to load a sprite
-#                    sprite = self.dataManager.getSprite(data['url'])
-#                    if sprite == None:
-#                        self.loading[entity_ref] = (task, req, data)
-#                    else:
-#                        req, data = task.wakeup(sprite)
-#                        self.loading[entity_ref] = (task, req, data)
-#                else:
-#                    # URL is invalid, just keep going
-#                    self.loading[entity_ref] = (task, None, None)
-#            elif req == REQUESTS.nativeResolution:
-#                # Set the native resolution of the scene for scaling purpouses
-#                w,h, ar = data
-#                self.renderer.setNativeResolution(w,h, ar)
-#                self.loading[entity_ref] = (task, None, None)
-#            elif req == REQUESTS.sceneSize:
-#                # Set the size of the scene for scrolling purpouses
-#                w,h = data
-#                self.renderer.setSceneSize(w,h)
-#                self.loading[entity_ref] = (task, None, None)
-
-        else:
-            # Unrecognized request
-            return (task, None, None)
 
     def renderScene(self):
         # Render a new scene
         if not self._freezeRenderer:
             self.renderer.update()
 
-    def refreshEntityZ(self, entity):
-        """ Change the entity's z index ordering """
-        # Remove from the old z-index
-        if entity.id in self.loading:
-            return
-
-        self.hideEntity(entity)
-        # Add to the new z-index
-        new_z = entity.z
-        if new_z != None and 'viewable' in entity.tags:
-            if not new_z in self.entitiesByZ:
-                self.entitiesByZ[new_z] = weakref.WeakSet()
-            self.entitiesByZ[new_z].add(entity)
-
-    def hideEntity(self, entity):
-        """ Check all the Z layers, remove the entity from it"""
-        for z in self.entitiesByZ.keys():
-            entities = self.entitiesByZ[z]
-            if entity in entities:
-                entities.remove(entity)
-                if not entities:
-                    del self.entitiesByZ[z]
-                break
+#    def refreshEntityZ(self, entity):
+#        """ Change the entity's z index ordering """
+#        # Remove from the old z-index
+#        if entity.id in self.loading:
+#            return
+#
+#        self.hideEntity(entity)
+#        # Add to the new z-index
+#        if entity not in self.entitiesByZ:
+#            self.entitiesByZ.append(entity)
+#
+#        self.entitiesByZ.sort(key = lambda x: x.z)
+#
+#    def hideEntity(self, entity):
+#        """ Check all the Z layers, remove the entity from it"""
+#        if entity in self.entitiesByZ:
+#            self.entitiesByZ.remove(entity)
 
     def refreshEntityTags(self, entity, added_tags=[], removed_tags=[]):
         for tag in added_tags:
             if tag not in self.entitiesByTag:
-                self.entitiesByTag[tag] = weakref.WeakSet()
+                self.entitiesByTag[tag] = [] #set() #weakref.WeakSet()
             if entity not in self.entitiesByTag[tag]:
-                self.entitiesByTag[tag].add(entity)
+                self.entitiesByTag[tag].append(entity)
 
         for tag in removed_tags:
             if tag in self.entitiesByTag:
@@ -499,19 +382,13 @@ class Gilbert:
             self._lastEvent = event
 
             if not self._touchCaptured:
-                zindexs = self.entitiesByZ.keys()
-                if len(zindexs) >0:
-                    zindexs.sort(reverse=True)
-                for z in zindexs:
+                for entity in self.entitiesByZ:
+                    continuePropagation, captureEvent = entity.event(event)
+                    if captureEvent:
+                        self._touchCaptor = entity
+                        self._touchCaptured = True
                     if not continuePropagation:
                         break
-                    for entity in self.entitiesByZ[z]:
-                        continuePropagation, captureEvent = entity.event(event)
-                        if captureEvent:
-                            self._touchCaptor = entity
-                            self._touchCaptured = True
-                        if not continuePropagation:
-                            break
             elif self._touchCaptor is not None:
                 continuePropagation, captureEvent = self._touchCaptor.event(event)
                 if not captureEvent:
@@ -556,19 +433,13 @@ class Gilbert:
             
         elif event.ethereal:
             # Send the event to all entity until something stops it
-            zindexs = self.entitiesByZ.keys()
-            if len(zindexs) >0:
-                zindexs.sort(reverse=True)
-            for z in zindexs:
+            for entity in self.entitiesByZ:
+                continuePropagation, captureEvent = entity.event(event)
+                if captureEvent:
+                    self._touchCaptor = entity
+                    self._touchCaptured = True
                 if not continuePropagation:
                     break
-                for entity in self.entitiesByZ[z]:
-                    continuePropagation, captureEvent = entity.event(event)
-                    if captureEvent:
-                        self._touchCaptor = entity
-                        self._touchCaptured = True
-                    if not continuePropagation:
-                        break
 
             if continuePropagation:
                 if self.scene and self.scene.userCanZoom:
@@ -600,12 +471,12 @@ class Gilbert:
         """ Serialize the current status of the engine """
         debug('Waiting for entities to finish loading before saving state')
         tries = 0
-        while self.loading:
-            self.update()
-            tries += 1
-            if tries > 100:
-                debug('Still waiting for loading entities: %s' % self.loading)
-                tries = 0
+#        while self.loading:
+#            self.update()
+#            tries += 1
+#            if tries > 100:
+#                debug('Still waiting for loading entities: %s' % self.loading)
+#                tries = 0
 
 
         #f = open('ignifuga.state', 'w')
@@ -643,6 +514,10 @@ class Gilbert:
         for scene_id, scene_data in copy.deepcopy(data).iteritems():
             self.loadScene(scene_id, scene_data)
 
+    def loadScenesFromFile(self, scenesFile):
+        scenes = self.dataManager.loadJsonFile(scenesFile)
+        self.loadScenes(scenes)
+
     def loadScene(self, scene_id, scene_data):
         scene = Scene(id=scene_id, **scene_data)
         self.scenes[scene_id] = scene
@@ -652,6 +527,7 @@ class Gilbert:
             self.scene = self.scenes[scene_id]
             self.entities = self.scene.entities
             self.scene.sceneInit()
+            self.startEntity(self.scene)
             for entity in self.entities.itervalues():
                 self.startEntity(entity)
 
@@ -680,13 +556,13 @@ class Gilbert:
         debug('Waiting for entities to finish loading/running')
         tries = 0
         self._freezeRenderer = True
-        while self.loading or self.running:
-            self.update(wrapup=True)
-            tries += 1
-            if tries > 100:
-                debug('Still waiting for loading entities: %s' % self.loading)
-                debug('Still waiting for running entities: %s' % self.running)
-                tries = 0
+#        while self.loading or self.running:
+#            self.update(wrapup=True)
+#            tries += 1
+#            if tries > 100:
+#                debug('Still waiting for loading entities: %s' % self.loading)
+#                debug('Still waiting for running entities: %s' % self.running)
+#                tries = 0
 
 
         for entity in self.entities.values():
@@ -697,18 +573,18 @@ class Gilbert:
         del self.scene
         del self.entitiesByZ
         del self.entitiesByTag
-        del self.loading
-        del self.running
+        #del self.loading
+        #del self.running
 
         # Really remove nodes and data
         gc.collect()
 
         self.scene = None
         self.entities = {}
-        self.entitiesByZ = {}
+        self.entitiesByZ = []
         self.entitiesByTag = {}
-        self.loading = {}
-        self.running = {}
+        #self.loading = {}
+        #self.running = {}
 
         # Clean up cache
         # Do not clean the cache here, there may be useful data for other scenes -> self.dataManager.cleanup()
@@ -722,24 +598,11 @@ class Gilbert:
 
     def startEntity(self, entity):
         # Add it to the loading queue
-        wr = weakref.ref(entity)
-        task = Task(wr, entity.init, parent=Task.getcurrent())
-        self.loading[wr] = (task, None, None)
-        entity.loading = True
+        self.gameLoop.startEntity(entity)
 
     def stopEntity(self, entity):
         """ Remove node, release its data """
-
-        # Add it to the loading queue
-        wr = weakref.ref(entity)
-        if wr in self.loading:
-            del self.loading[wr]
-
-        self.hideEntity(entity)
-        self.refreshEntityTags(entity, [], entity.tags)
-
-        if wr in self.running:
-            del self.running[wr]
+        self.gameLoop.stopEntity(entity)
 
 
     def getEmbedded(self, url):
@@ -751,8 +614,6 @@ class Gilbert:
 
 
 # Gilbert imports
-from Renderer import Renderer as _Renderer
-from Log import Log
 from Entity import Entity
 from components import Component
 from Scene import Scene

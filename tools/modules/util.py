@@ -10,6 +10,7 @@ import os, shlex, shutil, re, platform, fnmatch
 from os.path import *
 from subprocess import Popen, PIPE
 from log import info, log, error
+import multiprocessing
 
 def find_cython():
     cmd = 'which cython'
@@ -20,14 +21,14 @@ def find_cython():
         cmd = '%s -V' % cython
         output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
         version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
-        v = re.search("(\d+)\.(\d+)\.(.*)", version)
-        # We are looking for 0.15.1+ or higher
+        v = re.search("(\d+)\.(\d+)(.*)", version)
+        # We are looking for 0.16 or higher
         if v.groups(0) > 0:
             return cython
         if v.groups(0) == 0:
-            if v.groups(1) > 15:
+            if v.groups(1) > 16:
                 return cython
-            if v.groups(1) == 15:
+            if v.groups(1) == 16:
                 if v.groups(2).startswith('1+') or v.groups(2) >= 2:
                     return cython
         error ('Cython version %s is incompatible')
@@ -162,7 +163,7 @@ def check_host_tools():
             prepare_python('osx', None, python_build, os.environ)
             cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        cmd = 'make V=0 install -k -j4'
+        cmd = 'make V=0 install -k -j%d' % multiprocessing.cpu_count()
         Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         # Check that it built successfully
         if not isfile(join(python_build, 'python')) or not isfile(join(python_build, 'Parser', 'pgen')):
@@ -250,7 +251,7 @@ def install_host_tools():
         Popen(shlex.split(cmd)).communicate()
         cython = find_cython()
         if cython == None:
-            error('Could not install Cython (0.15.1+ or higher). Try installing it manually')
+            error('Could not install Cython (0.16 or higher). Try installing it manually')
             exit()
     else:
         log('Cython is available')

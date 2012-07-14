@@ -12,6 +12,7 @@ from subprocess import Popen, PIPE
 from ..log import log, error
 from schafer import SOURCES, SED_CMD
 from ..util import prepare_source
+import multiprocessing
 
 def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
@@ -26,13 +27,14 @@ def prepare(env, target):
 
 
 def make(env, target):
+    ncpu = multiprocessing.cpu_count()
     # Build zlib
     if isfile(join(target.dist, 'lib', 'libz.a')):
         os.remove(join(target.dist, 'lib', 'libz.a'))
     if not isfile(join(target.builds.ZLIB, 'Makefile')):
         cmd = './configure --static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make'
+    cmd = 'make -j%d' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     cmd = 'make install'
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
@@ -46,7 +48,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         os.remove(join(target.dist, 'lib', 'libpng.a'))
 
-    cmd = 'make V=0 prefix="%s"' % (target.dist,)
+    cmd = 'make -j%d V=0 prefix="%s"' % (ncpu, target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
     cmd = 'make V=0 install prefix="%s"' % (target.dist,)
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
@@ -75,7 +77,7 @@ def make(env, target):
         cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(target.builds.JPG, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
 
-    cmd = 'make V=0 '
+    cmd = 'make -j%d V=0 ' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
     cmd = 'make V=0 install-lib'
     Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
@@ -95,7 +97,7 @@ def make(env, target):
     if not isfile(join(target.builds.SDL, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
@@ -117,7 +119,7 @@ def make(env, target):
         pngld = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         cmd = './configure --enable-silent-rules CFLAGS="%s" LDFLAGS="-static-libgcc" LIBPNG_CFLAGS="%s" LIBPNG_LIBS="%s -ljpeg" --disable-png-shared --disable-jpg-shared --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (env['CFLAGS'], pngcf, pngld, target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
@@ -134,7 +136,7 @@ def make(env, target):
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2 --disable-shared --enable-static --with-sysroot=%s --prefix="%s"'% (target.dist,target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
@@ -155,7 +157,7 @@ def make(env, target):
     if not isfile(join(target.builds.SDL_TTF, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (target.dist, target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
-    cmd = 'make V=0'
+    cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
     cmd = 'make V=0 install'
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()

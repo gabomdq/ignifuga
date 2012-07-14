@@ -7,6 +7,8 @@
 # Canvas Base
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# xcython: profile=True
+
 from cpython cimport bool
 
 cdef class CanvasBase (object):

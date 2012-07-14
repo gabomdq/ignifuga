@@ -8,6 +8,8 @@
 # Created 20101105
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# xcython: profile=True
+
 from ignifuga.Singleton import Singleton
 import sys
 

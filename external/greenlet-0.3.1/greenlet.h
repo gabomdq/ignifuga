@@ -13,7 +13,7 @@ extern "C" {
 #define GREENLET_VERSION "0.3.1"
 
 typedef struct _greenlet {
-	PyObject_HEAD
+	PyObjectzz
 	char* stack_start;
 	char* stack_stop;
 	char* stack_copy;
