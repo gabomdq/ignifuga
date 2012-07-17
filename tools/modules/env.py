@@ -133,6 +133,7 @@ def prepare_android_env():
     env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "armeabi"
     env['SDK'] = ANDROID_SDK
+    env['NDK'] = ANDROID_NDK
 
     #env['ARCH'] = "armeabi-v7a"
     env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" % (ANDROID_NDK)

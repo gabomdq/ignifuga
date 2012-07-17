@@ -190,7 +190,6 @@ class Sprite(Viewable):
         if self._canvas == self._atlas:
             # No animation loop, directly update renderer
             self._updateRendererDst()
-            self._dirty = False
         else:
             # Mark as dirty so we update on the next update
             self._dirty = True

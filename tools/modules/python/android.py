@@ -21,7 +21,10 @@ def prepare(env, target, ignifuga_src, python_build):
     # Patch some problems with cross compilation
     cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
     Popen(shlex.split(cmd)).communicate()
-    ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.SDL, 'libs', 'armeabi'), sdlflags)
+    ignifuga_module = "\nignifuga %s -DAPP_STL=gnustl_static -I%s -L%s %s\n" % (' '.join(ignifuga_src),
+                                                             target.builds.IGNIFUGA,
+                                                             join(target.builds.SDL, 'libs', 'armeabi'),
+                                                             sdlflags)
 
     return ignifuga_module
 

@@ -251,7 +251,7 @@ compileall.compile_dir("%s")
 def prepare_ignifuga(platform):
     # Copy all .py, .pyx and .pxd files
     target = get_target(platform)
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
+    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --exclude tests --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
 
 def make_glue(package, glue_h, glue_c):
@@ -506,7 +506,8 @@ def build_project_generic(options, platform, target, env=None):
 
     if not isfile(main_file_c) or getctime(main_file_c) < main_file_ct:
         log('Cythonizing main file %s' % main_file)
-        cmd = 'cython --embed --cplus %s' % main_file
+        cmd = 'cython --embed --cplus --include-dir %s/.. %s' % (ROOT_DIR, main_file)
+        #cmd = 'cython --embed --cplus %s' % ( main_file)
         mfc = join(platform_build, splitext(main_file)[0] + '.cpp')
         Popen(shlex.split(cmd), cwd = platform_build).communicate()
         if not isfile(mfc):

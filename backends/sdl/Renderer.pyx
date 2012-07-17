@@ -329,8 +329,6 @@ cdef class Renderer:
 
             self._indexSprite(sprite)
             self.dirty = True
-
-
             sprite_wrap.sprite = sprite
             return sprite_wrap
         return None
@@ -372,8 +370,7 @@ cdef class Renderer:
         self.dirty = True
         return True
 
-    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h, double angle, int centerx, int centery, int flip):
-        cdef _Sprite *sprite = sprite_w.sprite
+    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h, double angle, int centerx, int centery, int flip):
         sprite.dst.x = x
         sprite.dst.y = y
         sprite.dst.w = w
@@ -384,6 +381,11 @@ cdef class Renderer:
         sprite.flip = <SDL_RendererFlip>flip
         self.dirty = True
         return True
+
+    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h, double angle, int centerx, int centery, int flip):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteDst(sprite, x, y, w, h, angle, centerx, centery, flip)
+
 
 
     property screenSize:

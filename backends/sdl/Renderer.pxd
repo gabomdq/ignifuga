@@ -81,6 +81,7 @@ cdef class Renderer:
     cpdef bint spriteZ(self, Sprite sprite_w, int z)
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h)
     cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h, double angle, int centerx, int centery, int flip)
+    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h, double angle, int centerx, int centery, int flip)
 
 
     # Render target related stuff

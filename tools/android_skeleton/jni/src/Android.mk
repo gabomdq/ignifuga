@@ -10,6 +10,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/$(SDL_PATH)/include \
 	$(LOCAL_PATH)/$(SDL_PATH)/src \
 	$(LOCAL_PATH)/../SDL_image \
+	$(LOCAL_PATH)/../SDL_ttf \
+	$(LOCAL_PATH)/../SDL \
 	$(LOCAL_PATH)/../python \
 	$(LOCAL_PATH)/../python/Include
 
