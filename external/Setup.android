@@ -463,7 +463,7 @@ binascii binascii.c
 # Andrew Kuchling's zlib module.
 # This require zlib 1.1.3 (or later).
 # See http://www.gzip.org/zlib/
-zlib zlibmodule.c -I$(prefix)/include -lz
+zlib zlibmodule.c -I$(prefix)/include 
 
 # Interface to the Expat XML parser
 #
@@ -500,3 +500,6 @@ zlib zlibmodule.c -I$(prefix)/include -lz
 greenlet greenlet.c
 _bitarray _bitarray.c
 
+#Profiling via cProfile
+# _lsprof is for cProfile.py
+_lsprof _lsprof.c rotatingtree.c

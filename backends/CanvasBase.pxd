@@ -8,8 +8,6 @@
 # Canvas Base
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from cpython cimport bool
-
 cdef class CanvasBase (object):
     cdef int width, height
     cdef float _r,_g,_b,_a

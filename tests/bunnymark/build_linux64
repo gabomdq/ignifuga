@@ -1,0 +1,6 @@
+#!/bin/bash
+#schafer -P linux64
+rm -rf build
+#schafer -P linux64 -m bunnies.py -p com.mdqinc.bunnymark
+rm -rf build
+schafer -P linux64 -m bunniesx.pyx -p com.mdqinc.bunnymarkx

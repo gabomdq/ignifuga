@@ -25,6 +25,6 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp jni_glue.cp
 
 #LOCAL_SHARED_LIBRARIES := SDL SDL_image python2.7
 
-LOCAL_LDLIBS := -lGLESv1_CM -llog -L$(LOCAL_PATH) -L$(LOCAL_PATH)/../SDL -L$(LOCAL_PATH)/../SDL_image -L$(LOCAL_PATH)/../SDL_ttf -L$(LOCAL_PATH)/../python -lz -lSDL2 -lSDL2_image -lSDL2_ttf -lpython2.7
+LOCAL_LDLIBS := -lGLESv1_CM -L$(LOCAL_PATH) -L$(LOCAL_PATH)/../SDL -L$(LOCAL_PATH)/../SDL_image -L$(LOCAL_PATH)/../SDL_ttf -L$(LOCAL_PATH)/../python -lz -lSDL2 -lSDL2_image -lSDL2_ttf -lpython2.7 -llog
 
 include $(BUILD_SHARED_LIBRARY)

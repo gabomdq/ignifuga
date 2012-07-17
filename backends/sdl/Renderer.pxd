@@ -27,6 +27,7 @@ cdef struct _Sprite:
     SDL_Point center
     SDL_RendererFlip flip
     int z
+    Uint8 r,g,b,a
 
 ctypedef _Sprite* Sprite_p
 
@@ -80,8 +81,12 @@ cdef class Renderer:
     cpdef bint removeSprite(self, Sprite sprite_w)
     cpdef bint spriteZ(self, Sprite sprite_w, int z)
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h)
-    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h, double angle, int centerx, int centery, int flip)
-    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h, double angle, int centerx, int centery, int flip)
+    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h)
+    cpdef bint spriteRot(self, Sprite sprite_w, double angle, int centerx, int centery, int flip)
+    cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a)
+    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h)
+    cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip)
+    cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 
 
     # Render target related stuff

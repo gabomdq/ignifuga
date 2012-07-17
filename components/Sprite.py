@@ -70,13 +70,11 @@ class Sprite(Viewable):
                 self._spriteData = self._atlas.spriteData
                 self.sprite = _Sprite(self._spriteData, self._atlas, self.frequency)
                 self._canvas = self.sprite.canvas
-                self._updateColorModulation()
                 if not self.forward:
                     self.sprite.frame = self.sprite.frameCount - 1
             else:
                 self.sprite = None
                 self._canvas = self._atlas
-        self._updateColorModulation()
         self._updateSize()
 
         self.show()
@@ -137,7 +135,7 @@ class Sprite(Viewable):
             self._doCompositing()
 
         if self._dirty:
-            self._updateRendererDst()
+            self._updateRenderer()
             self._dirty = False
 
     def _updateSize(self):
@@ -176,20 +174,23 @@ class Sprite(Viewable):
 
         self.updateRenderer()
 
-    def _updateRendererDst(self):
+    def _updateRenderer(self):
         if self._rendererSpriteId:
-            self.renderer.spriteDst(self._rendererSpriteId,
-            self._x, self._y, self._width_pre, self._height_pre,
+            self.renderer.spriteDst(self._rendererSpriteId, self._x, self._y, self._width_pre, self._height_pre)
+
+            self.renderer.spriteRot(self._rendererSpriteId,
             self._angle,
             self._center[0] if self._center != None else self._width_pre / 2,
             self._center[1] if self._center != None else self._height_pre / 2,
             (1 if self.fliph else 0) + (2 if self.flipv else 0))
+
+            self.renderer.spriteColor(self._rendererSpriteId, self._red, self._green, self._blue, self._alpha)
             self._dirty = False
 
     def updateRenderer(self):
         if self._canvas == self._atlas:
             # No animation loop, directly update renderer
-            self._updateRendererDst()
+            self._updateRenderer()
         else:
             # Mark as dirty so we update on the next update
             self._dirty = True
@@ -210,22 +211,22 @@ class Sprite(Viewable):
     @Viewable.red.setter
     def red(self, value):
         Viewable.red.fset(self,value)
-        self._updateColorModulation()
+        self.updateRenderer()
 
     @Viewable.green.setter
     def green(self, value):
         Viewable.green.fset(self,value)
-        self._updateColorModulation()
+        self.updateRenderer()
 
     @Viewable.blue.setter
     def blue(self, value):
         Viewable.blue.fset(self,value)
-        self._updateColorModulation()
+        self.updateRenderer()
 
     @Viewable.alpha.setter
     def alpha(self, value):
         Viewable.alpha.fset(self,value)
-        self._updateColorModulation()
+        self.updateRenderer()
 
     @property
     def frame(self):
@@ -320,7 +321,6 @@ class Sprite(Viewable):
                     use_tmpcanvas = self._doBluring(source, not use_tmpcanvas) or use_tmpcanvas
 
                 source.mod(self._red, self._green, self._blue, self._alpha)
-                self._updateColorModulation()
 
         if use_tmpcanvas:
             self._canvas = self._tmpcanvas
@@ -367,10 +367,6 @@ class Sprite(Viewable):
     @property
     def frameCount(self):
         return self.sprite.frameCount if self.sprite != None else 1
-
-    def _updateColorModulation(self):
-        if self.canvas != None:
-            self.canvas.mod(self._red, self._green, self._blue, self._alpha)
 
     def getRenderArea(self):
         return [0, 0, self._width_src, self._height_src, self.x, self.y, self.width, self.height]

@@ -1,0 +1,8 @@
+#!/bin/bash
+# This will profile the demo, then open KCacheGrind to view the results
+# To view the stats generated here you need to have installed KCacheGrind 
+# (in Ubuntu it's available with sudo apt-get install kcachegrind)
+# You also need pyprof2calltree, which you can install with sudo easy_install pyprof2calltree
+
+./ignifuga-python ./profile.py
+#pyprof2calltree -i profile_data.pyprof -k

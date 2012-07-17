@@ -516,6 +516,7 @@ def build_project_generic(options, platform, target, env=None):
 
         # Insert SDL.h into the cythonized file
         with file(mfc, 'r') as original: mfc_data = original.read()
+        mfc_data = mfc_data.replace('PyErr_Print();', 'PyErr_Print();fflush(stdout);fflush(stderr);')
         with file(mfc, 'w') as modified: modified.write("#include \"SDL.h\"\n"+mfc_data)
         shutil.move(mfc, main_file_c)
 

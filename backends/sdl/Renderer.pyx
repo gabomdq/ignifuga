@@ -251,7 +251,9 @@ cdef class Renderer:
                         dst_r.x -= self._scroll_x
                         dst_r.y -= self._scroll_y
 
-                        #print src_r, dst_r
+
+                        SDL_SetTextureColorMod(sprite.texture, sprite.r, sprite.g, sprite.b)
+                        SDL_SetTextureAlphaMod(sprite.texture, sprite.a)
 
                         # Perform the blitting if the src and dst rectangles have w,h > 0
                         if src_r.w > 0 and src_r.h >0 and dst_r.w>0 and dst_r.h > 0:
@@ -370,11 +372,7 @@ cdef class Renderer:
         self.dirty = True
         return True
 
-    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h, double angle, int centerx, int centery, int flip):
-        sprite.dst.x = x
-        sprite.dst.y = y
-        sprite.dst.w = w
-        sprite.dst.h = h
+    cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip):
         sprite.angle = angle
         sprite.center.x = centerx
         sprite.center.y = centery
@@ -382,10 +380,33 @@ cdef class Renderer:
         self.dirty = True
         return True
 
-    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h, double angle, int centerx, int centery, int flip):
-        cdef _Sprite *sprite = sprite_w.sprite
-        return self._spriteDst(sprite, x, y, w, h, angle, centerx, centery, flip)
+    cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a):
+        sprite.r = r
+        sprite.g = g
+        sprite.b = b
+        sprite.a = a
+        self.dirty = True
+        return True
 
+    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h):
+        sprite.dst.x = x
+        sprite.dst.y = y
+        sprite.dst.w = w
+        sprite.dst.h = h
+        self.dirty = True
+        return True
+
+    cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteDst(sprite, x, y, w, h)
+
+    cpdef bint spriteRot(self, Sprite sprite_w, double angle, int centerx, int centery, int flip):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteRot(sprite, angle, centerx, centery, flip)
+
+    cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteColor(sprite, <Uint8>(r*255.0), <Uint8>(g*255.0), <Uint8>(b*255.0), <Uint8>(a*255.0))
 
 
     property screenSize:

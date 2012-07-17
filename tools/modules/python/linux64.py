@@ -48,6 +48,10 @@ def make(env, target, freeze_modules, frozen_file):
     # Rebuild Python including the frozen modules!
     Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
 
+    if not isdir (join(target.dist, 'include', 'Modules')):
+        os.makedirs(join(target.dist, 'include', 'Modules'))
+    shutil.copy(join(target.builds.PYTHON, 'Modules/greenlet.h'), join(target.dist, 'include', 'Modules', 'greenlet.h'))
+
     # Check success
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
         log('Python built successfully')

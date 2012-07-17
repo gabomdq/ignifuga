@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //#include "video/android/SDL_androidkeyboard.h"
 //#include "video/android/SDL_androidtouch.h"
 //#include "events/SDL_events_c.h"
+#include <android/log.h>
 
 //static float fLastAccelerometer[3];
 extern "C" {
@@ -132,6 +133,8 @@ extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeRunAudioThread(
 extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj) {
     //Java_org_libsdl_app_SDLActivity_nativeInit(env, cls, obj);
      /* This interface could expand with ABI negotiation, calbacks, etc. */
+     __android_log_print(ANDROID_LOG_INFO, "SDL", "STARTING MAIN1");
+
     SDL_Android_Init(env, cls);
 
     /* Run the application code! */
@@ -139,8 +142,9 @@ extern "C" void Java_[[PROJECT_NAME]]_SDLActivity_nativeInit(JNIEnv* env, jclass
     char *argv[2];
     argv[0] = strdup("SDL_app");
     argv[1] = NULL;
+    __android_log_print(ANDROID_LOG_INFO, "SDL", "STARTING MAIN2");
     status = SDL_main(1, argv);
-
+    __android_log_print(ANDROID_LOG_INFO, "SDL", "FINISHED MAIN");
     // Don't issue exit!
 }
 

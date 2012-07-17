@@ -9,8 +9,6 @@
 
 # xcython: profile=True
 
-from cpython cimport bool
-
 cdef class CanvasBase (object):
     def __init__ (self, width=None, height=None, hw=True, srcURL = None, isRenderTarget = False):
         raise Exception('method not implemented')
