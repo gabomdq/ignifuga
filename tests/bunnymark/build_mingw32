@@ -1,0 +1,9 @@
+#!/bin/bash
+rm -rf build
+mkdir -p build
+cp bunniesx.pyx build/bunniesx.pyx
+cd build
+schafer -P mingw32 -m bunniesx.pyx -p com.mdqinc.bunnymarkx
+mv com.mdqinc.bunnymarkx.exe ..
+cd ..
+

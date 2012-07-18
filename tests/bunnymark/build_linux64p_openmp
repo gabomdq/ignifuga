@@ -1,0 +1,9 @@
+#!/bin/bash
+rm -rf build
+mkdir -p build
+cp bunniesp.pyx build/bunniesp.pyx
+cd build
+schafer --openmp -P linux64 -m bunniesp.pyx -p com.mdqinc.bunnymarkp_openmp
+mv com.mdqinc.bunnymarkp_openmp ..
+cd ..
+

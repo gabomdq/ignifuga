@@ -1,0 +1,9 @@
+#!/bin/bash
+rm -rf build
+mkdir -p build
+cp bunniesp.pyx build/bunniesp.pyx
+cd build
+schafer -P linux64 -m bunniesp.pyx -p com.mdqinc.bunnymarkp
+mv com.mdqinc.bunnymarkp ..
+cd ..
+
