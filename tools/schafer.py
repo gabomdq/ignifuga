@@ -543,12 +543,12 @@ def build_linux64 (options):
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_linux64_env()
+    env = prepare_linux64_env(options.openmp)
     build_generic(options, platform, env)
 
 def build_project_linux64(options, project_root):
     platform = 'linux64'
-    env = prepare_linux64_env()
+    env = prepare_linux64_env(options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -565,12 +565,12 @@ def build_osx (options):
     info('Building Ignifuga For OS X')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_osx_env()
+    env = prepare_osx_env(options.openmp)
     build_generic(options, platform, env)
 
 def build_project_osx(options, project_root):
     platform = 'osx'
-    env = prepare_osx_env()
+    env = prepare_osx_env(options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -592,13 +592,13 @@ def build_ios (options):
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For iOS')
-    env = prepare_ios_env(options.iossdk, options.iostarget)
+    env = prepare_ios_env(options.openmp, options.iossdk, options.iostarget)
     prepare_ios_skeleton()
     build_generic(options, platform, env)
 
 def build_project_ios(options, project_root):
     platform = 'ios'
-    env = prepare_ios_env(options.iossdk, options.iostarget)
+    env = prepare_ios_env(options.openmp, options.iossdk, options.iostarget)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -620,13 +620,13 @@ def build_android (options):
     if options.main != None and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Android')
-    env = prepare_android_env()
+    env = prepare_android_env(options.openmp)
     prepare_android_skeleton()
     build_generic(options, platform, env)
 
 def build_project_android(options, project_root):
     platform = 'android'
-    env = prepare_android_env()
+    env = prepare_android_env(options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -642,12 +642,12 @@ def build_mingw32 (options):
     info('Building Ignifuga For Windows 32 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_mingw32_env()
+    env = prepare_mingw32_env(options.openmp)
     build_generic(options, platform, env)
 
 def build_project_mingw32(options, project_root):
     platform = 'mingw32'
-    env = prepare_mingw32_env()
+    env = prepare_mingw32_env(options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, env)
 
@@ -704,6 +704,9 @@ if __name__ == '__main__':
     parser.add_option("--ios-codesign",
         default=None, dest="ioscodesign",
         help="Code Sign Authority For Signing Apps for iOS (required only for project building) ")
+    parser.add_option("--openmp",
+        action="store_true", dest="openmp", default=False,
+        help="Use OPENMP if available for the target")
 
     (options, args) = parser.parse_args()
 

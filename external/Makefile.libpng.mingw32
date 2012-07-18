@@ -36,9 +36,9 @@ DESTDIR=
 
 # If you're using a cross-compiler, add the appropriate prefix (e.g.,
 # "i386-mingw32msvc-") to the following three commands:
-CC=i586-mingw32msvc-gcc
-AR=i586-mingw32msvc-ar
-RANLIB=i586-mingw32msvc-ranlib
+CC=i686-w64-mingw32-gcc
+AR=i686-w64-mingw32-ar
+RANLIB=i686-w64-mingw32-ranlib
 
 MKDIR_P=/bin/mkdir -pv
 

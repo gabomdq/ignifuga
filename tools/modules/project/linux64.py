@@ -19,10 +19,10 @@ def make(options, env, target, sources, cython_src, cfiles):
     freetypeflags = get_freetype_flags(target)
     pngflags = get_png_flags(target)
 
-    sdlflags = sdlflags.replace('-lpthread', '').replace('-ldl', '')
+    sdlflags = sdlflags.replace('-lpthread', '').replace('-ldl', '') + env['LDFLAGS'] + ' ' + env['CFLAGS']
     freetypeflags = freetypeflags.replace('-lpthread', '').replace('-ldl', '')
     pngflags = pngflags.replace('-lpthread', '').replace('-ldl', '')
-    cmd = '%s -fopenmp -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -lgccpp -lstdc++ -lgc -lgomp -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
+    cmd = '%s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -ljpeg -lm %s %s -lgccpp -lstdc++ -lgc -lgomp -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
     Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
 
     if not isfile(join(cython_src, options.project)):

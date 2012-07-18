@@ -46,16 +46,22 @@ def get_target(platform, project_root = '.', dist=None, tmp=None):
 
 
 
-def prepare_linux64_env():
+def prepare_linux64_env(openmp=False):
     """ Set up the environment variables for Linux64 compilation"""
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
     env['CFLAGS'] = "" if not 'CFLAGS' in env else env['CFLAGS']
+    env['CPPFLAGS'] = "" if not 'CPPFLAGS' in env else env['CPPFLAGS']
+    env['LDFLAGS'] = "" if not 'LDFLAGS' in env else env['LDFLAGS']
+    if openmp:
+        env['CFLAGS'] += "-fopenmp"
+        env['CPPFLAGS'] += "-fopenmp"
+        env['LDFLAGS'] += '-lgomp'
     return env
 
 
-def prepare_osx_env():
+def prepare_osx_env(openmp=False):
     """ Set up the environment variables for OS X compilation"""
     global XCODE_ROOT, OSX_SDK
 
@@ -74,7 +80,7 @@ def prepare_osx_env():
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 --sysroot=%s' % OSX_SDK
     return env
 
-def prepare_ios_env(sdk=None, target='3.0'):
+def prepare_ios_env(openmp=False, sdk=None, target='3.0'):
     """ Set up the environment variables for iOS compilation"""
     env = deepcopy(os.environ)
     global XCODE_ROOT, BEST_IOS_SDK
@@ -104,7 +110,7 @@ def prepare_ios_env(sdk=None, target='3.0'):
     return env
 
 
-def prepare_android_env():
+def prepare_android_env(openmp=False):
     """ Set up the environment variables for Android compilation"""
     from schafer import ANDROID_NDK, ANDROID_SDK, HOSTPYTHON, HOSTPGEN
 
@@ -151,7 +157,7 @@ def prepare_android_env():
     return env
 
 
-def prepare_mingw32_env():
+def prepare_mingw32_env(openmp=False):
     """ Set up the environment variables for Mingw32 compilation"""
     from schafer import HOSTPYTHON, HOSTPGEN
     env = deepcopy(os.environ)
@@ -164,16 +170,16 @@ def prepare_mingw32_env():
     #env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
     env['CFLAGS'] = ""
     env['CXXFLAGS'] = env['CFLAGS']
-    env['CC'] = 'i586-mingw32msvc-gcc %s' % (env['CFLAGS'],)
-    env['CXX'] = 'i586-mingw32msvc-g++ %s' % (env['CXXFLAGS'],)
-    env['AR'] = "i586-mingw32msvc-ar"
-    env['RANLIB'] = "i586-mingw32msvc-ranlib"
-    env['STRIP'] = "i586-mingw32msvc-strip --strip-unneeded"
-    env['LD'] = "i586-mingw32msvc-ld"
-    env['AS'] = "i586-mingw32msvc-as"
-    env['NM'] = "i586-mingw32msvc-nm"
-    env['DLLTOOL'] = "i586-mingw32msvc-dlltool"
-    env['OBJDUMP'] = "i586-mingw32msvc-objdump"
-    env['RESCOMP'] = "i586-mingw32msvc-windres"
+    env['CC'] = 'i686-w64-mingw32-gcc %s' % (env['CFLAGS'],)
+    env['CXX'] = 'i686-w64-mingw32-g++ %s' % (env['CXXFLAGS'],)
+    env['AR'] = "i686-w64-mingw32-ar"
+    env['RANLIB'] = "i686-w64-mingw32-ranlib"
+    env['STRIP'] = "i686-w64-mingw32-strip --strip-unneeded"
+    env['LD'] = "i686-w64-mingw32-ld"
+    env['AS'] = "i686-w64-mingw32-as"
+    env['NM'] = "i686-w64-mingw32-nm"
+    env['DLLTOOL'] = "i686-w64-mingw32-dlltool"
+    env['OBJDUMP'] = "i686-w64-mingw32-objdump"
+    env['RESCOMP'] = "i686-w64-mingw32-windres"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     return env

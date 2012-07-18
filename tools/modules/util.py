@@ -54,8 +54,8 @@ def check_gnutools():
     return True
 
 def check_mingw32tools():
-    tools = ['i586-mingw32msvc-gcc', 'i586-mingw32msvc-g++', 'i586-mingw32msvc-ar', 'i586-mingw32msvc-ranlib', 'i586-mingw32msvc-strip', 'i586-mingw32msvc-ld', 'i586-mingw32msvc-as',
-             'i586-mingw32msvc-nm', 'i586-mingw32msvc-dlltool', 'i586-mingw32msvc-objdump', 'i586-mingw32msvc-windres']
+    tools = ['i686-w64-mingw32-gcc', 'i686-w64-mingw32-g++', 'i686-w64-mingw32-ar', 'i686-w64-mingw32-ranlib', 'i686-w64-mingw32-strip', 'i686-w64-mingw32-ld', 'i686-w64-mingw32-as',
+             'i686-w64-mingw32-nm', 'i686-w64-mingw32-dlltool', 'i686-w64-mingw32-objdump', 'i686-w64-mingw32-windres']
 
     for tool in tools:
         check_tool(tool)
@@ -213,7 +213,7 @@ def install_host_tools():
 
     log ('Installing development packages')
     if system == 'Linux':
-        cmd = 'sudo apt-get -y install rsync python-dev mingw32 mingw32-binutils mingw32-runtime make gcc-4.5 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
+        cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
         Popen(shlex.split(cmd)).communicate()
     elif system == 'Darwin':
         check_xcode()

@@ -62,7 +62,7 @@ def make(env, target):
         os.remove(join(target.dist, 'lib', 'libjpeg.a'))
 
     if not isfile(join(target.builds.JPG, 'Makefile')):
-        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i686-w64-mingw32 --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
         # Fixes for the Makefile
         cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(target.builds.JPG, 'Makefile'))
@@ -87,7 +87,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libSDL2.a')):
         os.remove(join(target.dist, 'lib', 'libSDL2.a'))
     if not isfile(join(target.builds.SDL, 'Makefile')):
-        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i686-w64-mingw32 --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
 
         # HACK FIX for SDL problem, this can be removed once SDL fixes this error
@@ -111,7 +111,7 @@ def make(env, target):
     if isfile(join(target.dist, 'lib', 'libSDL2_image.a')):
         os.remove(join(target.dist, 'lib', 'libSDL2_image.a'))
     if not isfile(join(target.builds.SDL_IMAGE, 'Makefile')):
-        cmd = './configure --enable-silent-rules LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i586-mingw32msvc --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(target.dist, 'lib'), join(target.dist, 'include'), target.dist, target.dist)
+        cmd = './configure --enable-silent-rules LIBPNG_CFLAGS="-L%s -lpng12 -lz -lm -I%s" LDFLAGS="-static-libgcc" --host=i686-w64-mingw32 --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s"'% (join(target.dist, 'lib'), join(target.dist, 'include'), target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_IMAGE, env=env).communicate()
@@ -128,7 +128,7 @@ def make(env, target):
         os.remove(join(target.dist, 'lib', 'libfreetype.a'))
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         #cflags = env['CFLAGS'] + ' -std=gnu99'
-        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i586-mingw32msvc --disable-shared --enable-static --prefix="%s"'% (target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --without-bzip2  --build=i686-pc-linux-gnu --host=i686-w64-mingw32 --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
@@ -148,7 +148,7 @@ def make(env, target):
         Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
 
     if not isfile(join(target.builds.SDL_TTF, 'Makefile')):
-        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i586-mingw32msvc --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (target.dist, target.dist, target.dist)
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-sdltest --host=i686-w64-mingw32 --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (target.dist, target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()

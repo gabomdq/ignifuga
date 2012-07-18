@@ -27,14 +27,15 @@ def make(env, target, freeze_modules, frozen_file):
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
         sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
-        sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] + env['CFLAGS']
         # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
         #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
         # Mostly static, minus pthread and dl - Linux
-        cmd = './configure --enable-silent-rules LDFLAGS="-fopenmp -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-fopenmp -static -fPIC %s" CFLAGS="-fopenmp" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="%s -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="%s -static -fPIC" CFLAGS="%s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'%\
+              (env['LDFLAGS'], env['CPPFLAGS'], sdlcflags,sdlldflags,target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
         # Patch the Makefile to optimize the static libraries inclusion... - Linux
-        cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc -static-libstdc++ -Wl,-Bstatic -lutil -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lgomp -lpthread -ldl |g" %s' % (join(target.builds.PYTHON, 'Makefile'))
+        cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc -static-libstdc++ -Wl,-Bstatic -lutil -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic %s -lpthread -ldl |g" %s' % (env['LDFLAGS'], join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
     make_python_freeze('linux64', freeze_modules, frozen_file)
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
