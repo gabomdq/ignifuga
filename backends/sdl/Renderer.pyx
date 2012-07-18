@@ -18,6 +18,8 @@ from ignifuga.Log import Log, debug, error
 from ignifuga.Singleton import Singleton
 from ignifuga.Rect cimport *
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
+from cython.parallel cimport parallel, prange, threadid
+cimport cython
 
 from time import time as getTime
 import sys
@@ -143,32 +145,95 @@ cdef class Renderer:
         # _Sprite list allocation and setup
         self.zmap = new map[int,deque[Sprite_p]]()
         self.free_sprites = new deque[Sprite_p]()
+        self.active_sprites = new deque[Sprite_p]()
         self.dirty = True
 
-    cpdef update(self, Uint32 now):
-        """ Renders the whole screen in every frame, ignores dirty rectangle markings completely (easier for handling rotations, etc) """
-        cdef SDL_Rect nr, ir, screen, src_r, dst_r
+    @cython.cdivision(True)
+    cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil:
+        cdef _Sprite out
+        cdef SDL_Rect nr, ir, src_r, dst_r
         cdef int z, extra
-        #cdef int sx,sy,sw,sh,dx,dy,dw,dh
-        cdef bint doScale, intersection
+        cdef bint intersection
         cdef double ex,ey,ew,eh,fx,fy
         cdef SDL_Point center
-        cdef Canvas canvas
 
-        self.frameTimestamp = now
+        sprite.show = False
+        nr = sprite.dst
 
-        # In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
-        # Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
-        # What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
+        # ir is the intersection, in scene coordinates
+        if sprite.angle != 0:
+            # Expand the entity rect with some generous dimensions (to avoid having to calculate exactly how bigger it is)
+            extra = nr.w if nr.w > nr.h else nr.h
+            nr.x -= extra
+            nr.y -= extra
+            nr.h += extra
+            nr.w += extra
 
-        # Let's start building a rectangle that holds the part of the scene we want to show
-        # screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
-        screen_w = self._width
-        screen_h = self._height
+        intersection = SDL_IntersectRect(screen, &nr, &ir)
+        if intersection:
+            nr = sprite.dst
+
+            if sprite.angle == 0 and sprite.flip == 0:
+                intersection = SDL_IntersectRect(screen, &nr, &ir)
+            else:
+                ir = nr
+                intersection = 1
+
+            if intersection:
+                # ir is now the intersection of the frame area (moved to the proper location in the scene) with the screen rectangle, in scene coordinates
+                src_r = ir
+                dst_r = ir
+
+                # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
+                # We need to move it to the proper position on the source canvas
+                # We adjust it to entity coordinates by substracting the entity position
+                # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
+                # Finally we add sx,sy to put the rectangle in the correct position in the canvas
+                # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
+                #src_r.x += (sx-dx)
+                #src_r.y += (sy-dy)
+                src_r.x += (sprite.src.x-sprite.dst.x)
+                src_r.y += (sprite.src.y-sprite.dst.y)
+
+                # Apply reverse scaling to the source rectangle
+                #print 'pre', src_r, dst_r
+                if sprite.src.w != sprite.dst.w or sprite.src.h != sprite.dst.h:
+                    fx = <double>sprite.src.w/<double>sprite.dst.w
+                    fy = <double>sprite.src.h/<double>sprite.dst.h
+                    src_r.x = <int>(src_r.x * fx)
+                    src_r.w = <int>(src_r.w * fx)
+                    src_r.y = <int>(src_r.y * fy)
+                    src_r.h = <int>(src_r.h * fy)
+
+                # dst_r is in scene coordinates, we will adjust it to screen coordinates
+                # Now we apply the scale factor
+                if doScale:
+                    #Scale the dst_r values
+                    dst_r.x = <int>(dst_r.x * self._scale_x)
+                    dst_r.w = <int>(dst_r.w * self._scale_x)
+                    dst_r.y = <int>(dst_r.y * self._scale_y)
+                    dst_r.h = <int>(dst_r.h * self._scale_y)
+
+                # Apply scrolling
+                dst_r.x -= self._scroll_x
+                dst_r.y -= self._scroll_y
+                if src_r.w > 0 and src_r.h >0 and dst_r.w>0 and dst_r.h > 0:
+                    sprite._src = src_r
+                    sprite._dst = dst_r
+                    sprite.show = True
+
+
+    @cython.cdivision(True)
+    cdef void _processSprites(self) nogil:
+        cdef int i, numsprites
+        cdef SDL_Rect screen
+        cdef bint doScale = 0
+        cdef Sprite_p sprite
+
         screen.x = self._scroll_x
         screen.y = self._scroll_y
-        screen.w = screen_w
-        screen.h = screen_h
+        screen.w = self._width
+        screen.h = self._height
 
         # Apply the overall scale setting if needed.
         if self._scale_x != 1.0 or self._scale_y != 1.0:
@@ -181,85 +246,48 @@ cdef class Renderer:
         else:
             doScale = 0
 
-        cdef zmap_iterator ziter = self.zmap.begin()
-        cdef deque[Sprite_p] *ds
-        cdef deque_Sprite_iterator iter
-        cdef _Sprite *sprite
 
-        while ziter != self.zmap.end():
+
+        numsprites = self.active_sprites.size()
+
+        with nogil, parallel():
+            for i in prange(numsprites):
+                self._processSprite(self.active_sprites.at(i), &screen, doScale)
+
+    cpdef update(self, Uint32 now):
+        """ Renders the whole screen in every frame, ignores dirty rectangle markings completely (easier for handling rotations, etc) """
+        self.frameTimestamp = now
+
+        # In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
+        # Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
+        # What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
+
+        # Let's start building a rectangle that holds the part of the scene we want to show
+        # screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
+
+
+        cdef zmap_iterator ziter, ziter_last
+        cdef deque[Sprite_p] *ds
+        cdef deque[Sprite_p].iterator iter, iter_last
+        cdef Sprite_p sprite
+
+        if self.dirty:
+            self._processSprites()
+
+        ziter = self.zmap.begin()
+        ziter_last = self.zmap.end()
+        while ziter != ziter_last:
             ds = &deref(ziter).second
             iter = ds.begin()
-            while iter != ds.end():
+            iter_last = ds.end()
+            while iter != iter_last:
                 sprite = deref(iter)
-                nr = sprite.dst
-
-                # ir is the intersection, in scene coordinates
-                if sprite.angle != 0:
-                    # Expand the entity rect with some generous dimensions (to avoid having to calculate exactly how bigger it is)
-                    extra = nr.w if nr.w > nr.h else nr.h
-                    nr.x -= extra
-                    nr.y -= extra
-                    nr.h += extra
-                    nr.w += extra
-
-                intersection = SDL_IntersectRect(&screen, &nr, &ir)
-                if intersection:
-                    nr = sprite.dst
-
-                    if sprite.angle == 0 and sprite.flip == 0:
-                        intersection = SDL_IntersectRect(&screen, &nr, &ir)
-                    else:
-                        ir = nr
-                        intersection = 1
-
-                    if intersection:
-                        # ir is now the intersection of the frame area (moved to the proper location in the scene) with the screen rectangle, in scene coordinates
-                        src_r = ir
-                        dst_r = ir
-
-                        # src_r is in scene coordinates, created by intersecting the destination rectangle with the screen rectangle in scene coordinates
-                        # We need to move it to the proper position on the source canvas
-                        # We adjust it to entity coordinates by substracting the entity position
-                        # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
-                        # Finally we add sx,sy to put the rectangle in the correct position in the canvas
-                        # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
-                        #src_r.x += (sx-dx)
-                        #src_r.y += (sy-dy)
-                        src_r.x += (sprite.src.x-sprite.dst.x)
-                        src_r.y += (sprite.src.y-sprite.dst.y)
-
-                        # Apply reverse scaling to the source rectangle
-                        #print 'pre', src_r, dst_r
-                        if sprite.src.w != sprite.dst.w or sprite.src.h != sprite.dst.h:
-                            fx = <double>sprite.src.w/<double>sprite.dst.w
-                            fy = <double>sprite.src.h/<double>sprite.dst.h
-                            src_r.x = <int>(src_r.x * fx)
-                            src_r.w = <int>(src_r.w * fx)
-                            src_r.y = <int>(src_r.y * fy)
-                            src_r.h = <int>(src_r.h * fy)
-
-                        # dst_r is in scene coordinates, we will adjust it to screen coordinates
-                        # Now we apply the scale factor
-                        if doScale:
-                            #Scale the dst_r values
-                            dst_r.x = <int>(dst_r.x * self._scale_x)
-                            dst_r.w = <int>(dst_r.w * self._scale_x)
-                            dst_r.y = <int>(dst_r.y * self._scale_y)
-                            dst_r.h = <int>(dst_r.h * self._scale_y)
-
-                        # Apply scrolling
-                        dst_r.x -= self._scroll_x
-                        dst_r.y -= self._scroll_y
-
-
-                        SDL_SetTextureColorMod(sprite.texture, sprite.r, sprite.g, sprite.b)
-                        SDL_SetTextureAlphaMod(sprite.texture, sprite.a)
-
-                        # Perform the blitting if the src and dst rectangles have w,h > 0
-                        if src_r.w > 0 and src_r.h >0 and dst_r.w>0 and dst_r.h > 0:
-                            SDL_RenderCopyEx(self.renderer, sprite.texture, &src_r, &dst_r, sprite.angle, &sprite.center, sprite.flip)
+                if sprite.show:
+                    SDL_SetTextureColorMod(sprite.texture, sprite.r, sprite.g, sprite.b)
+                    SDL_SetTextureAlphaMod(sprite.texture, sprite.a)
+                    SDL_RenderCopyEx(self.renderer, sprite.texture, &sprite._src, &sprite._dst, sprite.angle, &sprite.center, sprite.flip)
                 inc(iter)
-            inc(ziter)
+            inc (ziter)
 
         self.flip()
         # Calculate how long it's been since the pre update until now.
@@ -314,6 +342,7 @@ cdef class Renderer:
         if not self.free_sprites.empty():
             sprite = self.free_sprites.back()
             self.free_sprites.pop_back()
+            self.active_sprites.push_back(sprite)
             sprite.texture = canvas._surfacehw
             sprite.src.x = sx
             sprite.src.y = sy
@@ -337,7 +366,14 @@ cdef class Renderer:
 
     cpdef bint removeSprite(self, Sprite sprite_w):
         cdef _Sprite *sprite = sprite_w.sprite
+        cdef deque_Sprite_iterator iter
         if self._unindexSprite(sprite):
+            iter = self.active_sprites.begin()
+            while iter != self.active_sprites.end():
+                if deref(iter) == sprite:
+                    self.active_sprites.erase(iter)
+                    break
+                inc(iter)
             self.free_sprites.push_back(sprite)
             return True
         return False
@@ -372,7 +408,7 @@ cdef class Renderer:
         self.dirty = True
         return True
 
-    cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip):
+    cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil:
         sprite.angle = angle
         sprite.center.x = centerx
         sprite.center.y = centery
@@ -380,15 +416,14 @@ cdef class Renderer:
         self.dirty = True
         return True
 
-    cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a):
+    cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil:
         sprite.r = r
         sprite.g = g
         sprite.b = b
         sprite.a = a
-        self.dirty = True
         return True
 
-    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h):
+    cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil:
         sprite.dst.x = x
         sprite.dst.y = y
         sprite.dst.w = w
@@ -591,6 +626,7 @@ cdef class Renderer:
             self.free_sprites.pop_back()
 
         del self.free_sprites
+        del self.active_sprites
 
         # Release sprites in use
         while ziter != self.zmap.end():

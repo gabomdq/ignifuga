@@ -1,10 +1,13 @@
 #!/bin/bash
 rm -rf build
+mkdir -p build
+cp bunniesx.pyx build
+cp -r images build
+cd build
 schafer -P android
-#schafer -P android -m bunnies.py -p com.mdqinc.bunnymark -a images
-#rm -rf build
 schafer -P android -m bunniesx.pyx -p com.mdqinc.bunnymarkx -a images
+cp com.mdqinc.bunnymarkx ..
 cd build/android/android_project
 ant install
-cd ../../..
+cd ../../../..
 

@@ -31,10 +31,10 @@ def make(env, target, freeze_modules, frozen_file):
         # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
         #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
         # Mostly static, minus pthread and dl - Linux
-        cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="-fopenmp -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-fopenmp -static -fPIC %s" CFLAGS="-fopenmp" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlcflags,sdlldflags,target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
         # Patch the Makefile to optimize the static libraries inclusion... - Linux
-        cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc -static-libstdc++ -Wl,-Bstatic -lutil -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl |g" %s' % (join(target.builds.PYTHON, 'Makefile'))
+        cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc -static-libstdc++ -Wl,-Bstatic -lutil -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lgomp -lpthread -ldl |g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
     make_python_freeze('linux64', freeze_modules, frozen_file)
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):

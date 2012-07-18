@@ -1,4 +1,9 @@
 #!./ignifuga-python
+# Ignifuga Game Engine "Bunnymark" benchmark clone - Cython version
+# Original version: http://blog.iainlobb.com/2010/11/display-list-vs-blitting-results.html
+# See http://philippe.elsass.me/2011/11/nme-ready-for-the-show/ for a HaxeNME version
+# This code is licensed under MIT License
+
 from ignifuga.Gilbert import Gilbert, BACKENDS
 from ignifuga.Log import Log, debug
 from ignifuga.components import *
@@ -34,11 +39,9 @@ ctypedef _Bunny* _Bunny_p
 cdef deque[_Bunny] *bunnies = new deque[_Bunny]()
 ctypedef deque[_Bunny].iterator bunnies_iterator
 
-cdef int maxx, maxy, ft, ftc
+cdef int maxx, maxy
 
 cdef init():
-    global ft, ftc
-    ft = ftc = 0
     pass
 
 
@@ -69,31 +72,19 @@ cdef _addBunny(bunny):
         bunnies.push_back(_bunny)
 
 cdef _update(scene):
-    global bunnies, maxx, maxy, ft,ftc
-    cdef int gravity = 2
+    global bunnies, maxx, maxy
+    cdef int gravity = 2, ft
     cdef bunnies_iterator iter = bunnies.begin()
     cdef _Bunny_p bunny
     cdef Renderer renderer = scene.renderer
     cdef GameLoop gameLoop = scene.gameLoop
 
 
-    ft += gameLoop.frame_time
-    ftc += 1
-    if ftc > 10:
-        if ft < 100:
-            scene.addBunnies(3000)
-            debug("10x Frame Time %d" % ft)
-        elif ft < 250:
-            scene.addBunnies(1000)
-            debug("10x Frame Time %d" % ft)
-        elif ft < 310:
-            scene.addBunnies(500)
-            debug("10x Frame Time %d" % ft)
-        elif ft < 334:
-            scene.addBunnies(100)
-            debug("10x Frame Time %d" % ft)
-        ft = 0
-        ftc = 0
+    ft = gameLoop.frame_time
+    if ft < 10:
+        scene.addBunnies(1500)
+    elif ft < 33:
+        scene.addBunnies(500)
 
     while iter != bunnies.end():
         bunny = &deref(iter)
@@ -161,6 +152,7 @@ class Bunnies(Scene):
             },
         ]}
         r = Random()
+        debug(" ADDING %d BUNNIES" % num)
         for x in range(0,num):
             sprite_id = 'bunny_sprite %d' % self.nBunnies
             data['components'][0]['id'] = sprite_id
@@ -179,7 +171,7 @@ class Bunnies(Scene):
 
     def update(self, data):
         """ Move bunnies """
-        for bunny in self.bunnies[:]:
+        for bunny in self.bunnies:
             if bunny._components:
                 sprite = bunny._components.values()[0]
                 if hasattr(sprite, '_rendererSpriteId') and sprite._rendererSpriteId != None:

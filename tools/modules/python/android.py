@@ -6,6 +6,8 @@
 # Schafer Module: Build Python for Android
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# No OPENMP support in the Android NDK so far...
+
 import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE

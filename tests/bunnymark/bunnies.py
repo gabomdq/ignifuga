@@ -1,7 +1,11 @@
 #!./ignifuga-python
+# Ignifuga Game Engine "Bunnymark" benchmark clone - Pure Python version
+# Original version: http://blog.iainlobb.com/2010/11/display-list-vs-blitting-results.html
+# See http://philippe.elsass.me/2011/11/nme-ready-for-the-show/ for a HaxeNME version
+# This code is licensed under MIT License
 
 from ignifuga.Gilbert import Gilbert, BACKENDS
-from ignifuga.Log import Log
+from ignifuga.Log import Log, debug
 from ignifuga.components import *
 from ignifuga.Scene import Scene
 from ignifuga.Entity import Entity
@@ -25,7 +29,7 @@ class Bunnies(Scene):
 
     def sceneInit(self):
         # Add bunnies
-        self.gravity = 0.5
+        self.gravity = 2
         self.lastBunny = None
         self.firstBunny = None
         self.nBunnies = 0
@@ -50,8 +54,10 @@ class Bunnies(Scene):
                 self.firstBunny = bunny
             if self.lastBunny is not None:
                 self.lastBunny.nextBunny = bunny
-            bunny.speedx = (0.01+r.random())*50.0
-            bunny.speedy = (0.01+r.random())*50.0
+            bunny.x = r.random()*self.size['width']
+            bunny.y = self.size['height']
+            bunny.speedx = int(r.random()*70.0) - 35
+            bunny.speedy = int(r.random()*70.0)
             bunny.angle = 90 - r.random() * 90
             bunny.z = int(r.random()*100)
             bunny.nextBunny = None
@@ -60,7 +66,7 @@ class Bunnies(Scene):
             Gilbert().startEntity(bunny)
 
         self.nBunnies+=num
-        print "BUNNIES", self.nBunnies
+        debug( "BUNNIES %d" % self.nBunnies)
 
     def update(self, data):
         """ Move bunnies """
@@ -69,35 +75,18 @@ class Bunnies(Scene):
         bunny = self.firstBunny
         ft = Gilbert().gameLoop.frame_time
 
-        self.ft += ft
-        self.ftc += 1
-        if self.ftc > 10:
-            if self.ft < 320:
-                self.addBunnies(100)
-            elif self.ft > 360:
-                counter = 0
-                while counter < 50:
-                    bunny.unregister()
-                    self.nBunnies-=1
-                    if bunny.nextBunny:
-                        bunny = bunny.nextBunny
-                        self.firstBunny = bunny
-                    else:
-                        break
-                    counter +=1
-
-                print "BUNNIES", self.nBunnies
-
-            self.ft = 0
-            self.ftc = 0
+        if ft < 10:
+            self.addBunnies(500)
+        elif ft < 33:
+            self.addBunnies(100)
 
 
         while True:
             if bunny._initialized:
+                bunny.speedy += self.gravity
                 bunny.x += bunny.speedx
                 bunny.y += bunny.speedy
-                bunny.speedy += self.gravity
-                #bunny.alpha = 0.3 + 0.7 * bunny.y / maxy
+                bunny.alpha = 0.3 + 0.7 * bunny.y / maxy
                 if bunny.x > maxx:
                     bunny.x = maxx
                     bunny.speedx = -bunny.speedx
@@ -109,7 +98,7 @@ class Bunnies(Scene):
                     bunny.speedy = -bunny.speedy
                 elif bunny.y <= 0:
                     bunny.y = 0
-                    bunny.speedy = -bunny.speedy
+                    bunny.speedy = 0
                 bunny.updateRenderer()
 
             if bunny.nextBunny:
