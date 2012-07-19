@@ -18,7 +18,7 @@ def prepare(env, target, ignifuga_src, python_build):
     # Get some required flags
     sdlflags = get_sdl_flags(target)
     freetypeflags = get_freetype_flags(target)
-    ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+    ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
 def make(env, target, freeze_modules, frozen_file):
@@ -41,6 +41,10 @@ def make(env, target, freeze_modules, frozen_file):
     cmd = 'make V=0 install -k -j%d' % multiprocessing.cpu_count()
     # Rebuild Python including the frozen modules!
     Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
+
+    if not isdir (join(target.dist, 'include', 'Modules')):
+        os.makedirs(join(target.dist, 'include', 'Modules'))
+    shutil.copy(join(target.builds.PYTHON, 'Modules/greenlet.h'), join(target.dist, 'include', 'Modules', 'greenlet.h'))
 
     # Check success
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):

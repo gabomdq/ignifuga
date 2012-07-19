@@ -1,0 +1,10 @@
+#!/bin/bash
+rm -rf build
+mkdir -p build
+cp bunniesx.pyx build/bunniesx.pyx
+cp -r images build
+cd build
+schafer -P ios -m bunniesx.pyx -a images -p com.mdqinc.bunnymarkx --ios-codesign "iPhone Developer: Gabriel Jacobo (YZ73X8TYQ3)"
+mv bunnymarkx.ipa ..
+cd ..
+

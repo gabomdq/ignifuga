@@ -21,7 +21,7 @@ def prepare(env, target, ignifuga_src, python_build):
     # Patch some problems with cross compilation
     cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.ios.diff'), python_build)
     Popen(shlex.split(cmd)).communicate()
-    ignifuga_module = "\nignifuga %s -I%s -L%s %s\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.dist, 'libs'), sdlflags)
+    ignifuga_module = "\nignifuga %s -I%s -L%s %s -lstdc++\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.dist, 'libs'), sdlflags)
 
     return ignifuga_module
 
@@ -49,6 +49,9 @@ def make(env, target, freeze_modules, frozen_file):
 
     cmd = 'make V=0 install -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-apple-darwin CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
+    if not isdir (join(target.dist, 'include', 'Modules')):
+        os.makedirs(join(target.dist, 'include', 'Modules'))
+    shutil.copy(join(target.builds.PYTHON, 'Modules/greenlet.h'), join(target.dist, 'include', 'Modules', 'greenlet.h'))
 
     # Check success
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):

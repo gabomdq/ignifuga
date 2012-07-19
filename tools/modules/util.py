@@ -10,7 +10,15 @@ import os, shlex, shutil, re, platform, fnmatch
 from os.path import *
 from subprocess import Popen, PIPE
 from log import info, log, error
-import multiprocessing
+import multiprocessing, tempfile
+
+
+CYTHON_GIT = 'https://github.com/cython/cython.git'
+ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r8-linux-x86.tar.bz2',
+                   'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r8-darwin-x86.tar.bz2'}
+ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r18-linux.tgz',
+                   'Darwin': 'http://dl.google.com/android/android-sdk_r18-macosx.zip' }
+
 
 def find_cython():
     cmd = 'which cython'
@@ -23,15 +31,26 @@ def find_cython():
         version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
         v = re.search("(\d+)\.(\d+)(.*)", version)
         # We are looking for 0.16 or higher
-        if v.groups(0) > 0:
-            return cython
-        if v.groups(0) == 0:
-            if v.groups(1) > 16:
+        cython_ver = []
+        counter = 0
+        while True:
+            try:
+                cython_ver.append(int(v.group(counter+1)))
+                counter += 1
+            except:
+                break
+        try:
+            if cython_ver[0] > 0:
                 return cython
-            if v.groups(1) == 16:
-                if v.groups(2).startswith('1+') or v.groups(2) >= 2:
+            if cython_ver[0] == 0:
+                if cython_ver[1] > 15:
                     return cython
-        error ('Cython version %s is incompatible')
+    #            if v.group(1) == 16:
+    #                if v.groups(2).startswith('1+') or v.groups(2) >= 2:
+    #                    return cython
+        except:
+            pass
+        error ('Cython version %s is incompatible' % version)
     return None
 
 def check_tool(tool, fatal=True):
@@ -201,7 +220,7 @@ def install_mac_ports():
     else:
         log('Mac Ports is available')
 
-def install_host_tools():
+def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
     """ Install all the required host tools.
     Platforms supported:
     * Ubuntu 64 Natty 11.04
@@ -240,15 +259,19 @@ def install_host_tools():
         log ('GIT is available')
 
         log ('Installing Cython')
-        tmp_cython = tempfile.mkdtemp()
-        cmd = 'chmod 777 %s' % tmp_cython
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'git clone %s %s' % (CYTHON_GIT, tmp_cython)
-        Popen(shlex.split(cmd)).communicate()
+        tmp_cython = join(ROOT_DIR, 'tmp', 'cython')
+        if not isdir(tmp_cython):
+            cmd = 'mkdir -p %s' % tmp_cython
+            Popen(shlex.split(cmd)).communicate()
+            cmd = 'git clone %s %s' % (CYTHON_GIT, tmp_cython)
+            Popen(shlex.split(cmd)).communicate()
+        else:
+            cmd = 'git pull'
+            Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
         cmd = 'sudo python setup.py install'
         Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
-        cmd = 'sudo rm -rf %s' % tmp_cython
-        Popen(shlex.split(cmd)).communicate()
+#        cmd = 'sudo rm -rf %s' % tmp_cython
+#        Popen(shlex.split(cmd)).communicate()
         cython = find_cython()
         if cython == None:
             error('Could not install Cython (0.16 or higher). Try installing it manually')
