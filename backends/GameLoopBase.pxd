@@ -68,13 +68,13 @@ ctypedef deque[_Task_p].iterator task_iterator
 
 cdef class GameLoopBase(object):
     cdef public bint quit, paused, freezeRenderer
-    cdef public double _fps, _interval
+    cdef public double _fps
     cdef str platform
     cdef deque[_Task_p] *loading
     cdef deque[_Task_p] *running
     cdef map[PyObject_p, _EntityTasks] *entities
     cdef deque[_Task_p] *free_tasks
-    cdef readonly int frame_time
+    cdef readonly unsigned long frame_time, _interval, ticks_second
 
     cdef bint _allocTasks(self, int num=*)
     cpdef startEntity(self, entity)

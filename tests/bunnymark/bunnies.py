@@ -18,11 +18,24 @@ class Bunnies(Scene):
                     "height":1200
                 },
                 "keepAspect":True,
+                "autoScale": False,
                 "autoCenter": True,
                 "size":{
                     "width":1920,
                     "height":1200
-                }
+                },
+                "components":[
+                        {
+                        "id": "fps",
+                        "type":"Text",
+                        "font": u"images/teenbold.ttf",
+                        "htmlColor": u"#ffffff",
+                        "text":u"0",
+                        "size": 48,
+                        "x": 0,
+                        "y": 0
+                    }
+                ]
         }
         super(Bunnies, self).__init__(**data)
 
@@ -36,6 +49,10 @@ class Bunnies(Scene):
         self.ft = 0
         self.ftc = 0
         super(Bunnies, self).sceneInit()
+        maxx, maxy = Gilbert().renderer.screenSize
+        self.size = {'width': maxx, 'height': maxy}
+        self.resolution = {'width': maxx, 'height': maxy}
+        Gilbert().renderer.scrollTo(0,0)
         self.addBunnies()
 
     def addBunnies(self, num=500):
@@ -66,7 +83,10 @@ class Bunnies(Scene):
             Gilbert().startEntity(bunny)
 
         self.nBunnies+=num
-        debug( "BUNNIES %d" % self.nBunnies)
+        fps = self.getComponent("fps")
+        if fps != None:
+            fps.text = str(self.nBunnies)
+        #debug( "BUNNIES %d" % self.nBunnies)
 
     def update(self, data):
         """ Move bunnies """
@@ -75,10 +95,10 @@ class Bunnies(Scene):
         bunny = self.firstBunny
         ft = Gilbert().gameLoop.frame_time
 
-        if ft < 10:
-            self.addBunnies(500)
-        elif ft < 33:
-            self.addBunnies(100)
+        if ft < Gilbert().gameLoop.ticks_second / 100:
+            scene.addBunnies(1500)
+        elif ft < Gilbert().gameLoop.ticks_second / 30:
+            scene.addBunnies(500)
 
 
         while True:
@@ -107,12 +127,23 @@ class Bunnies(Scene):
                 break
 
 def run():
-    #try:
+    try:
         Log(0)
         bunnies = Bunnies()
         Gilbert().init(BACKENDS.sdl, bunnies)
-#    except:
-#        pass
+    except:
+        pass
 
 if __name__ == '__main__':
-    run()
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile")
+    (options, args) = parser.parse_args()
+
+    if options.profile:
+        import cProfile, pstats
+        profileFileName = 'profile_data.pyprof'
+        cProfile.runctx("run()", globals(), locals(), profileFileName)
+        pstats.Stats(profileFileName).strip_dirs().sort_stats("time").print_stats()
+    else:
+        run()

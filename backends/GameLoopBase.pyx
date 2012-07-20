@@ -11,6 +11,7 @@
 # xcython: profile=True
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
 from ignifuga.Gilbert import Gilbert
+from ignifuga.Log import debug, error
 
 
 cdef bint isdead(PyGreenlet* greenlet):
@@ -85,6 +86,8 @@ cdef class GameLoopBase(object):
                 self.free_tasks.push_back(&tasks[i])
 
             return True
+        else:
+            error("Could not allocate memory for new tasks!")
 
         return False
 
@@ -96,7 +99,7 @@ cdef class GameLoopBase(object):
             return self._fps
         def __set__(self, fps):
             self._fps = float(fps)
-            self._interval = 1000.0 / fps
+            self._interval = 1000 / fps
 
     cpdef startEntity(self, entity):
         cdef _Task *task
@@ -204,17 +207,16 @@ cdef class GameLoopBase(object):
         cdef _Task *task, *task_aux
         cdef _EntityTasks *et
         cdef entities_iterator eiter
-        cdef task_iterator iter
+        cdef task_iterator iter = self.loading.begin(), iter_end = self.loading.end()
         cdef PyObject *entity
 
         # Initialize objects
-        iter = self.loading.begin()
-        while iter != self.loading.end():
+        while iter != iter_end:
             task = deref(iter)
-
             if task.release or not self._processTask(task, now, wrapup, True):
                 # Remove the task from the loading deque, start it in the running deque
                 iter = self.loading.erase(iter)
+                iter_end = self.loading.end()
 
                 # No need to double check here, task.entity was added in self.entities when startEntity was called
                 eiter = self.entities.find(task.entity)
@@ -267,7 +269,8 @@ cdef class GameLoopBase(object):
 
         # Update objects
         iter = self.running.begin()
-        while iter != self.running.end():
+        iter_end = self.running.end()
+        while iter != iter_end:
             task = deref(iter)
             if task.release or not self._processTask(task, now, wrapup, False):
                 # Remove the task from the indexes
@@ -291,14 +294,14 @@ cdef class GameLoopBase(object):
                 task.entity = NULL
 
                 iter = self.running.erase(iter)
+                iter_end = self.running.end()
                 task.release = False
                 self.free_tasks.push_back(task)
             else:
-                # Someone may have deleted a loading task in the middle of this!
+                # Someone may have deleted a running task in the middle of this!
                 if iter == self.running.end():
                     break
                 inc(iter)
-
 
     cdef bint _doSwitch(self, _Task *task, PyObject *args, PyObject *kwargs):
         cdef PyObject *retp = NULL

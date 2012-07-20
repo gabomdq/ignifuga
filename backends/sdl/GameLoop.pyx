@@ -21,54 +21,54 @@ cdef class GameLoop(GameLoopBase):
         self.renderer = <Renderer>Gilbert().renderer
         self._screen_w, self._screen_h = self.renderer.screenSize
         self.paused = False
+        self.ticks_second = SDL_GetPerformanceFrequency()
 
 
     cpdef run(self):
         cdef SDL_Event ev
         cdef Uint32 now
-        cdef double remainingTime
+        cdef Sint64 remainingTime
+        cdef Uint64 nowx, freqx = self.ticks_second / 1000
 
         overlord = Gilbert()
-        if overlord.platform in ['iphone',]:
-            # Special loop for single app mobile platforms that slows down when not active
-            # TODO: Is this really required for iPhone?
-            # Note: Android does not need this anymore, I've enabled a blocking option in Android_PumpEvents
-            while not self.quit:
-                now = SDL_GetTicks()
-                self.update(now)
-                if not self.paused:
-                    self.renderer.update(now)
-
-                while SDL_PollEvent(&ev):
-                    self.handleSDLEvent(&ev)
-
-                if self.paused and not overlord.loading:
-                    # Slow down the update rhythm to 1 frame every 2 seconds
-                    SDL_Delay( <Uint32> 2000 )
-                else:
-                    # Sleep for the remainder of the alloted frame time, if there's time left
-                    remainingTime = self._interval  - (SDL_GetTicks()-now)
-                    if remainingTime > 0:
-                        SDL_Delay( <Uint32>(remainingTime+0.5) )
-        else:
-            # Regular loop, draws all the time independently of shown/hidden status
-            while not self.quit:
-                now = SDL_GetTicks()
-                self.update(now)
-#                print "UPDATE: ", SDL_GetTicks() - now
+#        if overlord.platform in ['iphone',]:
+#            # Special loop for single app mobile platforms that slows down when not active
+#            # TODO: Is this really required for iPhone?
+#            # Note: Android does not need this anymore, I've enabled a blocking option in Android_PumpEvents
+#            while not self.quit:
 #                now = SDL_GetTicks()
-                if not self.freezeRenderer:
-                    self.renderer.update(now)
-#                print "RENDESCENE: ", SDL_GetTicks() - now
+#                self.update(now)
+#                if not self.paused:
+#                    self.renderer.update(now)
+#
+#                while SDL_PollEvent(&ev):
+#                    self.handleSDLEvent(&ev)
+#
+#                if self.paused and not overlord.loading:
+#                    # Slow down the update rhythm to 1 frame every 2 seconds
+#                    SDL_Delay( <Uint32> 2000 )
+#                else:
+#                    # Sleep for the remainder of the alloted frame time, if there's time left
+#                    remainingTime = self._interval  - (SDL_GetTicks()-now)
+#                    if remainingTime > 0:
+#                        SDL_Delay( <Uint32>(remainingTime+0.5) )
+#        else:
+            # Regular loop, draws all the time independently of shown/hidden status
+        while not self.quit:
+            nowx = SDL_GetPerformanceCounter()
+            now = nowx / freqx
+            self.update(now)
+            if not self.freezeRenderer:
+                self.renderer.update(now)
 
-                while SDL_PollEvent(&ev):
-                    self.handleSDLEvent(&ev)
+            while SDL_PollEvent(&ev):
+                self.handleSDLEvent(&ev)
 
-                # Sleep for the remainder of the alloted frame time, if there's time left
-                self.frame_time = SDL_GetTicks()-now
-                remainingTime = self._interval  - self.frame_time
-                if remainingTime > 0:
-                    SDL_Delay( <Uint32>(remainingTime+0.5) )
+            # Sleep for the remainder of the alloted frame time, if there's time left
+            self.frame_time = SDL_GetPerformanceCounter()-nowx
+            remainingTime = self._interval  - self.frame_time / self.ticks_second
+            if remainingTime > 0:
+                SDL_Delay( remainingTime)
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev

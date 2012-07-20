@@ -8,12 +8,13 @@
 # Text component
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from Viewable import Viewable
+from Sprite import Sprite
 from ignifuga.Gilbert import Gilbert, Canvas
 from ignifuga.Task import *
+from ignifuga.Log import *
 import sys
 
-class Text(Viewable):
+class Text(Sprite):
     """ Text component class, viewable
     """
     ALIGN_CENTER = 'center'
@@ -39,18 +40,11 @@ class Text(Viewable):
 
     def init(self, **data):
         """ Initialize the required external data """
-
-        self._canvas = Canvas()(width=1, height=1)
+        self._atlas = self._canvas = Canvas()(width=1, height=1)
         self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-
         if self._text != '' and self._font != None:
             self._updateCanvas()
-
         super(Text, self).init(**data)
-
-    @property
-    def canvas(self):
-        return self._canvas
 
     @property
     def text(self):
@@ -84,7 +78,7 @@ class Text(Viewable):
             raise ValueError, "input #%s is not in #RRGGBB format" % colorstring
         r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
         r, g, b = [int(n, 16) for n in (r, g, b)]
-        self.color = (r, g, b)
+        self._color = (r,g,b)
 
     @property
     def font(self):
@@ -112,38 +106,13 @@ class Text(Viewable):
             self._align = value
 
     def _updateCanvas(self):
-        if self._canvas != None:
-            if self._text == '':
-                self._canvas = None
-                return
-            if self._font != None:
-                self._canvas.text(self._text,self._color, self._font, self._size)
-                self.width = self._canvas.width
-                self.height = self._canvas.height
-
-    @Viewable.red.setter
-    def red(self, value):
-        Viewable.red.fset(self,value)
-        if self._canvas != None:
-            self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-
-    @Viewable.green.setter
-    def green(self, value):
-        Viewable.green.fset(self,value)
-        if self._canvas != None:
-            self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-
-    @Viewable.blue.setter
-    def blue(self, value):
-        Viewable.blue.fset(self,value)
-        if self._canvas != None:
-            self._canvas.mod(self._red, self._green, self._blue, self._alpha)
-
-    @Viewable.alpha.setter
-    def alpha(self, value):
-        Viewable.alpha.fset(self,value)
-        if self._canvas != None:
-            self._canvas.mod(self._red, self._green, self._blue, self._alpha)
+        if self._canvas != None and self._font != None:
+            self._canvas.text(self._text,self._color, self._font, self._size)
+            self._updateSize()
+            if self._rendererSpriteId:
+                # The canvas surface changed, remove and add it to the renderer
+                self.hide()
+                self.show()
 
     def hits(self, x, y):
         """ x,y are in sprite coords"""

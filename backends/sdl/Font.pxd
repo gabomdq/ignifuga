@@ -15,3 +15,5 @@ from SDL cimport *
 cdef class Font(FontBase):
     cdef object __weakref__
     cdef TTF_Font *ttf_font
+    cdef char *buffer
+    cdef unsigned int buffersize

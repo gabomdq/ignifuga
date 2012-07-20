@@ -296,7 +296,7 @@ def cythonize(build_dir, package_name, skip=[]):
                 ccf = join(build_dir, 'cython_src', cf.replace(os.sep, '+')[len(build_dir)+1:])
                 if not isfile(ccf) or getctime(ccf) < mf:
                     log('Cythonizing %s' % basename(f))
-                    cmd = 'cython --cplus "%s"' % f
+                    cmd = 'cython --cplus --include-dir "%s/.." "%s"' % (ROOT_DIR, f)
                     p = Popen(shlex.split(cmd), cwd = build_dir)
                     p.communicate()
                     if p.returncode != 0:
@@ -501,7 +501,7 @@ def build_project_generic(options, platform, target, env=None):
 
     if not isfile(main_file_c) or getctime(main_file_c) < main_file_ct:
         log('Cythonizing main file %s' % main_file)
-        cmd = 'cython --embed --cplus --include-dir %s/.. %s' % (ROOT_DIR, main_file)
+        cmd = 'cython --embed --cplus --include-dir "%s/.." "%s"' % (ROOT_DIR, main_file)
         #cmd = 'cython --embed --cplus %s' % ( main_file)
         mfc = join(platform_build, splitext(main_file)[0] + '.cpp')
         Popen(shlex.split(cmd), cwd = platform_build).communicate()

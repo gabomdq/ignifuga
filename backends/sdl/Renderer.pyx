@@ -45,8 +45,6 @@ cdef class Renderer:
         cdef int display = 0, x, y
         cdef char *metamode
 
-        self.frameTimestamp = 0 # milliseconds since epoch
-        self.frameLapse = 0 # Time it takes to render a frame
         self.nativeResolution = (None, None)
         self._scale_x = 1.0
         self._scale_y = 1.0
@@ -224,7 +222,7 @@ cdef class Renderer:
 
 
     @cython.cdivision(True)
-    cdef void _processSprites(self) nogil:
+    cdef void _processSprites(self, bint all) nogil:
         cdef int i, numsprites
         cdef SDL_Rect screen
         cdef bint doScale = 0
@@ -250,9 +248,18 @@ cdef class Renderer:
 
         numsprites = self.active_sprites.size()
 
-        with nogil, parallel():
-            for i in prange(numsprites):
-                self._processSprite(self.active_sprites.at(i), &screen, doScale)
+        #with nogil, parallel():
+        for i in prange(numsprites, nogil=True):
+            sprite = self.active_sprites.at(i)
+            if all or sprite.dirty:
+                self._processSprite(sprite, &screen, doScale)
+                sprite.dirty = False
+#        cdef deque[Sprite_p].iterator iter, iter_last
+#        iter = self.active_sprites.begin()
+#        iter_last  = self.active_sprites.end()
+#        while iter != iter_last:
+#            self._processSprite(deref(iter), &screen, doScale)
+#            inc(iter)
 
     cpdef update(self, Uint32 now):
         """ Renders the whole screen in every frame, ignores dirty rectangle markings completely (easier for handling rotations, etc) """
@@ -271,8 +278,8 @@ cdef class Renderer:
         cdef deque[Sprite_p].iterator iter, iter_last
         cdef Sprite_p sprite
 
-        if self.dirty:
-            self._processSprites()
+        self._processSprites(self.dirty)
+        self.dirty = False
 
         ziter = self.zmap.begin()
         ziter_last = self.zmap.end()
@@ -288,12 +295,7 @@ cdef class Renderer:
                     SDL_RenderCopyEx(self.renderer, sprite.texture, &sprite._src, &sprite._dst, sprite.angle, &sprite.center, sprite.flip)
                 inc(iter)
             inc (ziter)
-
         self.flip()
-        # Calculate how long it's been since the pre update until now.
-        cdef Uint32 _now = SDL_GetTicks()
-        self.frameLapse = _now - self.frameTimestamp
-        self.frameTimestamp = _now
 
     cdef bint _allocSprites(self, int num=100):
         cdef size_t nbytes = sizeof(_Sprite)*num
@@ -306,6 +308,8 @@ cdef class Renderer:
                 self.free_sprites.push_back(&sprites[i])
 
             return True
+        else:
+            error("Could not allocate memory for new sprites!")
 
         return False
 
@@ -316,6 +320,7 @@ cdef class Renderer:
             self.zmap.insert(pair[int,deque[Sprite_p]](sprite.z,deque[Sprite_p]()))
             ziter = self.zmap.find(sprite.z)
         deref(ziter).second.push_back(sprite)
+        self.dirty = True
         return True
 
     cdef bint _unindexSprite(self, _Sprite *sprite):
@@ -333,7 +338,7 @@ cdef class Renderer:
                 inc(iter)
         return False
 
-    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip):
+    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
         cdef _Sprite *sprite
         cdef Sprite sprite_wrap = Sprite()
         if self.free_sprites.empty():
@@ -357,9 +362,13 @@ cdef class Renderer:
             sprite.center.y = centery
             sprite.flip = <SDL_RendererFlip>flip
             sprite.z = z
+            sprite.r = <Uint8>(r*255.0)
+            sprite.g = <Uint8>(g*255.0)
+            sprite.b = <Uint8>(b*255.0)
+            sprite.a = <Uint8>(a*255.0)
+            sprite.dirty = True
 
             self._indexSprite(sprite)
-            self.dirty = True
             sprite_wrap.sprite = sprite
             return sprite_wrap
         return None
@@ -405,7 +414,7 @@ cdef class Renderer:
         sprite.src.y = y
         sprite.src.w = w
         sprite.src.h = h
-        self.dirty = True
+        sprite.dirty = True
         return True
 
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil:
@@ -413,7 +422,7 @@ cdef class Renderer:
         sprite.center.x = centerx
         sprite.center.y = centery
         sprite.flip = <SDL_RendererFlip>flip
-        self.dirty = True
+        sprite.dirty = True
         return True
 
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil:
@@ -428,7 +437,7 @@ cdef class Renderer:
         sprite.dst.y = y
         sprite.dst.w = w
         sprite.dst.h = h
-        self.dirty = True
+        sprite.dirty = True
         return True
 
     cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h):
@@ -442,7 +451,6 @@ cdef class Renderer:
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a):
         cdef _Sprite *sprite = sprite_w.sprite
         return self._spriteColor(sprite, <Uint8>(r*255.0), <Uint8>(g*255.0), <Uint8>(b*255.0), <Uint8>(a*255.0))
-
 
     property screenSize:
         def __get__(self):
@@ -519,6 +527,7 @@ cdef class Renderer:
         
     cpdef _calculateScale(self, double scene_w, double scene_h, int screen_w, int screen_h, bint keep_aspect=1):
         cdef double sx, sy
+        self.dirty = True
         if scene_w!=-1.0 and scene_h != -1.0:
             sx = <double>screen_w/scene_w
             sy = <double>screen_h/scene_h
@@ -578,7 +587,7 @@ cdef class Renderer:
             sy = max_h
 
         if self._scroll_x != sx or self._scroll_y != sy:
-            #debug("SCROLLING TO %dx%d" % (sx,sy))
+            self.dirty = True
             self._scroll_x = sx
             self._scroll_y = sy
             Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
@@ -607,6 +616,7 @@ cdef class Renderer:
 
         self._scale_x = scale_x
         self._scale_y = scale_y
+        self.dirty = True
 
         # Adjust scrolling if needed
         self.scrollBy(0,0)

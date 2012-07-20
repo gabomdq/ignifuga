@@ -96,7 +96,7 @@ cdef void _processBunny(Renderer renderer, _Bunny_p bunny) nogil:
         bunny.speedy = 0
 
     renderer._spriteDst(bunny.sprite, bunny.x, bunny.y, bunny.w, bunny.h)
-    renderer._spriteRot(bunny.sprite, bunny.angle, bunny.cx,bunny.cy, 0)
+    #renderer._spriteRot(bunny.sprite, bunny.angle, bunny.cx,bunny.cy, 0)
     renderer._spriteColor(bunny.sprite, bunny.r, bunny.g, bunny.b, bunny.a)
 
 cdef _update(scene):
@@ -106,12 +106,10 @@ cdef _update(scene):
     cdef Renderer renderer = scene.renderer
     cdef GameLoop gameLoop = scene.gameLoop
 
-
-
     ft = gameLoop.frame_time
-    if ft < 10:
+    if ft < gameLoop.ticks_second / 100:
         scene.addBunnies(1500)
-    elif ft < 33:
+    elif ft < gameLoop.ticks_second / 30:
         scene.addBunnies(500)
 
 
@@ -130,17 +128,31 @@ class Bunnies(Scene):
                     "height":1200
                 },
                 "keepAspect":True,
+                "autoScale": False,
                 "autoCenter": True,
                 "size":{
                     "width":1920,
                     "height":1200
-                }
+                },
+                "components":[
+                     {
+                        "id": "fps",
+                        "type":"Text",
+                        "font": u"images/teenbold.ttf",
+                        "htmlColor": u"#ffffff",
+                        "text":u"0",
+                        "size": 48,
+                        "x": 0,
+                        "y": 0
+                    }
+                ]
         }
         super(Bunnies, self).__init__(**data)
 
 
     def sceneInit(self):
         global maxx, maxy
+        maxx, maxy = Gilbert().renderer.screenSize
         # Add bunnies
         self.nBunnies = 0
         self.ft = 0
@@ -148,11 +160,12 @@ class Bunnies(Scene):
         self.bunnies = []
         super(Bunnies, self).sceneInit()
         init()
-        self.addBunnies()
-        maxx = self.size['width']
-        maxy = self.size['height']
+        self.size = {'width': maxx, 'height': maxy}
+        self.resolution = {'width': maxx, 'height': maxy}
         self.renderer = Gilbert().renderer
         self.gameLoop = Gilbert().gameLoop
+        self.renderer.scrollTo(0,0)
+        self.addBunnies()
 
     def addBunnies(self, num=500):
         data = {"components":[
@@ -164,7 +177,7 @@ class Bunnies(Scene):
             },
         ]}
         r = Random()
-        debug(" ADDING %d BUNNIES" % num)
+        #debug(" ADDING %d BUNNIES" % num)
         for x in range(0,num):
             sprite_id = 'bunny_sprite %d' % self.nBunnies
             data['components'][0]['id'] = sprite_id
@@ -179,7 +192,10 @@ class Bunnies(Scene):
             self.bunnies.append(bunny)
             Gilbert().startEntity(bunny)
             self.nBunnies+=1
-        debug(" ADDED BUNNIES. TOTAL: %d" % self.nBunnies)
+        fps = self.getComponent("fps")
+        if fps != None:
+            fps.text = str(self.nBunnies)
+        #debug(" ADDED BUNNIES. TOTAL: %d" % self.nBunnies)
 
     def update(self, data):
         """ Move bunnies """
@@ -206,4 +222,15 @@ def run():
 #        pass
 
 if __name__ == '__main__':
-    run()
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile")
+    (options, args) = parser.parse_args()
+
+    if options.profile:
+        import cProfile, pstats
+        profileFileName = 'profile_data.pyprof'
+        cProfile.runctx("run()", globals(), locals(), profileFileName)
+        pstats.Stats(profileFileName).strip_dirs().sort_stats("time").print_stats()
+    else:
+        run()

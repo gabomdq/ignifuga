@@ -29,7 +29,7 @@ cdef struct _Sprite:
     int z
     Uint8 r,g,b,a
 
-    bint show
+    bint show, dirty
     SDL_Rect _src, _dst
 
 ctypedef _Sprite* Sprite_p
@@ -38,7 +38,7 @@ cdef class Sprite:
     cdef Sprite_p sprite
 
 cdef class Renderer:
-    cdef Uint32 frameTimestamp, frameLapse
+    cdef Uint32 frameTimestamp
     cdef tuple nativeResolution
     # Scale factor = screen/scene
     cdef double _scale_x, _scale_y
@@ -58,7 +58,7 @@ cdef class Renderer:
     cdef bint dirty
 
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil
-    cdef void _processSprites(self) nogil
+    cdef void _processSprites(self, bint all) nogil
 
     cpdef update(self, Uint32 now)
     cpdef getTimestamp(self)
@@ -84,7 +84,7 @@ cdef class Renderer:
     cdef bint _unindexSprite(self, _Sprite *sprite)
 
 
-    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip)
+    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a)
     cpdef bint removeSprite(self, Sprite sprite_w)
     cpdef bint spriteZ(self, Sprite sprite_w, int z)
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h)

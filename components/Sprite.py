@@ -59,11 +59,11 @@ class Sprite(Viewable):
 
         self._started = True
         self._dirty = True
-        self.renderer = Gilbert().renderer
 
     def init(self, **data):
         """ Initialize the required external data """
         # Do our initialization
+        self.renderer = Gilbert().renderer
         if self.file != None:
             self._atlas = LOAD_IMAGE(self.file)
             if self._atlas.spriteData != None:
@@ -448,10 +448,11 @@ class Sprite(Viewable):
                 self._angle,
                 self._center[0] if self._center != None else self._width_pre / 2,
                 self._center[1] if self._center != None else self._height_pre / 2,
-                (1 if self.fliph else 0) + (2 if self.flipv else 0))
+                (1 if self.fliph else 0) + (2 if self.flipv else 0),
+                self._red, self._green, self._blue, self._alpha)
 
     def hide(self):
-        if self._rendererSpriteId:
+        if self._rendererSpriteId is not None:
             self.renderer.removeSprite(self._rendererSpriteId)
             self._rendererSpriteId = None
 

@@ -24,6 +24,7 @@ from cython.operator cimport dereference as deref, preincrement as inc #derefere
 
 # cython: boundscheck=False
 # cython: wraparound=False
+# xcython: profile=True
 
 cdef struct _Bunny:
     Sprite_p sprite
@@ -74,19 +75,20 @@ cdef _addBunny(bunny):
 cdef _update(scene):
     global bunnies, maxx, maxy
     cdef int gravity = 2, ft
-    cdef bunnies_iterator iter = bunnies.begin()
+    cdef bunnies_iterator iter_end = bunnies.end(), iter = bunnies.begin()
     cdef _Bunny_p bunny
     cdef Renderer renderer = scene.renderer
     cdef GameLoop gameLoop = scene.gameLoop
 
-
     ft = gameLoop.frame_time
-    if ft < 10:
-        scene.addBunnies(1500)
-    elif ft < 33:
-        scene.addBunnies(500)
+#    if ft < gameLoop.ticks_second / 100:
+#        scene.addBunnies(1500)
+#    elif ft < gameLoop.ticks_second / 30:
+#        scene.addBunnies(500)
+    if ft < gameLoop.ticks_second / 30:
+            scene.addBunnies(100)
 
-    while iter != bunnies.end():
+    while iter != iter_end:
         bunny = &deref(iter)
         bunny.speedy += gravity
         bunny.x += bunny.speedx
@@ -106,7 +108,7 @@ cdef _update(scene):
             bunny.speedy = 0
 
         renderer._spriteDst(bunny.sprite, bunny.x, bunny.y, bunny.w, bunny.h)
-        renderer._spriteRot(bunny.sprite, bunny.angle, bunny.cx,bunny.cy, 0)
+        #renderer._spriteRot(bunny.sprite, bunny.angle, bunny.cx,bunny.cy, 0)
         renderer._spriteColor(bunny.sprite, bunny.r, bunny.g, bunny.b, bunny.a)
         inc(iter)
 
@@ -118,17 +120,31 @@ class Bunnies(Scene):
                     "height":1200
                 },
                 "keepAspect":True,
+                "autoScale": False,
                 "autoCenter": True,
                 "size":{
                     "width":1920,
                     "height":1200
-                }
+                },
+                "components":[
+                        {
+                        "id": "fps",
+                        "type":"Text",
+                        "font": u"images/teenbold.ttf",
+                        "htmlColor": u"#ffffff",
+                        "text":u"0",
+                        "size": 48,
+                        "x": 0,
+                        "y": 0
+                    }
+                ]
         }
         super(Bunnies, self).__init__(**data)
 
 
     def sceneInit(self):
         global maxx, maxy
+        maxx, maxy = Gilbert().renderer.screenSize
         # Add bunnies
         self.nBunnies = 0
         self.ft = 0
@@ -136,13 +152,14 @@ class Bunnies(Scene):
         self.bunnies = []
         super(Bunnies, self).sceneInit()
         init()
-        self.addBunnies()
-        maxx = self.size['width']
-        maxy = self.size['height']
+        self.size = {'width': maxx, 'height': maxy}
+        self.resolution = {'width': maxx, 'height': maxy}
         self.renderer = Gilbert().renderer
         self.gameLoop = Gilbert().gameLoop
+        self.renderer.scrollTo(0,0)
+        self.addBunnies()
 
-    def addBunnies(self, num=500):
+    def addBunnies(self, num=100):
         data = {"components":[
                 {
                 "type":"Sprite",
@@ -152,7 +169,6 @@ class Bunnies(Scene):
             },
         ]}
         r = Random()
-        debug(" ADDING %d BUNNIES" % num)
         for x in range(0,num):
             sprite_id = 'bunny_sprite %d' % self.nBunnies
             data['components'][0]['id'] = sprite_id
@@ -167,10 +183,13 @@ class Bunnies(Scene):
             self.bunnies.append(bunny)
             Gilbert().startEntity(bunny)
             self.nBunnies+=1
-        debug(" ADDED BUNNIES. TOTAL: %d" % self.nBunnies)
+        fps = self.getComponent("fps")
+        if fps != None:
+            fps.text = str(self.nBunnies)
 
     def update(self, data):
         """ Move bunnies """
+        release = []
         for bunny in self.bunnies:
             if bunny._components:
                 sprite = bunny._components.values()[0]
@@ -178,20 +197,30 @@ class Bunnies(Scene):
                     sprite.speedx = bunny.speedx
                     sprite.speedy = bunny.speedy
                     _addBunny(sprite)
-                    self.bunnies.remove(bunny)
+                    release.append(bunny)
 
+        for bunny in release:
+            self.bunnies.remove(bunny)
         _update(self)
-
-
-
 
 def run():
     #try:
         Log(0)
         bunnies = Bunnies()
         Gilbert().init(BACKENDS.sdl, bunnies)
-#    except:
-#        pass
+    #except:
+    #    pass
 
 if __name__ == '__main__':
-    run()
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile")
+    (options, args) = parser.parse_args()
+
+    if options.profile:
+        import cProfile, pstats
+        profileFileName = 'profile_data.pyprof'
+        cProfile.runctx("run()", globals(), locals(), profileFileName)
+        pstats.Stats(profileFileName).strip_dirs().sort_stats("time").print_stats()
+    else:
+        run()

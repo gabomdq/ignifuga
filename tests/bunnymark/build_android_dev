@@ -8,6 +8,6 @@ schafer -P android
 schafer -P android -m bunniesx.pyx -p com.mdqinc.bunnymarkx -a images
 cp com.mdqinc.bunnymarkx ..
 cd build/android/android_project
-ant install
+ant debug install
 cd ../../../..
 

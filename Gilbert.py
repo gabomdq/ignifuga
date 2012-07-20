@@ -181,6 +181,7 @@ class Gilbert:
         parser.add_option("--width", dest="width", default=None,help="Resolution Width")
         parser.add_option("--height", dest="height", default=None,help="Resolution Height")
         parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
+        parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
         (options, args) = parser.parse_args()
 
         # Set up dynamic imports

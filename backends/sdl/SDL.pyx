@@ -6,6 +6,7 @@
 # xcython: profile=True
 
 from libc.stdlib cimport free, malloc
+from ignifuga.Log import error
 
 DEF SDL_INIT_EVERYTHING = 0x0000FFFF
 
@@ -34,6 +35,10 @@ cpdef str readFile(str name):
     cdef size_t bytesread
     if ctx != NULL:
         buf = <char*>malloc(1025)
+        if buf == NULL:
+            error("Could not allocate memory for temp buffer to read file!")
+            return None
+
         bytesread = ctx.read(ctx, buf, 1, 1024)
         while bytesread > 0:
             buf[bytesread] = 0

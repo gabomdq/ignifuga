@@ -142,8 +142,10 @@ def prepare_android_env(openmp=False):
     env['NDK'] = ANDROID_NDK
     env['STL'] = 'gnu'
 
+
     #env['ARCH'] = "armeabi-v7a"
     env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" % (ANDROID_NDK)
+
     if env['ARCH'] == "armeabi-v7a":
         env['CFLAGS']+=" -march=armv7-a -mfloat-abi=softfp -mfpu=vfp -mthumb"
     env['CXXFLAGS'] = env['CFLAGS']
@@ -153,6 +155,12 @@ def prepare_android_env(openmp=False):
     env['RANLIB'] = "arm-linux-androideabi-ranlib"
     env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
+
+    # Debugging
+#    env['NDK_DEBUG'] = "1"
+#    # "-g" for debug info
+#    env['CFLAGS'] += " -g -gstabs+"
+#    env['CPPFLAGS'] = " -g -gstabs+"
 
     return env
 
