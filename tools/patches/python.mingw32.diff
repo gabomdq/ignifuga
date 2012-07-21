@@ -440,22 +440,6 @@ Index: configure.in
 ===================================================================
 --- configure.in	(revisión: 29)
 +++ configure.in	(copia de trabajo)
-@@ -43,7 +43,15 @@
- mv confdefs.h.new confdefs.h
- 
- AC_SUBST(VERSION)
-+case $host in
-+  *-*-mingw*)
-+  dnl To be compatible with MSVC build.
-+VERSION=`echo PYTHON_VERSION | sed -e 's|\.||g'`
-+  ;;
-+  *)
- VERSION=PYTHON_VERSION
-+  ;;
-+esac
- 
- AC_SUBST(SOVERSION)
- SOVERSION=1.0
 @@ -277,8 +285,28 @@
  # Set name for machine-dependent library files
  AC_SUBST(MACHDEP)
