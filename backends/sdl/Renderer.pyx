@@ -73,6 +73,7 @@ cdef class Renderer:
         SDL_GetDesktopDisplayMode(display, &dm)
         self.platform = Gilbert().platform
 
+        debug("Platform: " + str(self.platform))
         debug("Display: %d,  desktop mode is %dx%d" % (display, dm.w, dm.h))
 
         if width is None:
@@ -85,20 +86,24 @@ cdef class Renderer:
             height=int(height)
 
         debug("WIDTH: %d HEIGHT: %d X: %d Y: %d" % (width, height, x, y))
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0)
+        SDL_GL_SetAttribute(SDL_GL_RETAINED_BACKING,1)
         if self.platform in ['win32', 'darwin', 'linux']:
+            print "CREATING FOR WIN/OSX/LINUX"
             if fullscreen:
                 self.window = SDL_CreateWindow("Ignifuga",
                     x, y,
-                    width, height, SDL_WINDOW_FULLSCREEN)
+                    width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE)
             else:
                 self.window = SDL_CreateWindow("Ignifuga",
                     SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
                     width, height, SDL_WINDOW_RESIZABLE)
         else:
             # Android and iOS don't care what we tell them to do, they create a full screen window anyway
+            print "CREATING FOR IOS/ANDROID"
             self.window = SDL_CreateWindow("Ignifuga",
                 SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
-                width, height, SDL_WINDOW_FULLSCREEN)
+                width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE)
         if self.window == NULL:
             error("COULD NOT CREATE SDL WINDOW")
             error(SDL_GetError())
