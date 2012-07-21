@@ -58,6 +58,7 @@ cdef class Canvas (CanvasBase):
             if ss != NULL:
                 # Create texture from image
                 self._surfacehw = SDL_CreateTextureFromSurface(self._sdlRenderer, ss)
+
                 if ss.userdata != NULL:
                     self.spriteData = json.loads(<char*>ss.userdata)
                     
@@ -93,11 +94,13 @@ cdef class Canvas (CanvasBase):
         SDL_SetTextureBlendMode(self._surfacehw, SDL_BLENDMODE_BLEND)
 
     def __dealloc__(self):
-        #debug( "CANVAS DEALLOC %s" % self)
+        debug( ">>>CANVAS DEALLOC %s<<<" % self)
         if self._hw:
             SDL_DestroyTexture(self._surfacehw)
+            self._surfacehw = NULL
         else:
             SDL_FreeSurface(self._surfacesw)
+            self._surfacesw = NULL
 
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
         #cdef Canvas canvas
@@ -241,16 +244,21 @@ cdef class Canvas (CanvasBase):
         cdef bytes btext = bytes(text)
         sdl_color.r, sdl_color.g, sdl_color.b = color
         ss = TTF_RenderUTF8_Solid(self._font.ttf_font, btext, sdl_color)
-        if self._hw:
-            SDL_DestroyTexture(self._surfacehw)
-        else:
-            SDL_FreeSurface(self._surfacesw)
+        if ss != NULL:
+            if self._hw and self._surfacehw != NULL:
+                SDL_DestroyTexture(self._surfacehw)
+            elif self._surfacesw != NULL:
+                SDL_FreeSurface(self._surfacesw)
 
-        self._surfacehw = SDL_CreateTextureFromSurface(self._sdlRenderer, ss)
-        self._hw = True
-        self._width = ss.w
-        self._height = ss.h
-        SDL_FreeSurface(ss)
+            self._surfacehw = SDL_CreateTextureFromSurface(self._sdlRenderer, ss)
+            if self._surfacehw == NULL:
+                error(">>> Problem creating Text HW Surface!! <<<")
+                exit(1)
+
+            self._hw = True
+            self._width = ss.w
+            self._height = ss.h
+            SDL_FreeSurface(ss)
         self.mod(self._r, self._g, self._b, self._a)
 
 

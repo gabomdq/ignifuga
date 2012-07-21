@@ -3,6 +3,7 @@
 # Original version: http://blog.iainlobb.com/2010/11/display-list-vs-blitting-results.html
 # See http://philippe.elsass.me/2011/11/nme-ready-for-the-show/ for a HaxeNME version
 # This code is licensed under MIT License
+# Cython version
 
 from ignifuga.Gilbert import Gilbert, BACKENDS
 from ignifuga.Log import Log, debug
@@ -81,12 +82,8 @@ cdef _update(scene):
     cdef GameLoop gameLoop = scene.gameLoop
 
     ft = gameLoop.frame_time
-#    if ft < gameLoop.ticks_second / 100:
-#        scene.addBunnies(1500)
-#    elif ft < gameLoop.ticks_second / 30:
-#        scene.addBunnies(500)
     if ft < gameLoop.ticks_second / 30:
-            scene.addBunnies(100)
+        scene.addBunnies+=100
 
     while iter != iter_end:
         bunny = &deref(iter)
@@ -94,6 +91,7 @@ cdef _update(scene):
         bunny.x += bunny.speedx
         bunny.y += bunny.speedy
         bunny.a = 76 + 178 * bunny.y / maxy
+
         if bunny.x > maxx:
             bunny.x = maxx
             bunny.speedx = -bunny.speedx
@@ -135,7 +133,8 @@ class Bunnies(Scene):
                         "text":u"0",
                         "size": 48,
                         "x": 0,
-                        "y": 0
+                        "y": 0,
+                        "z": 1000
                     }
                 ]
         }
@@ -149,17 +148,14 @@ class Bunnies(Scene):
         self.nBunnies = 0
         self.ft = 0
         self.ftc = 0
-        self.bunnies = []
-        super(Bunnies, self).sceneInit()
+        self.addBunnies = 500
         init()
         self.size = {'width': maxx, 'height': maxy}
         self.resolution = {'width': maxx, 'height': maxy}
         self.renderer = Gilbert().renderer
         self.gameLoop = Gilbert().gameLoop
-        self.renderer.scrollTo(0,0)
-        self.addBunnies()
+        super(Bunnies, self).sceneInit()
 
-    def addBunnies(self, num=100):
         data = {"components":[
                 {
                 "type":"Sprite",
@@ -168,39 +164,44 @@ class Bunnies(Scene):
                 "y": 0
             },
         ]}
-        r = Random()
-        for x in range(0,num):
-            sprite_id = 'bunny_sprite %d' % self.nBunnies
-            data['components'][0]['id'] = sprite_id
-            bunny = Entity.create(id = 'bunny %d' % self.nBunnies, scene=self, **data)
-            bunny.x = r.random()*self.size['width']
-            bunny.y = self.size['height']
-            bunny.speedx = int(r.random()*70.0) - 35
-            bunny.speedy = int(r.random()*70.0)
-            bunny.angle = 90 - r.random() * 90
-            bunny.z = int(r.random()*100)
-            self.entities[bunny.id] = bunny
-            self.bunnies.append(bunny)
-            Gilbert().startEntity(bunny)
-            self.nBunnies+=1
+
+        self.bunny = Entity.create(id = 'bunny %d' % self.nBunnies, scene=self, **data)
+        self.entities[self.bunny.id] = self.bunny
+        Gilbert().startEntity(self.bunny)
         fps = self.getComponent("fps")
         if fps != None:
             fps.text = str(self.nBunnies)
 
+        self.renderer.scrollTo(0,0)
+
     def update(self, data):
         """ Move bunnies """
-        release = []
-        for bunny in self.bunnies:
-            if bunny._components:
-                sprite = bunny._components.values()[0]
-                if hasattr(sprite, '_rendererSpriteId') and sprite._rendererSpriteId != None:
-                    sprite.speedx = bunny.speedx
-                    sprite.speedy = bunny.speedy
-                    _addBunny(sprite)
-                    release.append(bunny)
+        addedBunnies = 0
+        if self.addBunnies > 0:
+            r = Random()
+            for x in range(0, self.addBunnies):
+                if self.bunny._components:
+                    sprite = self.bunny._components.values()[0]
+                    if hasattr(sprite, '_rendererSpriteId') and sprite._rendererSpriteId != None:
+                        self.bunny.x = r.random()*self.size['width']
+                        self.bunny.y = self.size['height']
+                        self.bunny.speedx = int(r.random()*70.0) - 35
+                        self.bunny.speedy = int(r.random()*70.0)
+                        self.bunny.angle = 90 - r.random() * 90
+                        self.bunny.z = 0
+                        sprite.speedx = self.bunny.speedx
+                        sprite.speedy = self.bunny.speedy
+                        _addBunny(sprite)
+                        sprite._rendererSpriteId = None
+                        sprite.show()
+                        addedBunnies +=1
 
-        for bunny in release:
-            self.bunnies.remove(bunny)
+            self.addBunnies -= addedBunnies
+            self.nBunnies += addedBunnies
+            fps = self.getComponent("fps")
+            if fps != None:
+                fps.text = str(self.nBunnies)
+
         _update(self)
 
 def run():

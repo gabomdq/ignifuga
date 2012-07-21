@@ -302,9 +302,9 @@ class Gilbert:
                         elif isinstance(ref, list):
                             debug("    LIST: %s items" % len(ref))
                         elif isinstance(ref, tuple):
-                            debug("    TUPLE: %s" % ref)
+                            debug("    TUPLE: %s" % str(ref))
                         else:
-                            debug("    OTHER: %s" % ref)
+                            debug("    OTHER: %s" % str(ref))
         self.dataManager.cleanup(True)
         # Break any remaining cycles that prevent garbage collection
         del self.dataManager

@@ -53,8 +53,7 @@ cdef class Renderer:
 
     # Sprites
     cdef map[int,deque[Sprite_p]] *zmap
-    cdef deque[Sprite_p] *active_sprites
-    cdef deque[Sprite_p] *free_sprites
+    cdef deque[_Sprite] *active_sprites
     cdef bint dirty
 
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil
@@ -79,7 +78,6 @@ cdef class Renderer:
     cpdef tuple screenToScene(self, int sx, int sy)
     cpdef tuple sceneToScreen(self, double sx, double sy)
 
-    cdef bint _allocSprites(self, int num=*)
     cdef bint _indexSprite(self, _Sprite *sprite)
     cdef bint _unindexSprite(self, _Sprite *sprite)
 

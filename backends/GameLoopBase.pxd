@@ -64,19 +64,17 @@ cdef struct _EntityTasks:
 ctypedef PyObject* PyObject_p
 
 ctypedef map[PyObject_p, _EntityTasks].iterator entities_iterator
-ctypedef deque[_Task_p].iterator task_iterator
+ctypedef deque[_Task].iterator task_iterator
 
 cdef class GameLoopBase(object):
     cdef public bint quit, paused, freezeRenderer
     cdef public double _fps
     cdef str platform
-    cdef deque[_Task_p] *loading
-    cdef deque[_Task_p] *running
+    cdef deque[_Task] *loading
+    cdef deque[_Task] *running
     cdef map[PyObject_p, _EntityTasks] *entities
-    cdef deque[_Task_p] *free_tasks
     cdef readonly unsigned long frame_time, _interval, ticks_second
 
-    cdef bint _allocTasks(self, int num=*)
     cpdef startEntity(self, entity)
     cpdef startComponent(self, component)
     cpdef bint stopEntity(self, entity)

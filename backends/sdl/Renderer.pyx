@@ -147,8 +147,7 @@ cdef class Renderer:
 
         # _Sprite list allocation and setup
         self.zmap = new map[int,deque[Sprite_p]]()
-        self.free_sprites = new deque[Sprite_p]()
-        self.active_sprites = new deque[Sprite_p]()
+        self.active_sprites = new deque[_Sprite]()
         self.dirty = True
 
     @cython.cdivision(True)
@@ -255,15 +254,15 @@ cdef class Renderer:
 
         #with nogil, parallel():
         for i in prange(numsprites, nogil=True):
-            sprite = self.active_sprites.at(i)
+            sprite = &self.active_sprites.at(i)
             if all or sprite.dirty:
                 self._processSprite(sprite, &screen, doScale)
                 sprite.dirty = False
-#        cdef deque[Sprite_p].iterator iter, iter_last
+#        cdef deque[Sprite].iterator iter, iter_last
 #        iter = self.active_sprites.begin()
 #        iter_last  = self.active_sprites.end()
 #        while iter != iter_last:
-#            self._processSprite(deref(iter), &screen, doScale)
+#            self._processSprite(&deref(iter), &screen, doScale)
 #            inc(iter)
 
     cpdef update(self, Uint32 now):
@@ -302,22 +301,6 @@ cdef class Renderer:
             inc (ziter)
         self.flip()
 
-    cdef bint _allocSprites(self, int num=100):
-        cdef size_t nbytes = sizeof(_Sprite)*num
-        cdef _Sprite *sprites = <_Sprite*>malloc(nbytes)
-        cdef int i
-
-        if sprites != NULL:
-            memset(<void *>sprites, 0, nbytes)
-            for i in range(0,num):
-                self.free_sprites.push_back(&sprites[i])
-
-            return True
-        else:
-            error("Could not allocate memory for new sprites!")
-
-        return False
-
     cdef bint _indexSprite(self, _Sprite* sprite):
         cdef zmap_iterator ziter
         ziter = self.zmap.find(sprite.z)
@@ -344,51 +327,45 @@ cdef class Renderer:
         return False
 
     cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
-        cdef _Sprite *sprite
+        cdef _Sprite sprite, *spritep
         cdef Sprite sprite_wrap = Sprite()
-        if self.free_sprites.empty():
-            self._allocSprites()
 
-        if not self.free_sprites.empty():
-            sprite = self.free_sprites.back()
-            self.free_sprites.pop_back()
-            self.active_sprites.push_back(sprite)
-            sprite.texture = canvas._surfacehw
-            sprite.src.x = sx
-            sprite.src.y = sy
-            sprite.src.w = sw
-            sprite.src.h = sh
-            sprite.dst.x = dx
-            sprite.dst.y = dy
-            sprite.dst.w = dw
-            sprite.dst.h = dh
-            sprite.angle = angle
-            sprite.center.x = centerx
-            sprite.center.y = centery
-            sprite.flip = <SDL_RendererFlip>flip
-            sprite.z = z
-            sprite.r = <Uint8>(r*255.0)
-            sprite.g = <Uint8>(g*255.0)
-            sprite.b = <Uint8>(b*255.0)
-            sprite.a = <Uint8>(a*255.0)
-            sprite.dirty = True
+        sprite.texture = canvas._surfacehw
+        sprite.src.x = sx
+        sprite.src.y = sy
+        sprite.src.w = sw
+        sprite.src.h = sh
+        sprite.dst.x = dx
+        sprite.dst.y = dy
+        sprite.dst.w = dw
+        sprite.dst.h = dh
+        sprite.angle = angle
+        sprite.center.x = centerx
+        sprite.center.y = centery
+        sprite.flip = <SDL_RendererFlip>flip
+        sprite.z = z
+        sprite.r = <Uint8>(r*255.0)
+        sprite.g = <Uint8>(g*255.0)
+        sprite.b = <Uint8>(b*255.0)
+        sprite.a = <Uint8>(a*255.0)
+        sprite.dirty = True
 
-            self._indexSprite(sprite)
-            sprite_wrap.sprite = sprite
-            return sprite_wrap
-        return None
+        self.active_sprites.push_back(sprite)
+        spritep = &self.active_sprites.back()
+        self._indexSprite(spritep)
+        sprite_wrap.sprite = spritep
+        return sprite_wrap
 
     cpdef bint removeSprite(self, Sprite sprite_w):
         cdef _Sprite *sprite = sprite_w.sprite
-        cdef deque_Sprite_iterator iter
+        cdef deque[_Sprite].iterator iter
         if self._unindexSprite(sprite):
             iter = self.active_sprites.begin()
             while iter != self.active_sprites.end():
-                if deref(iter) == sprite:
+                if &deref(iter) == sprite:
                     self.active_sprites.erase(iter)
                     break
                 inc(iter)
-            self.free_sprites.push_back(sprite)
             return True
         return False
 
@@ -635,12 +612,6 @@ cdef class Renderer:
         cdef deque_Sprite_iterator iter
 
         # Release unused sprites
-        while not self.free_sprites.empty():
-            sprite = self.free_sprites.back()
-            free(sprite)
-            self.free_sprites.pop_back()
-
-        del self.free_sprites
         del self.active_sprites
 
         # Release sprites in use

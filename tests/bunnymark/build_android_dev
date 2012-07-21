@@ -6,7 +6,7 @@ cp -r images build
 cd build
 schafer -P android
 schafer -P android -m bunniesx.pyx -p com.mdqinc.bunnymarkx -a images
-cp com.mdqinc.bunnymarkx ..
+cp com.mdqinc.bunnymarkx.apk ..
 cd build/android/android_project
 ant debug install
 cd ../../../..

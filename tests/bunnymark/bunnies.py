@@ -3,6 +3,7 @@
 # Original version: http://blog.iainlobb.com/2010/11/display-list-vs-blitting-results.html
 # See http://philippe.elsass.me/2011/11/nme-ready-for-the-show/ for a HaxeNME version
 # This code is licensed under MIT License
+# Pure Python version
 
 from ignifuga.Gilbert import Gilbert, BACKENDS
 from ignifuga.Log import Log, debug
@@ -33,7 +34,8 @@ class Bunnies(Scene):
                         "text":u"0",
                         "size": 48,
                         "x": 0,
-                        "y": 0
+                        "y": 0,
+                        "z": 1000
                     }
                 ]
         }
