@@ -93,7 +93,7 @@ cdef class Renderer:
             if fullscreen:
                 self.window = SDL_CreateWindow("Ignifuga",
                     x, y,
-                    width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE)
+                    width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
             else:
                 self.window = SDL_CreateWindow("Ignifuga",
                     SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
@@ -103,7 +103,7 @@ cdef class Renderer:
             print "CREATING FOR IOS/ANDROID"
             self.window = SDL_CreateWindow("Ignifuga",
                 SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
-                width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE)
+                width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
         if self.window == NULL:
             error("COULD NOT CREATE SDL WINDOW")
             error(SDL_GetError())
@@ -111,7 +111,19 @@ cdef class Renderer:
             return
 
         #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
-        self.renderer = SDL_CreateRenderer(self.window, -1, 0)
+
+        # Find the GL renderer (useful for windows)
+        cdef int num_renderers =  SDL_GetNumRenderDrivers(), renderer_index
+        cdef SDL_RendererInfo renderer_info
+        #debug("FOUND %d RENDERERS" % num_renderers)
+        for renderer_index in range(num_renderers):
+            SDL_GetRenderDriverInfo(renderer_index, &renderer_info)
+            #debug("RENDERER %s" % renderer_info.name)
+            if renderer_info.name==bytes('opengl'):
+                break
+
+
+        self.renderer = SDL_CreateRenderer(self.window, renderer_index, 0)
         if self.renderer == NULL:
             error("COULD NOT CREATE RENDERER")
             error(SDL_GetError())
@@ -649,7 +661,7 @@ cdef class Renderer:
     cpdef clearRect(self, rect):
         return self.clear(rect[0], rect[1], rect[2], rect[3])
 
-    cpdef flip(self):
+    cdef flip(self):
         """ Show the contents of the window in a coordinated manner"""
         SDL_RenderPresent(self.renderer)
         if self._doublebuffered:

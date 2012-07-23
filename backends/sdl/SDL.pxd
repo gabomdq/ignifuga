@@ -397,6 +397,8 @@ cdef extern from "SDL.h":
     cdef Uint64 SDL_GetPerformanceCounter() nogil
     cdef Uint64 SDL_GetPerformanceFrequency() nogil
     cdef int SDL_GL_SetAttribute(SDL_GLattr attr, int value)
+    cdef int SDL_GetNumRenderDrivers()
+    cdef int SDL_GetRenderDriverInfo(int index, SDL_RendererInfo* info)
 
 
 cdef extern from "SDL_image.h":

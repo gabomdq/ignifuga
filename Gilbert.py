@@ -164,7 +164,15 @@ class Gilbert:
     __metaclass__ = Singleton
 
     def __init__(self):
-        pass
+        usage = "game [options]"
+        self.parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
+        self.parser.add_option("-d", "--display", dest="display", default=0,help="Display (default: 0)")
+        self.parser.add_option("--width", dest="width", default=None,help="Resolution Width")
+        self.parser.add_option("--height", dest="height", default=None,help="Resolution Height")
+        self.parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
+        self.parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
+
+
     
     def init(self, backend, firstScene, scenesFile=None):
         """
@@ -175,14 +183,7 @@ class Gilbert:
         self.backend = backend
         debug ('Initializing Gilbert Overlord')
 
-        usage = "game [options]"
-        parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
-        parser.add_option("-d", "--display", dest="display", default=0,help="Display (default: 0)")
-        parser.add_option("--width", dest="width", default=None,help="Resolution Width")
-        parser.add_option("--height", dest="height", default=None,help="Resolution Height")
-        parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
-        parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
-        (options, args) = parser.parse_args()
+        (options, args) = self.parser.parse_args()
 
         # Set up dynamic imports
         global GameLoop

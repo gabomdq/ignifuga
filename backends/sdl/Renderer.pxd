@@ -106,5 +106,5 @@ cdef class Renderer:
 
     cpdef clear(self, x, y, w, h)
     cpdef clearRect(self, rect)
-    cpdef flip(self)
+    cdef flip(self)
     cpdef isVisible(self)

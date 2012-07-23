@@ -54,15 +54,20 @@ cdef class GameLoop(GameLoopBase):
 #                        SDL_Delay( <Uint32>(remainingTime+0.5) )
 #        else:
             # Regular loop, draws all the time independently of shown/hidden status
+
+# TODO: When pausing/resuming, fix up the timing in the active actions so there's no abrupt jump
+
         while not self.quit:
             nowx = SDL_GetPerformanceCounter()
             now = nowx / freqx
-            self.update(now)
-            if not self.freezeRenderer:
-                self.renderer.update(now)
 
             while SDL_PollEvent(&ev):
                 self.handleSDLEvent(&ev)
+
+            if not self.paused:
+                self.update(now)
+                if not self.freezeRenderer:
+                    self.renderer.update(now)
 
             # Sleep for the remainder of the alloted frame time, if there's time left
             self.frame_time = SDL_GetPerformanceCounter()-nowx
@@ -132,10 +137,22 @@ cdef class GameLoop(GameLoopBase):
                 debug('Window is being restored')
                 self.paused = False
                 debug('Window restored')
-                
             elif winev.event == SDL_WINDOWEVENT_MINIMIZED:
                 self.paused = True
                 debug('Window minimized')
+            elif winev.event == SDL_WINDOWEVENT_FOCUS_GAINED:
+                debug('Window focus gained')
+                self.paused = False
+            elif winev.event == SDL_WINDOWEVENT_FOCUS_LOST:
+                # Pause here is strictly required for fullscreen Direct3D backed apps...
+                # but it doesn't hurt to pause in windowed apps or other platforms
+                # TODO: Should we make pausing here optional? Command line option enabled?
+                debug('Window focus lost')
+                self.paused = True
+            elif winev.event == SDL_WINDOWEVENT_CLOSE:
+                debug('Window closed')
+                Gilbert().endLoop()
+
 
             
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):

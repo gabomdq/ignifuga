@@ -138,8 +138,7 @@ def run():
 
 if __name__ == '__main__':
     from optparse import OptionParser
-    parser = OptionParser()
-    parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile")
+    parser = Gilbert().parser
     (options, args) = parser.parse_args()
 
     if options.profile:
