@@ -117,7 +117,7 @@ cdef class Renderer:
         cdef SDL_RendererInfo renderer_info
         #debug("FOUND %d RENDERERS" % num_renderers)
         for ri in range(num_renderers):
-            SDL_GetRenderDriverInfo(renderer_index, &renderer_info)
+            SDL_GetRenderDriverInfo(ri, &renderer_info)
             #debug("RENDERER %s" % renderer_info.name)
             if renderer_info.name==bytes('opengl'):
                 renderer_index = ri
