@@ -113,15 +113,15 @@ cdef class Renderer:
         #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
 
         # Find the GL renderer (useful for windows)
-        cdef int num_renderers =  SDL_GetNumRenderDrivers(), renderer_index
+        cdef int num_renderers =  SDL_GetNumRenderDrivers(), renderer_index = -1, ri
         cdef SDL_RendererInfo renderer_info
         #debug("FOUND %d RENDERERS" % num_renderers)
-        for renderer_index in range(num_renderers):
+        for ri in range(num_renderers):
             SDL_GetRenderDriverInfo(renderer_index, &renderer_info)
             #debug("RENDERER %s" % renderer_info.name)
             if renderer_info.name==bytes('opengl'):
+                renderer_index = ri
                 break
-
 
         self.renderer = SDL_CreateRenderer(self.window, renderer_index, 0)
         if self.renderer == NULL:
