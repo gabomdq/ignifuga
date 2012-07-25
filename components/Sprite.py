@@ -189,10 +189,12 @@ class Sprite(Viewable):
 
     def updateRenderer(self):
         if self._canvas == self._atlas:
+            #print "_updateRenderer", self, self._rendererSpriteId
             # No animation loop, directly update renderer
             self._updateRenderer()
         else:
             # Mark as dirty so we update on the next update
+            #print "_updateRenderer", self, "mark dirty"
             self._dirty = True
 
     # The current composed full image frame (not the animation atlas, but the consolidated final viewable image)
@@ -225,6 +227,7 @@ class Sprite(Viewable):
 
     @Viewable.alpha.setter
     def alpha(self, value):
+        #print "SETTING ALPHA", value
         Viewable.alpha.fset(self,value)
         self.updateRenderer()
 

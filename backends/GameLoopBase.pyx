@@ -37,13 +37,17 @@ cdef class GameLoopBase(object):
         self.entities = new map[PyObject_p, _EntityTasks]()
 
         PyGreenlet_Import()
+        self.main_greenlet = PyGreenlet_GetCurrent()
+        Py_XINCREF(<PyObject*>self.main_greenlet)
 
     def __dealloc__(self):
-        print "Releasing Game Loop data"
+        debug("Releasing Game Loop data")
 
         cdef _Task *task
         cdef entities_iterator iter
         cdef _EntityTasks *et
+
+        Py_XDECREF(<PyObject*>self.main_greenlet)
 
         # Release sprites in use
         iter = self.entities.begin()
@@ -90,7 +94,7 @@ cdef class GameLoopBase(object):
         runnable = entity.init
         new_task.runnable = <PyObject*>runnable
         Py_XINCREF(new_task.runnable)
-        new_task.greenlet = PyGreenlet_New(new_task.runnable, NULL )
+        new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet )
         Py_XINCREF(<PyObject*>new_task.greenlet)
         new_task.data = NULL
         self.loading.push_back(new_task)
@@ -112,7 +116,6 @@ cdef class GameLoopBase(object):
         cdef PyObject *obj = <PyObject*> component
         cdef _EntityTasks *et = NULL, new_et
 
-
         new_task.release = False
         new_task.req = REQUEST_NONE
         new_task.entity = obj
@@ -121,7 +124,7 @@ cdef class GameLoopBase(object):
         runnable = component.update
         new_task.runnable = <PyObject*>runnable
         Py_XINCREF(new_task.runnable)
-        new_task.greenlet = PyGreenlet_New(new_task.runnable, NULL )
+        new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet )
         Py_XINCREF(<PyObject*>new_task.greenlet)
         new_task.data = NULL
         self.running.push_back(new_task)
@@ -211,7 +214,7 @@ cdef class GameLoopBase(object):
                     runnable = tentity.update
                     new_task.runnable = <PyObject*>runnable
                     Py_XINCREF(new_task.runnable)
-                    new_task.greenlet = PyGreenlet_New(new_task.runnable, NULL)
+                    new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet)
                     Py_XINCREF(<PyObject*>new_task.greenlet)
                     new_task.req = REQUEST_NONE
                     new_task.data = NULL
@@ -268,16 +271,21 @@ cdef class GameLoopBase(object):
         if task.release:
             # The task was marked for release at some point during the switch, don't use it further
             return False
-        if isdead(task.greenlet):
+
+        ret = None
+        if retp != NULL:
+            Py_XINCREF(retp)
+            ret = <object>retp
+
+        if isdead(task.greenlet) or ret is None:
             # The greenlet is dead, assume it was done
             task.req = REQUEST_DONE
             Py_XDECREF(task.data)
             task.data = NULL
+            Py_XDECREF(retp)
             return True
 
         if retp != NULL:
-            Py_XINCREF(retp)
-            ret = <object>retp
             task.req = <REQUESTS> ret[0]
             Py_XDECREF(task.data)
             task.data = <PyObject*> ret[1]
@@ -309,7 +317,7 @@ cdef class GameLoopBase(object):
                     # There was a problem with initialization, let's try again
                     Py_XDECREF(<PyObject*>task.greenlet)
                     task.req = REQUEST_NONE
-                    task.greenlet = PyGreenlet_New(task.runnable, NULL)
+                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
                     Py_XINCREF(<PyObject*>task.greenlet)
                     return True
             else:
@@ -325,7 +333,7 @@ cdef class GameLoopBase(object):
                 else:
                     # Restart the update loop
                     Py_XDECREF(<PyObject*>task.greenlet)
-                    task.greenlet = PyGreenlet_New(task.runnable, NULL)
+                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
                     Py_XINCREF(<PyObject*>task.greenlet)
                     return self._doSwitch(task, args, kwargs)
         elif task.req == REQUEST_SKIP:
@@ -334,11 +342,12 @@ cdef class GameLoopBase(object):
             return True
         elif task.req == REQUEST_STOP:
             # Stop entity from updating
+            task.release = True
             return False
         elif task.req == REQUEST_LOADIMAGE:
             # Load an image
             data = <object>task.data
-            if data.has_key('url') and data['url'] != None:
+            if isinstance(data, dict) and data.has_key('url') and data['url'] != None:
                 # Try to load an image
                 img = (Gilbert().dataManager.getImage(data['url']),)
                 if img is not None:
@@ -350,6 +359,7 @@ cdef class GameLoopBase(object):
                 return True
         else:
             # Unrecognized request
+            #print "Unrecognized request", task.req
             return self._doSwitch(task, args, kwargs)
 
 

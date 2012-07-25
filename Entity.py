@@ -108,34 +108,37 @@ class Entity(object):
         self._initialComponents = []
 
     def __str__(self):
-        return "Entity with ID %s" % (self.id,)
+        return "Entity with ID %s (%s)" % (self.id,hash(self))
 
     def init(self,**data):
         """ Initialize the required external data """
-        components = self._initialComponents
         failcount = {}
-        while components:
-            component = components.pop(0)
+        while self._initialComponents:
+            component = self._initialComponents.pop(0)
             try:
                 component.init(**data)
             except Exception, ex:
                 # Something failed, try it again later
+                self._initialComponents.append(component)
                 if component not in failcount:
                     failcount[component] = 1
                 else:
                     failcount[component] += 1
-                if failcount[component] < 10:
-                    components.append(component)
-                else:
+
+                if failcount[component] >= 10:
                     error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
                     error(traceback.format_exc())
                     self._initFailCount+=1
                     if self._initFailCount > 10:
+                        self._initFailCount = 0
                         error('Ignoring Entity %s, could not initialize it because of component %s' % (self.id, component))
                         error(traceback.format_exc())
-                        return DONE()
-                    ERROR()
-                    return
+                        DONE()
+                        return
+                    else:
+                        ERROR()
+                        return
+                    break
 
         self._initialized = True
 
@@ -446,4 +449,4 @@ class Entity(object):
 
 
     def __repr__(self):
-        return 'Entity with ID: %s' % (self.id,)
+        return 'Entity with ID: %s (%s)' % (self.id,hash(self))

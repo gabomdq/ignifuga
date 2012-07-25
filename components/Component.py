@@ -112,8 +112,9 @@ class Component(object):
             error('Entity %s already has a component with id %s' % (entity, self._id))
 
         self._entity = entity
-        if self._active:
-            entity.add(self)
+
+        # If the component is not active, the entity will keep tabs on it but it won't add its properties to itself
+        entity.add(self)
 
     @property
     def period(self):

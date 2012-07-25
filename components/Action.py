@@ -11,6 +11,7 @@ import pickle
 from copy import deepcopy
 from Component import Component
 from ignifuga.Gilbert import Gilbert
+from ignifuga.Task import STOP
 
 class Action(Component):
     """
@@ -48,6 +49,7 @@ class Action(Component):
         self._persistent = persistent
         self._running = False
         self._root = root
+        self._cancelUpdate = False
 
         # Process runWith and runNext
         if runWith != None:
@@ -68,6 +70,7 @@ class Action(Component):
 
     def init(self, **kwargs):
         targets = self._initParams['targets']
+        self._targets = [] # init needs to be reentrant because if we fail to initialize it will be called again!
 
         if targets is None:
             self._targets = [self.entity,]
@@ -90,13 +93,13 @@ class Action(Component):
                                 if component is not None:
                                     self._targets.append(component)
                                 else:
-                                    raise Exception('Action target %s not found' % target)
+                                    raise Exception('Action target entity %s does not have a component %s' % (target_parts[0], target_parts[1]))
                             else:
                                 self._targets.append(target_entity)
                         else:
                             raise Exception('Action target %s (Entity %s) not found' % (target, target_parts[0]))
                     else:
-                        raise Exception('Action target %s not found' % target)
+                        raise Exception('Can not determine which type of target is %s' % target)
             elif isinstance(self.entity, Entity):
                 # Targets can be other components owned by the entity (passed by id or by object) or the entity itself if target=None
                 for target in targets:
@@ -127,15 +130,20 @@ class Action(Component):
         if self._root:
             if active == self._active or self._entity == None:
                 return
-            self._active = active
-            if active and not self._running:
-                self.start()
-            elif not active and self._running:
-                self.stop()
-            if self._active:
-                self.entity.add(self)
-            else:
-                self.entity.remove(self)
+            try:
+                self._active = active
+                if active and not self._running:
+                    self.start()
+                elif not active and self._running:
+                    self.stop()
+                if self._active:
+                    self.entity.add(self)
+                else:
+                    self.entity.remove(self)
+            except Exception, ex:
+                self._active = False
+                raise ex
+
         elif self._active:
                 self._active = False
                 self.entity.remove(self)
@@ -193,6 +201,8 @@ class Action(Component):
             for target in self._targets:
                 self._tasksStatus[target] = {}
                 for task in self._tasks:
+                    if not hasattr(target, task):
+                        raise Exception("Could not start action %s, %s does not have an attribute %s" % (self, target, task))
                     self._tasksStatus[target][task] = {
                         'targetValue': self._tasks[task],
                         'initValue': getattr(target, task)
@@ -201,8 +211,9 @@ class Action(Component):
             for a in self._runWith:
                 a.start()
             self.run(self._onStart)
-            Gilbert().gameLoop.startComponent(self)
-    
+            if self._root:
+                Gilbert().gameLoop.startComponent(self)
+
     def reset(self):
         """ Reset the internal status """
         self._startTime = None  # Indicates when the action started
@@ -226,7 +237,9 @@ class Action(Component):
 
             # The associated entity doesnt need to get a callback, it polls the action status on each update
             self.run(self._onStop)
-            Gilbert().gameLoop.stopComponent(self)
+            # We will be removed from the update list when update finishes.
+            if self._root:
+                self._cancelUpdate = True
 
     def update(self, now, **kwargs):
         """ Update the action, now is a integer in milliseconds, dt is float specifying elapsed seconds """
@@ -277,8 +290,8 @@ class Action(Component):
             if not self._running:
                 # Check if we need to loop the action
                 self._loop+=1
+                self.reset()
                 if self._loopMax == None or self._loop < self._loopMax:
-                    self.reset()
                     if self._relative:
                         self.start()
                     else:
@@ -287,16 +300,10 @@ class Action(Component):
                     self.run(self._onLoop)
                 else:
                     self._loop = 0
-                    # The associated entity doesnt need to get a callback, it polls the action status on each update
-#                    if self._onStop != None:
-#                        if hasattr(self._onStop, '__call__'):
-#                            self._onStop(self)
-#                        else:
-#                            exec self._onStop
-                    self.reset()
+                    if self._root and self._cancelUpdate == True:
+                        self._cancelUpdate = False
+                        STOP()
 
-
-            
     def _step(self, dt):
         """ Increase parameters by delta time (in seconds, elapsed since the start of the action) """
         if dt < self._duration:

@@ -74,6 +74,7 @@ cdef class GameLoopBase(object):
     cdef deque[_Task] *running
     cdef map[PyObject_p, _EntityTasks] *entities
     cdef readonly unsigned long frame_time, _interval, ticks_second
+    cdef PyGreenlet *main_greenlet
 
     cpdef startEntity(self, entity)
     cpdef startComponent(self, component)
