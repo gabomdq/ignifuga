@@ -592,6 +592,8 @@ class Gilbert:
         # Do not clean the cache here, there may be useful data for other scenes -> self.dataManager.cleanup()
         gc.collect()
 
+        self.renderer.cleanup()
+
     def changeScene(self, scene_id):
         debug("Switching scene to: %s " % scene_id)
         self.resetScene()

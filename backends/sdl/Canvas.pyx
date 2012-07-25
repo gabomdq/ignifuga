@@ -94,7 +94,7 @@ cdef class Canvas (CanvasBase):
         SDL_SetTextureBlendMode(self._surfacehw, SDL_BLENDMODE_BLEND)
 
     def __dealloc__(self):
-        debug( ">>>CANVAS DEALLOC %s<<<" % self)
+        debug( ">>>CANVAS DEALLOC %s (URL: %s) <<<" % (self, self._srcURL))
         if self._hw:
             SDL_DestroyTexture(self._surfacehw)
             self._surfacehw = NULL
@@ -118,7 +118,7 @@ cdef class Canvas (CanvasBase):
             dh = sh
             
         
-        if self._isRenderTarget and self._hw and canvas._hw:
+        if self._isRenderTarget and self._hw and canvasbase._hw:
             # Both canvas are hardware based, and we can render on this canvas from another canvas
             return self.blitCanvasHW(<Canvas>canvasbase,dx,dy,dw,dh,sx,sy,sw,sh, blend)
         else:

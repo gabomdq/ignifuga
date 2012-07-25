@@ -160,6 +160,7 @@ cdef class Renderer:
         # _Sprite list allocation and setup
         self.zmap = new map[int,deque[Sprite_p]]()
         self.active_sprites = new deque[_Sprite]()
+        self.free_sprites = new deque[Sprite_p]()
         self.dirty = True
 
     @cython.cdivision(True)
@@ -267,7 +268,7 @@ cdef class Renderer:
         #with nogil, parallel():
         for i in prange(numsprites, nogil=True):
             sprite = &self.active_sprites.at(i)
-            if all or sprite.dirty:
+            if not sprite.free and (all or sprite.dirty):
                 self._processSprite(sprite, &screen, doScale)
                 sprite.dirty = False
 #        cdef deque[Sprite].iterator iter, iter_last
@@ -361,9 +362,17 @@ cdef class Renderer:
         sprite.b = <Uint8>(b*255.0)
         sprite.a = <Uint8>(a*255.0)
         sprite.dirty = True
+        sprite.free = False
 
-        self.active_sprites.push_back(sprite)
-        spritep = &self.active_sprites.back()
+
+        if self.free_sprites.size() > 0:
+            spritep = self.free_sprites.back()
+            self.free_sprites.pop_back()
+            spritep[0] = sprite
+        else:
+            self.active_sprites.push_back(sprite)
+            spritep = &self.active_sprites.back()
+
         self._indexSprite(spritep)
         sprite_wrap.sprite = spritep
         return sprite_wrap
@@ -372,13 +381,8 @@ cdef class Renderer:
         cdef _Sprite *sprite = sprite_w.sprite
         cdef deque[_Sprite].iterator iter
         if self._unindexSprite(sprite):
-            iter = self.active_sprites.begin()
-            while iter != self.active_sprites.end():
-                if &deref(iter) == sprite:
-                    self.active_sprites.erase(iter)
-                    break
-                inc(iter)
-            return True
+            self.free_sprites.push_back(sprite)
+            sprite.free = True
         return False
 
 
@@ -615,27 +619,20 @@ cdef class Renderer:
         # Adjust scrolling if needed
         self.scrollBy(0,0)
 
+    cpdef cleanup(self):
+        """ Remove free sprites if they are not in use"""
+        if self.active_sprites.size() == self.free_sprites.size():
+            # All active sprites are freed, so we can modify pointers at will
+            self.active_sprites.resize(0)
+            self.free_sprites.resize(0)
+
     def __dealloc__(self):
         debug('Releasing Sprites')
 
-        cdef _Sprite *sprite
-        cdef zmap_iterator ziter = self.zmap.begin()
-        cdef deque[Sprite_p] *ds
-        cdef deque_Sprite_iterator iter
-
-        # Release unused sprites
-        del self.active_sprites
-
-        # Release sprites in use
-        while ziter != self.zmap.end():
-            ds = &deref(ziter).second
-            iter = ds.begin()
-            while iter != ds.end():
-                sprite = deref(iter)
-                free(sprite)
-            ds.resize(0)
-
+        # Release sprites
         del self.zmap
+        del self.active_sprites
+        del self.free_sprites
 
         debug('Releasing SDL renderer')
         if self.renderer != NULL:

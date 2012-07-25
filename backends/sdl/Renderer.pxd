@@ -29,7 +29,7 @@ cdef struct _Sprite:
     int z
     Uint8 r,g,b,a
 
-    bint show, dirty
+    bint show, dirty, free
     SDL_Rect _src, _dst
 
 ctypedef _Sprite* Sprite_p
@@ -54,6 +54,7 @@ cdef class Renderer:
     # Sprites
     cdef map[int,deque[Sprite_p]] *zmap
     cdef deque[_Sprite] *active_sprites
+    cdef deque[Sprite_p] *free_sprites
     cdef bint dirty
 
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil
@@ -93,6 +94,7 @@ cdef class Renderer:
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil
 
+    cpdef cleanup(self)
 
     # Render target related stuff
     cdef int _width, _height

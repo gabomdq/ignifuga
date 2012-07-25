@@ -52,7 +52,9 @@ class Sprite(Viewable):
             '_blur': 0.0,
             '_lastBlurAmount': None,
             '_overlays': {},
-            '_rendererSpriteId': None
+            '_rendererSpriteId': None,
+            '_static': False,
+            '_parent': None
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
@@ -75,6 +77,7 @@ class Sprite(Viewable):
             else:
                 self.sprite = None
                 self._canvas = self._atlas
+                self._static = True
         self._updateSize()
 
         self.show()
@@ -82,13 +85,14 @@ class Sprite(Viewable):
 
     def free(self, **kwargs):
         self.hide()
+        self._tmpcanvas = None
         super(Sprite, self).free(**kwargs)
 
     def update(self, now, **data):
         """ Initialize the required external data """
         super(Sprite, self).update(now, **data)
 
-        if self._canvas == self._atlas:
+        if self._static:
             # This is a single image non animated sprite, we return with the STOP instruction so the update loop is not called
             STOP()
             return
@@ -175,7 +179,10 @@ class Sprite(Viewable):
         self.updateRenderer()
 
     def _updateRenderer(self):
-        if self._rendererSpriteId:
+        if self._parent is not None:
+            print "PARENT _DOCOMPOSITING"
+            self._parent._doCompositing()
+        elif self._rendererSpriteId:
             self.renderer.spriteDst(self._rendererSpriteId, self._x, self._y, self._width_pre, self._height_pre)
 
             self.renderer.spriteRot(self._rendererSpriteId,
@@ -188,26 +195,16 @@ class Sprite(Viewable):
             self._dirty = False
 
     def updateRenderer(self):
-        if self._canvas == self._atlas:
-            #print "_updateRenderer", self, self._rendererSpriteId
+        if self._static:
             # No animation loop, directly update renderer
             self._updateRenderer()
         else:
             # Mark as dirty so we update on the next update
-            #print "_updateRenderer", self, "mark dirty"
             self._dirty = True
 
     # The current composed full image frame (not the animation atlas, but the consolidated final viewable image)
     @property
     def canvas(self):
-#        if self._tmpcanvas != None:
-#            return self._tmpcanvas
-#        elif self.sprite != None:
-#            return self.sprite.canvas
-#        elif self._atlas != None:
-#            return self._atlas
-#        else:
-#            return None
         return self._canvas
 
     @Viewable.red.setter
@@ -250,13 +247,15 @@ class Sprite(Viewable):
         """ Set the blur amount, this is actually an integer value that equals the pixel displacement used to simulate bluring"""
         if value <= 0:
             # Remove the temporal canvas
-            self._tmpcanvas = None
             self._lastBlurAmount = None
             value = 0
         else:
             # Create a temporal canvas
             value = int(value)
         self._blur = value
+
+        if self._static:
+            self._doCompositing()
 
     @Viewable.x.setter
     def x(self, new_x):
@@ -305,43 +304,59 @@ class Sprite(Viewable):
                 if self._overlays:
                     use_tmpcanvas = True
                     source.mod(1.0,1.0,1.0,1.0)
-                    self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_NONE)
+                    self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
                     for z in self._overlays.iterkeys():
                         (id,x,y,op,_r,_g,_b,_a,sprite) = self._overlays[z]
+
                         w = sprite.width
                         h = sprite.height
                         canvas = sprite.canvas
                         if canvas is not None:
-                            r = canvas.r
-                            g = canvas.g
-                            b = canvas.b
-                            a = canvas.a
+                            r = sprite._red
+                            g = sprite._green
+                            b = sprite._blue
+                            a = sprite._alpha
                             canvas.mod(_r if _r is not None else r, _g if _g is not None else g, _b if _b is not None else b, _a if _a is not None else a)
                             self._tmpcanvas.blitCanvas(canvas,0,0,w,h,x,y,w,h,op)
                             canvas.mod(r,g,b,a)
 
-                if self._blur > 0 and self._blur != self._lastBlurAmount:
-                    use_tmpcanvas = self._doBluring(source, not use_tmpcanvas) or use_tmpcanvas
+                if self._blur > 0:
+                    if self._blur != self._lastBlurAmount:
+                        self._doBluring(source, not use_tmpcanvas)
+                    use_tmpcanvas = True
 
                 source.mod(self._red, self._green, self._blue, self._alpha)
 
         if use_tmpcanvas:
-            self._canvas = self._tmpcanvas
+            if self._canvas != self._tmpcanvas:
+                self._canvas = self._tmpcanvas
+                self.hide()
+                self.show()
         else:
-            self._tmpcanvas = None
+            #
             if self.sprite is not None:
-                self._canvas = self.sprite.canvas
+                if self._canvas != self.sprite.canvas:
+                    self._canvas = self.sprite.canvas
+                    self.hide()
+                    self.show()
             elif self._atlas is not None:
-                self._canvas = self._atlas
+                if self._canvas != self._atlas:
+                    self._canvas = self._atlas
+                    self.hide()
+                    self.show()
             else:
-                self._canvas = None
+                if self._canvas is not None:
+                    self._canvas = None
+                    self.hide()
+
+        self.updateRenderer()
 
     def _doBluring(self, source, start_clean = False):
         """ Take the current canvas and "blur it" by doing a few blits out of center"""
-        if self._blur > 0:
+        if self._blur > 0 and self._tmpcanvas is not None:
             if start_clean:
                 source.mod(1.0,1.0,1.0,1.0)
-                self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_NONE)
+                self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
             source.mod(1.0,1.0,1.0,0.2)
             b = int (self._blur / 2)
             w = self._tmpcanvas.width-b
@@ -396,7 +411,10 @@ class Sprite(Viewable):
         if self.entity is not None:
             sprite = self.entity.getComponent(id)
             if sprite is not None and isinstance(sprite, Sprite):
+                if z in self._overlays:
+                    self.removeOverlay(z, update=False)
                 self._overlays[z] = (id,x,y,op,r,b,g,a,sprite)
+                sprite.parent = self
                 if update:
                     self._doCompositing()
                 return True
@@ -405,6 +423,8 @@ class Sprite(Viewable):
     def removeOverlay(self, zindex, update=False):
         """ Remove an overlay by index"""
         try:
+            id,x,y,op,r,b,g,a,sprite = self._overlays[z]
+            sprite.parent = None
             del self._overlays[zindex]
             if update:
                 self._doCompositing()
@@ -413,6 +433,9 @@ class Sprite(Viewable):
             return None
 
     def clearOverlays(self, update=False):
+        for z in self._overlays.keys():
+            self.removeOverlay(z, update=False)
+
         self._overlays = {}
         if update:
             self._doCompositing()
@@ -443,7 +466,8 @@ class Sprite(Viewable):
         return odict
 
     def show(self):
-        if self._rendererSpriteId is None:
+        if self._rendererSpriteId is None and self._active and self._canvas != None:
+            self._updateSize()
             self._rendererSpriteId = self.renderer.addSprite(self._canvas,
                 self._z,
                 0, 0, self._width_src, self._height_src,
@@ -476,6 +500,14 @@ class Sprite(Viewable):
                 self.show()
             else:
                 self.hide()
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, value):
+        self._parent = value
+
 
 
 class _Sprite(object):
