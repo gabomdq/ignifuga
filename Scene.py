@@ -24,7 +24,11 @@ class Scene(Entity):
             '_autoCenter': False,
             '_userCanScroll': True,
             '_userCanZoom': True,
-            '_size': {'width': None, 'height': None}
+            '_size': {'width': None, 'height': None},
+            '_scale': None,
+            '_scrollX': None,
+            '_scrollY': None,
+            '_ready': False
         })
         # Add the Scene entity
         #self.entities[self.id] = self
@@ -54,8 +58,15 @@ class Scene(Entity):
     def sceneInit(self):
         Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale)
         Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
+        if self._scale is not None:
+            Gilbert().renderer.scaleTo(self._scale,self._scale)
+        if self._scrollX is not None and self._scrollY is not None:
+            print "SCROLL TO",self._scrollX, self._scrollY
+            Gilbert().renderer.scrollTo(self._scrollX, self._scrollY)
         if self._autoCenter:
             Gilbert().renderer.centerScene()
+
+        self._ready = True
 
 #    def init(self,data={}):
 #        """ Initialize the required external data """
@@ -110,6 +121,44 @@ class Scene(Entity):
     @userCanZoom.setter
     def userCanZoom(self, value):
         self._userCanZoom = value
+
+    @property
+    def scale(self):
+        return self._scale
+    @scale.setter
+    def scale(self, value):
+        self._scale = value
+        if self._ready:
+            Gilbert().renderer.scaleTo(self._scale,self._scale)
+
+    @property
+    def scrollX(self):
+        return self._scrollX
+    @scrollX.setter
+    def scrollX(self, value):
+        self._scrollX = value
+        if self._ready:
+            Gilbert().renderer.scrollTo(self._scrollX, self._scrollY)
+
+    @property
+    def scrollY(self):
+        return self._scrollY
+    @scrollY.setter
+    def scrollY(self, value):
+        self._scrollY = value
+        if self._ready:
+            Gilbert().renderer.scrollTo(self._scrollX, self._scrollY)
+
+    @property
+    def scroll(self):
+        return self._scrollX, self._scrollY
+    @scroll.setter
+    def scroll(self, value):
+        self._scrollX, self._scrollY = value
+        if self._ready:
+            Gilbert().renderer.scrollTo(self._scrollX, self._scrollY)
+
+
 
     def __repr__(self):
         return 'Scene with ID: %s, Resolution %dx%d, KeepAspect: %s, AutoScale: %s, AutoCenter: %s, Size: %dx%d' % \

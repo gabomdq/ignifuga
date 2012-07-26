@@ -73,6 +73,7 @@ cdef class Renderer:
     cpdef scrollTo(self, int x, int y)
     cpdef scaleBy(self, int delta)
     cpdef scaleByFactor(self, double factor)
+    cpdef scaleTo(self, double scale_x, double scale_y)
     cpdef centerScene(self)
     cpdef centerOnScenePoint(self, double sx, double sy)
     cpdef centerOnScreenPoint(self, int sx, int sy)

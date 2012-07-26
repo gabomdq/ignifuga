@@ -123,7 +123,7 @@ cdef class Renderer:
                 renderer_index = ri
                 break
 
-        self.renderer = SDL_CreateRenderer(self.window, renderer_index, 0)
+        self.renderer = SDL_CreateRenderer(self.window, renderer_index, SDL_RENDERER_PRESENTVSYNC)
         if self.renderer == NULL:
             error("COULD NOT CREATE RENDERER")
             error(SDL_GetError())
@@ -586,6 +586,7 @@ cdef class Renderer:
 
         if self._scroll_x != sx or self._scroll_y != sy:
             self.dirty = True
+            #print "SCROLL", sx, sy
             self._scroll_x = sx
             self._scroll_y = sy
             Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
@@ -600,6 +601,9 @@ cdef class Renderer:
         cdef double scale_x = self._scale_x * factor
         cdef double scale_y = self._scale_y * factor
 
+        self.scaleTo(scale_x, scale_y)
+
+    cpdef scaleTo(self, double scale_x, double scale_y):
         if self._native_size_w*scale_x < self._width:
             scale_x = self._width / self._native_size_w
 
@@ -616,8 +620,10 @@ cdef class Renderer:
         self._scale_y = scale_y
         self.dirty = True
 
+        #print "SCALE", self._scale_x,self._scale_y
         # Adjust scrolling if needed
         self.scrollBy(0,0)
+
 
     cpdef cleanup(self):
         """ Remove free sprites if they are not in use"""

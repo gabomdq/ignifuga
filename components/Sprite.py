@@ -180,7 +180,6 @@ class Sprite(Viewable):
 
     def _updateRenderer(self):
         if self._parent is not None:
-            print "PARENT _DOCOMPOSITING"
             self._parent._doCompositing()
         elif self._rendererSpriteId:
             self.renderer.spriteDst(self._rendererSpriteId, self._x, self._y, self._width_pre, self._height_pre)

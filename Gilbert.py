@@ -23,7 +23,7 @@ REQUEST_DONE = 0x00000001
 REQUEST_SKIP = 0x00000002
 REQUEST_STOP = 0x00000004
 REQUEST_LOADIMAGE = 0x0000008
-REQUEST_ERROR = 0x80000000
+REQUEST_ERROR = 0x0000010
 
 #from Task import Task
     
@@ -263,7 +263,6 @@ class Gilbert:
 # ANY MODIFICATION OF THE SCENE DEFINITION AND RELATED CODE AND ARTWORK RENDERS THE LICENSE TO USE THIS ENGINE VOID.
 ########################################################################################################################
             self.loadScene('splash', copy.deepcopy(SPLASH_SCENE))
-            #self.startFirstScene()
             if not self.startScene('splash'):
                 error('Could not load splash scene')
                 return

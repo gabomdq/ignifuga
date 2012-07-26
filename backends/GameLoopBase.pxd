@@ -45,7 +45,7 @@ ctypedef enum REQUESTS:
     REQUEST_SKIP = 0x00000002
     REQUEST_STOP = 0x00000004
     REQUEST_LOADIMAGE = 0x0000008
-    REQUEST_ERROR = 0x80000000
+    REQUEST_ERROR = 0x0000010
 
 cdef struct _Task:
     PyGreenlet *greenlet
