@@ -43,7 +43,7 @@ SOURCES['JPG'] = join(ROOT_DIR, 'external', 'jpeg')
 SOURCES['ZLIB'] = join(ROOT_DIR, 'external', 'zlib')
 SOURCES['GREENLET'] = join(ROOT_DIR, 'external', 'greenlet')
 SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
-SOURCES['IGNIFUGA'] = ROOT_DIR
+SOURCES['IGNIFUGA'] = join(ROOT_DIR, 'src')
 
 ########################################################################################################################
 
@@ -132,8 +132,10 @@ def make_python(platform, ignifuga_src, env=os.environ):
     freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii']
     # Modules required by Ignifuga in addition to the above
     freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref', 'optparse', 'textwrap']
+    # Threading
+    freeze_modules += ['threading','collections', 'keyword', 'heapq']
     # For profiling
-    freeze_modules += ['cProfile', 'runpy', 'pkgutil', 'pstats', 'functools']
+    freeze_modules += ['cProfile', 'runpy', 'pkgutil', 'pstats', 'functools', 'bisect']
 
     target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])
@@ -244,7 +246,7 @@ compileall.compile_dir("%s")
 # ===============================================================================================================
 
 def prepare_ignifuga(platform):
-    # Copy all .py, .pyx and .pxd files
+    # Copy .py, .pyx .pxd .h .c .cpp files
     target = get_target(platform)
     cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --exclude tests --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()

@@ -11,12 +11,18 @@ from ignifuga.backends.sdl.SDL cimport *
 from ignifuga.Gilbert import Gilbert, Event
 from ignifuga.backends.GameLoopBase cimport GameLoopBase
 from ignifuga.backends.sdl.Renderer cimport Renderer
+from ignifuga.FileWatcher.FileWatcher cimport FileWatcher, FileWatchListenerIgnifuga
+from libcpp.string cimport *
 
 cdef class GameLoop(GameLoopBase):
     cdef int _screen_w, _screen_h
     cdef Renderer renderer
+    cdef FileWatcher *fw
+    cdef FileWatchListenerIgnifuga *fwli
+
     cpdef run(self)
     cdef handleSDLEvent(self, SDL_Event *sdlev)
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev)
+
 
 

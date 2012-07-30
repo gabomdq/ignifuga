@@ -57,29 +57,26 @@ cdef struct _Task:
 
 ctypedef _Task*  _Task_p
 
-cdef struct _EntityTasks:
-    _Task *loading
-    _Task *running
-
 ctypedef PyObject* PyObject_p
 
-ctypedef map[PyObject_p, _EntityTasks].iterator entities_iterator
 ctypedef deque[_Task].iterator task_iterator
 
 cdef class GameLoopBase(object):
     cdef public bint quit, paused, freezeRenderer
     cdef public double _fps
     cdef str platform
-    cdef deque[_Task] *loading
-    cdef deque[_Task] *running
-    cdef map[PyObject_p, _EntityTasks] *entities
+    cdef deque[_Task] *loading, *loading_tmp, *running, *running_tmp
     cdef readonly unsigned long frame_time, _interval, ticks_second
     cdef PyGreenlet *main_greenlet
 
-    cpdef startEntity(self, entity)
+
+    cpdef startEntity(self, entity, bint load_phase=*)
     cpdef startComponent(self, component)
     cpdef bint stopEntity(self, entity)
     cpdef bint stopComponent(self, component)
     cpdef update(self, int now=*, bint wrapup=*)
     cdef bint _doSwitch(self, _Task *task, PyObject *args, PyObject *kwargs)
     cdef bint _processTask(self, _Task *task, int now=*, bint wrapup=*, bint init=*)
+    cpdef addWatch(self, filename)
+    cpdef removeWatch(self, filename)
+    cdef taskDecRef (self, _Task* taskp)

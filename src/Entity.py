@@ -182,6 +182,8 @@ class Entity(object):
                     c_data['entity'] = self
                     self._initialComponents.append(Component.create(**c_data))
 
+
+
     def __getstate__(self):
         odict = self.__dict__.copy()
         # These dont exist in self.__dict__ as they come from Cython (some weird voodoo, right?)...

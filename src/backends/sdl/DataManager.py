@@ -8,7 +8,7 @@
 # Data Manager
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-import json
+import json, gc
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Log import debug, error
 from SDL import *
@@ -35,14 +35,22 @@ def sanitizeData (k,v, p=True):
     return key, value
 
 class DataManager(DataManagerBase):
-    def loadJsonFile(self, name):
-        data = json.loads(readFile('data/scenes/'+name+'.json'))
-        ret_data = {}
-        for k,v in data.items():
-            key, value = sanitizeData(k,v)
-            ret_data[key] = value
+    def loadSceneData(self, filename):
+        url = 'data/scenes/'+filename+'.json'
+        return url, self.loadJsonFile(url)
 
-        return ret_data
+    def loadJsonFile(self, url):
+        if url not in self.cache:
+            data = json.loads(readFile(url))
+            ret_data = {}
+            for k,v in data.items():
+                key, value = sanitizeData(k,v)
+                ret_data[key] = value
+
+            self.cache[url] = ret_data
+            Gilbert().gameLoop.addWatch(url)
+
+        return self.cache[url]
 
     def getImage(self, url):
         if url not in self.cache:
@@ -55,6 +63,8 @@ class DataManager(DataManagerBase):
                     return None
             else:
                 self.cache[url] = Canvas(srcURL=url)
+                Gilbert().gameLoop.addWatch(url)
+
         return self.cache[url]
 
     def getFont(self, url, size):
@@ -62,3 +72,19 @@ class DataManager(DataManagerBase):
         if cache_url not in self.cache:
             self.cache[cache_url] = Font(url, size)
         return self.cache[cache_url]
+
+    def urlReloaded(self, url):
+        print url, "reloaded"
+        reload = []
+        if url in self.cache:
+            print self.notifications
+            if url in self.notifications:
+                for ref in self.notifications[url]:
+                    if hasattr(ref, 'reload') and ref not in reload:
+                        reload.append(ref)
+
+            del self.cache[url]
+            for ref in reload:
+                ref.reload(url)
+
+

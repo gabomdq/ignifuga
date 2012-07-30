@@ -74,6 +74,7 @@ from ignifuga.Log import *
 class DataManagerBase(object):
     def __init__(self):
         self.cache = {}
+        self.notifications = {}
 
     def __del__(self):        
         self.cleanup(True)
@@ -102,3 +103,18 @@ class DataManagerBase(object):
 
     def getFont(self, url, size):
         raise Exception('method not implemented')
+
+    def urlReloaded(self, url):
+        raise Exception('method not implemented')
+
+    def addListener(self, url, obj):
+        print "add listener", url, obj
+        if url not in self.notifications:
+            self.notifications[url] = []
+
+        if obj not in self.notifications[url]:
+            self.notifications[url].append(obj)
+
+    def removeListener(self, url, obj):
+        if url in self.notifications and obj in self.notifications[url]:
+            self.notifications[url].remove(obj)

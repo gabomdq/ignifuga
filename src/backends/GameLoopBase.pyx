@@ -13,7 +13,6 @@ from cython.operator cimport dereference as deref, preincrement as inc #derefere
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Log import debug, error
 
-
 cdef bint isdead(PyGreenlet* greenlet):
     ##define PyGreenlet_STARTED(op)    (((PyGreenlet*)(op))->stack_stop != NULL)
     ##define PyGreenlet_ACTIVE(op)     (((PyGreenlet*)(op))->stack_start != NULL)
@@ -33,8 +32,9 @@ cdef class GameLoopBase(object):
         self.frame_time = 0
 
         self.loading = new deque[_Task]()
+        self.loading_tmp = new deque[_Task]()
         self.running = new deque[_Task]()
-        self.entities = new map[PyObject_p, _EntityTasks]()
+        self.running_tmp = new deque[_Task]()
 
         PyGreenlet_Import()
         self.main_greenlet = PyGreenlet_GetCurrent()
@@ -44,31 +44,40 @@ cdef class GameLoopBase(object):
         debug("Releasing Game Loop data")
 
         cdef _Task *task
-        cdef entities_iterator iter
-        cdef _EntityTasks *et
+        cdef task_iterator iter
+
 
         Py_XDECREF(<PyObject*>self.main_greenlet)
 
         # Release sprites in use
-        iter = self.entities.begin()
-        while iter != self.entities.end():
-            et = &deref(iter).second
-            if et.loading != NULL:
-                Py_XDECREF(et.loading.data)
-                Py_XDECREF(<PyObject*>et.loading.greenlet)
-                Py_XDECREF(et.loading.runnable)
-                Py_XDECREF(et.loading.entity)
-                free(et.loading)
-            if et.running != NULL:
-                Py_XDECREF(et.running.data)
-                Py_XDECREF(<PyObject*>et.running.greenlet)
-                Py_XDECREF(et.running.runnable)
-                Py_XDECREF(et.running.entity)
-                free(et.running)
+        iter = self.loading.begin()
+        while iter != self.loading.end():
+            task = &deref(iter)
+            self.taskDecRef(task)
+            inc(iter)
+
+        iter = self.loading_tmp.begin()
+        while iter != self.loading_tmp.end():
+            task = &deref(iter)
+            self.taskDecRef(task)
+            inc(iter)
+
+        iter = self.running.begin()
+        while iter != self.running.end():
+            task = &deref(iter)
+            self.taskDecRef(task)
+            inc(iter)
+
+        iter = self.running_tmp.begin()
+        while iter != self.running_tmp.end():
+            task = &deref(iter)
+            self.taskDecRef(task)
+            inc(iter)
 
         del self.loading
+        del self.loading_tmp
         del self.running
-        del self.entities
+        del self.running_tmp
 
     def run(self):
         raise Exception('not implemented')
@@ -80,158 +89,115 @@ cdef class GameLoopBase(object):
             self._fps = float(fps)
             self._interval = 1000 / fps
 
-    cpdef startEntity(self, entity):
+    cpdef startEntity(self, entity, bint load_phase=True):
+        """ Put an entity in the loading or running queue"""
         cdef _Task new_task, *taskp
-        cdef entities_iterator iter
         cdef PyObject *obj = <PyObject*> entity
-        cdef _EntityTasks *et = NULL, new_et
+
 
         new_task.release = False
         new_task.req = REQUEST_NONE
         new_task.entity = obj
-        Py_XINCREF(new_task.entity)
         # Note: Got to do this assignment with an intermediary object, otherwise Cython just can't take it!
-        runnable = entity.init
+        if load_phase:
+            runnable = entity.init
+        else:
+            runnable = entity.update
+
         new_task.runnable = <PyObject*>runnable
+        new_task.data = NULL
+        Py_XINCREF(new_task.entity)
         Py_XINCREF(new_task.runnable)
         new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet )
         Py_XINCREF(<PyObject*>new_task.greenlet)
-        new_task.data = NULL
-        self.loading.push_back(new_task)
-        taskp = &self.loading.back()
 
-        iter = self.entities.find(obj)
-        if iter == self.entities.end():
-            self.entities.insert(pair[PyObject_p,_EntityTasks](obj,new_et))
-            iter = self.entities.find(obj)
-
-        et = &(deref(iter).second)
-        et.loading = taskp
-        et.running = NULL
+        # We don't directly add new tasks to self.loading or self.running to avoid invalidating iterators or pointers in self.update
+        # Instead, we add them to a temporary list which will be processed in self.update.
+        if load_phase:
+            self.loading_tmp.push_back(new_task)
+        else:
+            self.running_tmp.push_back(new_task)
 
     cpdef startComponent(self, component):
         """ Components hit the ground running, their initialization was handled by their entity"""
-        cdef _Task *taskp, new_task
-        cdef entities_iterator iter
-        cdef PyObject *obj = <PyObject*> component
-        cdef _EntityTasks *et = NULL, new_et
-
-        new_task.release = False
-        new_task.req = REQUEST_NONE
-        new_task.entity = obj
-        Py_XINCREF(new_task.entity)
-        # Note: Got to do this assignment with an intermediary object, otherwise Cython just can't take it!
-        runnable = component.update
-        new_task.runnable = <PyObject*>runnable
-        Py_XINCREF(new_task.runnable)
-        new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet )
-        Py_XINCREF(<PyObject*>new_task.greenlet)
-        new_task.data = NULL
-        self.running.push_back(new_task)
-        taskp = &self.running.back()
-
-        iter = self.entities.find(obj)
-        if iter == self.entities.end():
-            self.entities.insert(pair[PyObject_p,_EntityTasks](obj,new_et))
-            iter = self.entities.find(obj)
-
-        et = &(deref(iter).second)
-        et.loading = NULL
-        et.running = taskp
+        self.startEntity(component, False)
 
     cpdef bint stopEntity(self, entity):
         cdef _Task *taskp
-        cdef entities_iterator iter
-        cdef task_iterator titer
-        cdef _EntityTasks *et
+        cdef task_iterator iter
         cdef PyObject *obj = <PyObject*> entity
         cdef bint eraseEntity = True
 
         # Release tasks in use
-        iter = self.entities.find(obj)
-        if iter != self.entities.end():
-            et = &deref(iter).second
-            # The tasks may be in use, if that's the case we mark them for release and wait for the update loop to release them and call us back
-            if et.loading != NULL:
-                et.loading.release = True
-                eraseEntity = False
-            if et.running != NULL:
-                et.running.release = True
-                eraseEntity = False
+        iter = self.loading.begin()
+        while iter != self.loading.end():
+            taskp = &deref(iter)
+            if taskp.entity == obj:
+                taskp.release = True
 
-            if eraseEntity:
-                self.entities.erase(iter)
-            return True
+            inc(iter)
 
-        return False
+        iter = self.running.begin()
+        while iter != self.running.end():
+            taskp = &deref(iter)
+            if taskp.entity == obj:
+                taskp.release = True
+
+            inc(iter)
 
     cpdef bint stopComponent(self, component):
         return self.stopEntity(component)
 
+
+    cdef taskDecRef (self, _Task* taskp):
+        Py_XDECREF(taskp.data)
+        Py_XDECREF(<PyObject*>taskp.greenlet)
+        Py_XDECREF(taskp.runnable)
+        Py_XDECREF(taskp.entity)
 
     cpdef update(self, int now=0, bint wrapup=False):
         """ Update everything, then render the scene
         now is the current time, specified in milliseconds
         wrapup = True forces the update loop to be broken, all running entities eventually stop running
         """
-        #cdef deque[_Task_p] remove_entities = new deque[_Task_p]()
-        cdef _Task *taskp, new_task, *task_aux
-        cdef _EntityTasks *et
-        cdef entities_iterator eiter
-        cdef task_iterator iter = self.loading.begin(), iter_end = self.loading.end()
+        cdef _Task *taskp
+        cdef deque[_Task].iterator iter, iter_end
         cdef PyObject *entity
 
+        # Add loading and running tasks from the temporary queues
+        while self.loading_tmp.size() > 0:
+            self.loading.push_back(self.loading_tmp.back())
+            self.loading_tmp.pop_back()
+
+        while self.running_tmp.size() > 0:
+            self.running.push_back(self.running_tmp.back())
+            self.running_tmp.pop_back()
+
         # Initialize objects
+        iter = self.loading.begin()
+        iter_end = self.loading.end()
+
         while iter != iter_end:
             taskp = &deref(iter)
             if taskp.release or not self._processTask(taskp, now, wrapup, True):
                 # Remove the task from the loading deque, start it in the running deque
 
-                # No need to double check here, task.entity was added in self.entities when startEntity was called
-                eiter = self.entities.find(taskp.entity)
-                et = &(deref(eiter).second)
-                et.loading = NULL
-
                 # Release the reference we held to data
-                entity = taskp.entity
-                Py_XDECREF(taskp.data)
-                Py_XDECREF(<PyObject*>taskp.greenlet)
-                Py_XDECREF(taskp.runnable)
-                Py_XDECREF(taskp.entity)
+                obj = <object>taskp.entity
+                self.taskDecRef(taskp)
                 iter = self.loading.erase(iter)
                 iter_end = self.loading.end()
-
                 if wrapup:
-                    if et.running == NULL and et.loading == NULL:
-                        obj = <object>taskp.entity
-                        self.stopEntity(obj)
+                    self.stopEntity(obj)
                 else:
-                    new_task.release = False
-                    new_task.entity = entity
-                    Py_XINCREF(new_task.entity)
-                    # Note: Got to do this assignment with an intermediary object, otherwise Cython just can't take it!
-                    tentity = <object>new_task.entity
-                    runnable = tentity.update
-                    new_task.runnable = <PyObject*>runnable
-                    Py_XINCREF(new_task.runnable)
-                    new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet)
-                    Py_XINCREF(<PyObject*>new_task.greenlet)
-                    new_task.req = REQUEST_NONE
-                    new_task.data = NULL
-                    self.running.push_back(new_task)
-                    et.running = &self.running.back()
-
-                    runnable = tentity._update
-                    new_task.runnable = <PyObject*>runnable
-                    Py_XINCREF(new_task.runnable)
-
+                    self.startEntity(obj, False)
             else:
                 # Someone may have deleted a loading task in the middle of this!
                 if iter == self.loading.end():
                     break
                 inc(iter)
 
-        if self.loading.empty() and self.freezeRenderer:
+        if self.loading.empty() and self.loading_tmp.empty() and self.freezeRenderer:
             self.freezeRenderer = False
 
         # Update objects
@@ -242,19 +208,8 @@ cdef class GameLoopBase(object):
             if taskp.release or not self._processTask(taskp, now, wrapup, False):
                 # Remove the task from the indexes
 
-                # No need to double check here, task.entity was added in self.entities when startEntity was called
-                eiter = self.entities.find(taskp.entity)
-                et = &(deref(eiter).second)
-                et.running = NULL
-                if et.running == NULL and et.loading == NULL:
-                    obj = <object>taskp.entity
-                    self.stopEntity(obj)
-
                 # Release the reference we held to data
-                Py_XDECREF(taskp.data)
-                Py_XDECREF(<PyObject*>taskp.greenlet)
-                Py_XDECREF(taskp.runnable)
-                Py_XDECREF(taskp.entity)
+                self.taskDecRef(taskp)
                 iter = self.running.erase(iter)
                 iter_end = self.running.end()
             else:
@@ -359,7 +314,10 @@ cdef class GameLoopBase(object):
                 return True
         else:
             # Unrecognized request
-            #print "Unrecognized request", task.req
             return self._doSwitch(task, args, kwargs)
 
+    cpdef addWatch(self, filename):
+        raise Exception('not implemented')
 
+    cpdef removeWatch(self, filename):
+        raise Exception('not implemented')

@@ -286,7 +286,13 @@ cdef extern from "SDL.h":
     cdef struct SDL_QuitEvent:
         pass
     cdef struct SDL_UserEvent:
-        pass
+        Uint32 type
+        Uint32 timestamp
+        Uint32 windowID
+        int code
+        void *data1
+        void *data2
+
     cdef struct SDL_SysWMEvent:
         pass
     cdef struct SDL_TouchFingerEvent:

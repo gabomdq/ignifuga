@@ -24,6 +24,9 @@ cdef class GameLoop(GameLoopBase):
         self.ticks_second = SDL_GetPerformanceFrequency()
 
 
+        self.fw = new FileWatcher()
+        self.fwli = new FileWatchListenerIgnifuga()
+
     cpdef run(self):
         cdef SDL_Event ev
         cdef Uint32 now
@@ -73,6 +76,7 @@ cdef class GameLoop(GameLoopBase):
             self.frame_time = SDL_GetPerformanceCounter()-nowx
             remainingTime = self._interval  - self.frame_time / self.ticks_second
             if remainingTime > 0:
+                self.fw.update()
                 SDL_Delay( remainingTime)
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
@@ -81,6 +85,7 @@ cdef class GameLoop(GameLoopBase):
         cdef SDL_MouseWheelEvent *mwev      
         cdef SDL_WindowEvent *winev
         cdef SDL_TouchFingerEvent *fev
+        cdef SDL_UserEvent *uev
 
         if sdlev.type == SDL_QUIT:
             Gilbert().endLoop()
@@ -142,23 +147,29 @@ cdef class GameLoop(GameLoopBase):
                 debug('Window minimized')
             elif winev.event == SDL_WINDOWEVENT_FOCUS_GAINED:
                 debug('Window focus gained')
-                self.paused = False
+                #self.paused = False
             elif winev.event == SDL_WINDOWEVENT_FOCUS_LOST:
                 # Pause here is strictly required for fullscreen Direct3D backed apps...
                 # but it doesn't hurt to pause in windowed apps or other platforms
                 # TODO: Should we make pausing here optional? Command line option enabled?
                 debug('Window focus lost')
-                self.paused = True
+                #self.paused = True
             elif winev.event == SDL_WINDOWEVENT_CLOSE:
                 debug('Window closed')
                 Gilbert().endLoop()
+        elif sdlev.type == SDL_USEREVENT:
+            # Used by the FileWatcher to report file changes
+            uev = <SDL_UserEvent*>sdlev
+            # TODO: Different actions depending on uev.code
+            Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
 
-
-            
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):
         """ Normalize the finger event coordinates from 0->32768 to the screen resolution """
         fev.x = fev.x * self._screen_w / 32768
         fev.y = fev.y * self._screen_h / 32768
 
+    cpdef addWatch(self, filename):
+        self.fw.addWatch(string(<char*>filename), self.fwli)
 
-
+    cpdef removeWatch(self, filename):
+        self.fw.removeWatch(string(<char*>filename))

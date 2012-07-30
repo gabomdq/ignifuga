@@ -227,11 +227,8 @@ class Gilbert:
         self.scenes = {}
         # A pointer to the current scene stored in self.scenes
         self.scene = None
-        # A pointer to the current scene entities
-        self.entities = {}
         # These dictionaries keep weakrefs via WeakSet, contain the current scene entities
         self.entitiesByTag = {}
-        self.entitiesByZ = []
 
         # These keep weakrefs in the key and via Task
         #self.loading = {}
@@ -241,8 +238,6 @@ class Gilbert:
         self._touchCaptured = False
         self._touchCaptor = None
         self._lastEvent = None
-
-        self._freezeRenderer = False
 
         self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display)
         self.dataManager = DataManager()
@@ -316,31 +311,6 @@ class Gilbert:
         """ End the game loop, free stuff """
         self.gameLoop.quit = True
 
-
-
-    def renderScene(self):
-        # Render a new scene
-        if not self._freezeRenderer:
-            self.renderer.update()
-
-#    def refreshEntityZ(self, entity):
-#        """ Change the entity's z index ordering """
-#        # Remove from the old z-index
-#        if entity.id in self.loading:
-#            return
-#
-#        self.hideEntity(entity)
-#        # Add to the new z-index
-#        if entity not in self.entitiesByZ:
-#            self.entitiesByZ.append(entity)
-#
-#        self.entitiesByZ.sort(key = lambda x: x.z)
-#
-#    def hideEntity(self, entity):
-#        """ Check all the Z layers, remove the entity from it"""
-#        if entity in self.entitiesByZ:
-#            self.entitiesByZ.remove(entity)
-
     def refreshEntityTags(self, entity, added_tags=[], removed_tags=[]):
         for tag in added_tags:
             if tag not in self.entitiesByTag:
@@ -383,13 +353,14 @@ class Gilbert:
             self._lastEvent = event
 
             if not self._touchCaptured:
-                for entity in self.entitiesByZ:
-                    continuePropagation, captureEvent = entity.event(event)
-                    if captureEvent:
-                        self._touchCaptor = entity
-                        self._touchCaptured = True
-                    if not continuePropagation:
-                        break
+#                for entity in self.entitiesByZ:
+#                    continuePropagation, captureEvent = entity.event(event)
+#                    if captureEvent:
+#                        self._touchCaptor = entity
+#                        self._touchCaptured = True
+#                    if not continuePropagation:
+#                        break
+                pass
             elif self._touchCaptor is not None:
                 continuePropagation, captureEvent = self._touchCaptor.event(event)
                 if not captureEvent:
@@ -434,13 +405,13 @@ class Gilbert:
             
         elif event.ethereal:
             # Send the event to all entity until something stops it
-            for entity in self.entitiesByZ:
-                continuePropagation, captureEvent = entity.event(event)
-                if captureEvent:
-                    self._touchCaptor = entity
-                    self._touchCaptured = True
-                if not continuePropagation:
-                    break
+#            for entity in self.entitiesByZ:
+#                continuePropagation, captureEvent = entity.event(event)
+#                if captureEvent:
+#                    self._touchCaptor = entity
+#                    self._touchCaptured = True
+#                if not continuePropagation:
+#                    break
 
             if continuePropagation:
                 if self.scene and self.scene.userCanZoom:
@@ -503,37 +474,34 @@ class Gilbert:
 #        except:
 #            return False
 
-    def loadScenes(self, data):
+    def loadScenesFromFile(self, scenesFile):
+        url, scenes = self.dataManager.loadSceneData(scenesFile)
+        self.loadScenes(scenes, data_url=url)
+
+    def loadScenes(self, scenes, data_url = None):
         """ Load scenes from a dictionary like structure. The data format is...
         """
-        if not isinstance(data, dict):
+        if not isinstance(scenes, dict):
             return False
 
         # As scene data may be cached or still referenced when the loop ends,
         # we iterate over a deepcopy of it to avoid a reference circle with entities
         # that prevents them from being garbage collected
-        for scene_id, scene_data in copy.deepcopy(data).iteritems():
-            self.loadScene(scene_id, scene_data)
+        for scene_id, scene_data in copy.deepcopy(scenes).iteritems():
+            self.loadScene(scene_id, scene_data, data_url)
 
-    def loadScenesFromFile(self, scenesFile):
-        scenes = self.dataManager.loadJsonFile(scenesFile)
-        self.loadScenes(scenes)
-
-    def loadScene(self, scene_id, scene_data):
-        scene = Scene(id=scene_id, **scene_data)
+    def loadScene(self, scene_id, scene_data, data_url = None):
+        scene = Scene(id=scene_id, data_url = data_url, **scene_data)
         self.scenes[scene_id] = scene
 
     def startScene(self, scene_id):
         if scene_id in self.scenes:
             self.scene = self.scenes[scene_id]
-            self.entities = self.scene.entities
             self.scene.sceneInit()
             self.startEntity(self.scene)
-            for entity in self.entities.itervalues():
-                self.startEntity(entity)
-
             return True
 
+        error("COULD NOT FIND SCENE %s" % scene_id)
         return False
 
     def startFirstScene(self):
@@ -556,7 +524,7 @@ class Gilbert:
         # Make sure all entities finished loading and running
         debug('Waiting for entities to finish loading/running')
         tries = 0
-        self._freezeRenderer = True
+        self.gameLoop.freezeRenderer = True
 #        while self.loading or self.running:
 #            self.update(wrapup=True)
 #            tries += 1
@@ -566,13 +534,10 @@ class Gilbert:
 #                tries = 0
 
 
-        for entity in self.entities.values():
-            # Forget about the entity and release data
-            entity.unregister()
+        if self.scene is not None:
+            self.scene.reset()
 
-        del self.entities
         del self.scene
-        del self.entitiesByZ
         del self.entitiesByTag
         #del self.loading
         #del self.running
@@ -581,8 +546,6 @@ class Gilbert:
         gc.collect()
 
         self.scene = None
-        self.entities = {}
-        self.entitiesByZ = []
         self.entitiesByTag = {}
         #self.loading = {}
         #self.running = {}
@@ -614,6 +577,12 @@ class Gilbert:
             return base64.b64decode(EMBEDDED_IMAGES[url])
 
         return None
+
+    def freezeRenderer(self):
+        self.gameLoop.freezeRenderer = True
+
+    def unfreezeRenderer(self):
+        self.gameLoop.freezeRenderer = False
 
 
 # Gilbert imports
