@@ -369,13 +369,13 @@ class Gilbert:
 
             if continuePropagation and self._touchCaptor == None:
                 if event.deltax != None and event.deltay != None and event.type != Event.TYPE.touchdown:
-                    if self.scene and self.scene.userCanScroll and event.stream == 0 and event.stream in self._touches and len(self._touches)==1:
+                    if self.scene is not None and self.scene.userCanScroll and event.stream == 0 and event.stream in self._touches and len(self._touches)==1:
                         # Handle scrolling
                         self.renderer.scrollBy(event.deltax, event.deltay)
                         self._touchCaptured = True
                         self._touchCaptor = None
 
-                    if self.scene and self.scene.userCanZoom and len(self._touches) == 2 and (event.stream == 0 or event.stream == 1) and 0 in self._touches and 1 in self._touches:
+                    if self.scene is not None and self.scene.userCanZoom and len(self._touches) == 2 and (event.stream == 0 or event.stream == 1) and 0 in self._touches and 1 in self._touches:
                         # Handle zooming
                         prevArea = (self._touches[0].x-self._touches[1].x)**2 + (self._touches[0].y-self._touches[1].y)**2
                         if event.stream == 0:
@@ -497,7 +497,6 @@ class Gilbert:
     def startScene(self, scene_id):
         if scene_id in self.scenes:
             self.scene = self.scenes[scene_id]
-            self.scene.sceneInit()
             self.startEntity(self.scene)
             return True
 

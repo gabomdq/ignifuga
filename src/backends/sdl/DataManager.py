@@ -74,16 +74,19 @@ class DataManager(DataManagerBase):
         return self.cache[cache_url]
 
     def urlReloaded(self, url):
-        print url, "reloaded"
         reload = []
         if url in self.cache:
-            print self.notifications
             if url in self.notifications:
                 for ref in self.notifications[url]:
                     if hasattr(ref, 'reload') and ref not in reload:
                         reload.append(ref)
 
-            del self.cache[url]
+            if isinstance(self.cache[url], Canvas):
+                # Reload the canvas before issuing the notifications
+                self.cache[url].reload(url)
+            else:
+                del self.cache[url]
+
             for ref in reload:
                 ref.reload(url)
 

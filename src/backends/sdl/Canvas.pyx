@@ -30,27 +30,44 @@ cdef class Canvas (CanvasBase):
         isRenderTarget -> if True, then other canvases with hw=True can be rendered on top of this canvas via hw rendering
         srclURL != None -> Load image into software canvas
         """
-        cdef SDL_Surface *ss = NULL
-        cdef char *bindata
-        cdef bytes embedded_data
+
         renderer = getRenderer()
         self._sdlRenderer = (<Renderer>renderer).renderer
-        self._srcURL = srcURL
+
         self._isRenderTarget = isRenderTarget
         self._fontURL = None
         self._fontSize = 0
         self._font = None
         self._r = self._g = self_b = self._a = 1.0
         self.spriteData = None
-        
-        if srcURL != None or embedded != None:
+        self._req_width = width if width != None else -1
+        self._req_height = height if height != None else -1
+        self._hw = hw
+
+        if srcURL is not None:
+            self._srcURL = bytes(srcURL)
+        else:
+            self._srcURL = None
+
+        if embedded is not None:
+            self.embedded_data = bytes(embedded)
+        else:
+            self.embedded_data = None
+
+        self.load()
+
+    cpdef load(self):
+        cdef SDL_Surface *ss = NULL
+        cdef char *bindata
+        cdef int src_len
+
+        if self._srcURL is not None or self.embedded_data is not None:
             # Initialize a software surface with contents loaded from the image
-            if srcURL != None:
-                ss = IMG_Load(srcURL)
-            elif embedded != None:
-                src_len = len(embedded)
-                embedded_data = bytes(embedded)
-                bindata = embedded_data
+            if self._srcURL is not None:
+                ss = IMG_Load(self._srcURL)
+            elif self.embedded_data is not None:
+                src_len = len(self.embedded_data)
+                bindata = self.embedded_data
                 rwops = SDL_RWFromConstMem(<void*>bindata, src_len )
                 if rwops != NULL:
                     ss = IMG_Load_RW(rwops, 1)
@@ -67,18 +84,17 @@ cdef class Canvas (CanvasBase):
                 self._height = ss.h
                 SDL_FreeSurface(ss)
         else:
-            self._hw = hw
-            
-            if width is None:
-                width = Renderer()._width
-            if height is None:
-                height = Renderer()._height
-                
-            self._width = width
-            self._height = height
-                
+            if self._req_width == -1:
+                self._width = Renderer()._width
+            else:
+                self._width = self._req_width
+            if self._req_height == -1:
+                self._height = Renderer()._height
+            else:
+                self._height = self._req_height
+
             if self._hw:
-                if isRenderTarget:
+                if self._isRenderTarget:
                     self._surfacehw = SDL_CreateTexture(self._sdlRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, self._width, self._height)
                 else:
                     self._surfacehw = SDL_CreateTexture(self._sdlRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, self._width, self._height)
@@ -88,25 +104,34 @@ cdef class Canvas (CanvasBase):
         
         if (self._hw and self._surfacehw == NULL) or ( not self._hw and self._surfacesw == NULL):
             # Error loading surface, we got a null pointer
-            error("Could not initialize canvas (srcURL: %s, hw: %s)" % (srcURL, hw))
+            error("Could not initialize canvas (srcURL: %s, hw: %s)" % (self._srcURL, self._hw))
             exit(1)
 
         SDL_SetTextureBlendMode(self._surfacehw, SDL_BLENDMODE_BLEND)
 
-    def __dealloc__(self):
-        debug( ">>>CANVAS DEALLOC %s (URL: %s) <<<" % (self, self._srcURL))
-        if self._hw:
+    cpdef reload(self, url):
+        cdef SDL_Texture * oldsurface = self._surfacehw
+        cdef Renderer renderer = <Renderer>Gilbert().renderer
+        self.free()
+        self._srcURL = bytes(url)
+        self.load()
+        if oldsurface != NULL and self._surfacehw != NULL and self._surfacehw != oldsurface:
+            renderer.updateTexture(oldsurface, self._surfacehw)
+
+    cdef free(self):
+        if self._surfacehw != NULL:
             SDL_DestroyTexture(self._surfacehw)
             self._surfacehw = NULL
-        else:
+
+        if self._surfacesw != NULL:
             SDL_FreeSurface(self._surfacesw)
             self._surfacesw = NULL
 
+    def __dealloc__(self):
+        debug( ">>>CANVAS DEALLOC %s (URL: %s) <<<" % (self, self._srcURL))
+        self.free()
+
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):
-        #cdef Canvas canvas
-
-        #canvas = <Canvas>canvasbase
-
         if sw == -1:
             sw = canvasbase._width
         if sh == -1:

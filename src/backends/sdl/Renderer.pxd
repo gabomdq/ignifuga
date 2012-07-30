@@ -94,6 +94,7 @@ cdef class Renderer:
     cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil
+    cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil
 
     cpdef cleanup(self)
 

@@ -79,7 +79,8 @@ class Entity(object):
             self.scene = None
 
         # Process the data, load the components from it
-        self.load(data)
+        self.setup(**data)
+        self.load()
 
         # Fix the id in case it wasn't specified
         if self.id == None:
@@ -126,8 +127,8 @@ class Entity(object):
                     failcount[component] += 1
 
                 if failcount[component] >= 10:
-                    error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
-                    error(traceback.format_exc())
+                    #error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
+                    #error(traceback.format_exc())
                     self._initFailCount+=1
                     if self._initFailCount > 10:
                         self._initFailCount = 0
@@ -136,9 +137,9 @@ class Entity(object):
                         DONE()
                         return
                     else:
-                        ERROR()
-                        return
-                    break
+                        failcount[component] = 0
+                        # Allow other entities to initialize, then come back here
+                        SKIP()
 
         self._initialized = True
 
@@ -147,9 +148,18 @@ class Entity(object):
 #        """ Register Entity with the Overlord """
 #        Gilbert().registerNode(self)
 
+    def setup(self, **data):
+        self._data = data
+
+    def reset(self):
+        Gilbert().gameLoop.stopEntity(self)
+        for component in self._components.itervalues():
+            Gilbert().gameLoop.stopEntity(component)
+
     def unregister(self):
         """ Unregister Entity with the Overlord """
-        Gilbert().gameLoop.stopEntity(self)
+        self.reset()
+
         # Break dependency cycles
         if not self._released:
             self.__free__()
@@ -163,7 +173,7 @@ class Entity(object):
             if not hasattr(self, key):
                 setattr(self, key, value)
 
-    def load(self, data):
+    def load(self, data = None):
         """ Load components from given data
         data has the format may be:
         { 'components': [{'id':'something', 'type':'position','x':1.0,'y':1.0}, {id:'somethingelse', 'type':'sprite',image:'test.png'}, etc], otherdata }
@@ -171,6 +181,17 @@ class Entity(object):
 
         The key of each entry
         """
+        if data is None:
+            data = self._data
+
+        #Load attributes from data
+        for key,value in data.iteritems():
+            if key not in ['entities', 'components']:
+                setattr(self, key, value)
+                print self.id, key, value
+
+        self._initialComponents = []
+
         if 'components' in data:
             if isinstance(data['components'], dict):
                 for c_id, c_data in data['components'].iteritems():
@@ -181,8 +202,6 @@ class Entity(object):
                 for c_data in data['components']:
                     c_data['entity'] = self
                     self._initialComponents.append(Component.create(**c_data))
-
-
 
     def __getstate__(self):
         odict = self.__dict__.copy()

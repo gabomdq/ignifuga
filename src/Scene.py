@@ -25,10 +25,11 @@ class Scene(Entity):
             '_userCanScroll': True,
             '_userCanZoom': True,
             '_size': {'width': None, 'height': None},
-            '_scale': None,
+            '_scale': (None, None),
             '_scrollX': None,
             '_scrollY': None,
             '_ready': False,
+            'reloadPreserveCamera': True,
             'data_url': None
         })
         # Add the Scene entity
@@ -41,12 +42,13 @@ class Scene(Entity):
         self.reset()
         super(Scene, self).__del__()
 
-    def setup(self, **data):
-        self._data = data
+
 
     def reset(self):
         # Remove existing entities
         self._ready = False
+        super(Scene, self).reset()
+
         for entity in self.entities.itervalues():
             entity.unregister()
         self.entities = {}
@@ -57,15 +59,17 @@ class Scene(Entity):
     def reload(self, source):
         Gilbert().freezeRenderer()
         self.reset()
+
         new_data = Gilbert().dataManager.loadJsonFile(source)
         if self.id in new_data:
-            new_data[self.id]['scale'] = self.scale
-            new_data[self.id]['scroll'] = self.scroll
-            new_data[self.id]['autoCenter'] = False
+            if self.reloadPreserveCamera:
+                print "preserving camera"
+                new_data[self.id]['scale'] = self.scale
+                new_data[self.id]['scroll'] = self.scroll
+                new_data[self.id]['autoCenter'] = False
             self.source = source
             self.setup(**new_data[self.id])
-            self.sceneInit()
-            Gilbert().stopEntity(self)
+            self.load()
             Gilbert().startEntity(self)
 
     def getEntity(self, id):
@@ -75,26 +79,20 @@ class Scene(Entity):
 
         return None
 
-    def sceneInit(self, data = None):
-        if data is None:
-            data = self._data
-
-        self.reset()
-
-        #Load data
-        for key,value in data.iteritems():
-            if key != 'entities':
-                setattr(self, key, value)
-
-        if self.data_url is not None:
-            Gilbert().dataManager.addListener(self.data_url, self)
-
+    def init(self,**data):
+        """ Initialize the required external data """
         # Build entities
-        if 'entities' in data:
-            for entity_id, entity_data in data['entities'].iteritems():
+        if 'entities' in self._data:
+            for entity_id, entity_data in self._data['entities'].iteritems():
                 entity = Entity.create(id=entity_id, scene=self, **entity_data)
                 if entity != None:
                     self.entities[entity_id] = entity
+
+        for entity in self.entities.itervalues():
+            Gilbert().startEntity(entity)
+
+        if self.data_url is not None:
+            Gilbert().dataManager.addListener(self.data_url, self)
 
         Gilbert().renderer.setNativeResolution(self._resolution['width'], self._resolution['height'], self._keepAspect, self._autoScale)
         Gilbert().renderer.setSceneSize(self._size['width'], self._size['height'])
@@ -103,16 +101,12 @@ class Scene(Entity):
 
         self._ready = True
         # Apply scaling and scrolling
-        if self._scale is not None:
-            self.scale = self._scale
+        print "scene init", self._scale, self._scrollX, self._scrollY
+        self.scale = self._scale
         if self._scrollX is not None and self._scrollY is not None:
             self.scroll = self._scrollX, self._scrollY
 
-    def init(self,**data):
-        """ Initialize the required external data """
         super(Scene, self).init(**data)
-        for entity in self.entities.itervalues():
-            Gilbert().startEntity(entity)
 
     @property
     def resolution(self):
@@ -164,16 +158,40 @@ class Scene(Entity):
         self._userCanZoom = value
 
     @property
+    def scaleX(self):
+        return self.scale[0]
+
+    @scaleX.setter
+    def scaleX(self, value):
+        self.scale = (value, self._scale[1])
+
+    @property
+    def scaleY(self):
+        return self.scale[1]
+
+    @scaleY.setter
+    def scaleY(self, value):
+        self.scale = (self._scale[0], value)
+
+    @property
     def scale(self):
-        return Gilbert().renderer.scale
+        self._scale = Gilbert().renderer.scale
+        return self._scale
+
     @scale.setter
     def scale(self, value):
-        self._scale = value
-        if self._ready:
-            if len(value) == 2:
+        if (isinstance(value, tuple) or isinstance(value, list)) and len(value) == 2:
+            self._scale = value
+            if self._ready and self._scale[0] is not None and self._scale[1] is not None:
                 Gilbert().renderer.scaleTo(self._scale[0],self._scale[1])
-            else:
-                Gilbert().renderer.scaleTo(self._scale,self._scale)
+        else:
+            try:
+                value = float(value)
+                self._scale = value, value
+                if self._ready:
+                    Gilbert().renderer.scaleTo(value, value)
+            except:
+                self._scale = None, None
 
     @property
     def scrollX(self):

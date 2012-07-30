@@ -8,7 +8,6 @@
 # SDL 2D Canvas
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from cpython cimport bool
 from ignifuga.backends.CanvasBase cimport CanvasBase
 from ignifuga.backends.sdl.Font cimport Font
 from SDL cimport *
@@ -18,9 +17,10 @@ cdef class Canvas (CanvasBase):
     cdef SDL_Renderer * _sdlRenderer
     cdef SDL_Texture * _surfacehw
     cdef SDL_Surface * _surfacesw
-    cdef unicode _srcURL, _fontURL
-    cdef readonly bool _isRenderTarget, _hw
-    cdef readonly int _width, _height, _fontSize
+    cdef bytes _srcURL, _fontURL
+    cdef readonly bint _isRenderTarget, _hw
+    cdef readonly int _width, _height, _fontSize, _req_width, _req_height
+    cdef bytes embedded_data
     cdef Font _font
     cdef readonly object spriteData
     

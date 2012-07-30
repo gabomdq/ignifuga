@@ -155,3 +155,6 @@ class Component(object):
                 command(self)
             else:
                 exec command
+
+    def reload(self, url):
+        pass

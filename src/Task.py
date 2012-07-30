@@ -9,7 +9,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import greenlet
-from ignifuga.Gilbert import REQUEST_DONE, REQUEST_LOADIMAGE, REQUEST_ERROR, REQUEST_STOP
+from ignifuga.Gilbert import REQUEST_DONE, REQUEST_LOADIMAGE, REQUEST_ERROR, REQUEST_STOP, REQUEST_SKIP
 
 #class Task(greenlet.greenlet):
 #    def __init__(self, entity_wr, run=None, parent=None):
@@ -40,6 +40,10 @@ def ERROR(data=None):
 def STOP(data=None):
     g = greenlet.getcurrent()
     return g.parent.switch((REQUEST_STOP, data))
+
+def SKIP(data=None):
+    g = greenlet.getcurrent()
+    return g.parent.switch((REQUEST_SKIP, data))
 
 def LOAD_IMAGE(url):
     g = greenlet.getcurrent()

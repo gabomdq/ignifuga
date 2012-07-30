@@ -68,6 +68,7 @@ class Sprite(Viewable):
         self.renderer = Gilbert().renderer
         if self.file != None:
             self._atlas = LOAD_IMAGE(self.file)
+            Gilbert().dataManager.addListener(self.file, self)
             if self._atlas.spriteData != None:
                 self._spriteData = self._atlas.spriteData
                 self.sprite = _Sprite(self._spriteData, self._atlas, self.frequency)
@@ -86,6 +87,7 @@ class Sprite(Viewable):
     def free(self, **kwargs):
         self.hide()
         self._tmpcanvas = None
+        Gilbert().dataManager.removeListener(self.file, self)
         super(Sprite, self).free(**kwargs)
 
     def update(self, now, **data):
@@ -506,6 +508,14 @@ class Sprite(Viewable):
     @parent.setter
     def parent(self, value):
         self._parent = value
+
+
+    def reload(self, url):
+        # The Canvas was reloaded before we get here
+        if self._visible:
+            self.hide()
+            self.show()
+
 
 
 

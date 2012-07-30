@@ -108,7 +108,6 @@ class DataManagerBase(object):
         raise Exception('method not implemented')
 
     def addListener(self, url, obj):
-        print "add listener", url, obj
         if url not in self.notifications:
             self.notifications[url] = []
 

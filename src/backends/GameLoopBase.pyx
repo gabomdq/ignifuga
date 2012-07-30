@@ -30,6 +30,7 @@ cdef class GameLoopBase(object):
         self.quit = False
         self.fps = fps
         self.frame_time = 0
+        self.freezeRenderer = True
 
         self.loading = new deque[_Task]()
         self.loading_tmp = new deque[_Task]()
@@ -197,7 +198,7 @@ cdef class GameLoopBase(object):
                     break
                 inc(iter)
 
-        if self.loading.empty() and self.loading_tmp.empty() and self.freezeRenderer:
+        if self.freezeRenderer and self.loading.empty() and self.loading_tmp.empty():
             self.freezeRenderer = False
 
         # Update objects
@@ -269,7 +270,7 @@ cdef class GameLoopBase(object):
         if task.req == REQUEST_NONE:
             if self._doSwitch(task, args, kwargs):
                 if init and task.req == REQUEST_ERROR:
-                    # There was a problem with initialization, let's try again
+                    # There was a problem with initialization, let's try again from scratch
                     Py_XDECREF(<PyObject*>task.greenlet)
                     task.req = REQUEST_NONE
                     task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)

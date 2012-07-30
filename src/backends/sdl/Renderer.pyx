@@ -450,6 +450,15 @@ cdef class Renderer:
         cdef _Sprite *sprite = sprite_w.sprite
         return self._spriteColor(sprite, <Uint8>(r*255.0), <Uint8>(g*255.0), <Uint8>(b*255.0), <Uint8>(a*255.0))
 
+    cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil:
+        cdef int i, numsprites = self.active_sprites.size()
+        cdef Sprite_p sprite
+
+        for i in prange(numsprites, nogil=True):
+            sprite = &self.active_sprites.at(i)
+            if sprite.texture == oldt:
+                sprite.texture = newt
+
     property screenSize:
         def __get__(self):
             """ Return the width,height of the screen """
@@ -502,9 +511,7 @@ cdef class Renderer:
 
     cpdef centerOnScenePoint(self, double sx, double sy):
         """ Center scene around the given scene point"""
-        cdef int ssx, ssy
-        ssx,ssy = self.sceneToScreen(sx,sy)
-        self.centerOnScreenPoint(ssx,ssy)
+        self.centerOnScreenPoint(<int>(sx*self._scale_x),<int>(sy*self._scale_y))
 
     cpdef centerOnScreenPoint(self, int sx, int sy):
         """ Center scene around the given screen point"""
@@ -526,7 +533,7 @@ cdef class Renderer:
     cpdef _calculateScale(self, double scene_w, double scene_h, int screen_w, int screen_h, bint keep_aspect=1):
         cdef double sx, sy
         self.dirty = True
-        if scene_w!=-1.0 and scene_h != -1.0:
+        if scene_w > 0.0 and scene_h > 0.0:
             sx = <double>screen_w/scene_w
             sy = <double>screen_h/scene_h
             if keep_aspect:
