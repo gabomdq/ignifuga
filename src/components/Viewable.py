@@ -8,9 +8,10 @@
 # Graphic component, common base for text and sprite components
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import Gilbert, Event, Signal
+from ignifuga.Gilbert import Gilbert
 from ignifuga.Task import *
 from ignifuga.components.Component import Component
+from ignifuga.backends.GameLoopBase import EVENT_TYPE_TOUCH_DOWN, EVENT_TYPE_TOUCH_UP, EVENT_TYPE_TOUCH_MOTION, EVENT_TYPE_TOUCH_LAST, EVENT_TYPE_ETHEREAL_ZOOM_IN, EVENT_TYPE_ETHEREAL_ZOOM_OUT, EVENT_TYPE_ETHEREAL_SCROLL
 import sys
 
 
@@ -62,7 +63,7 @@ class Viewable(Component):
             'parallax_y': 0.0,
             '_scrollx': 0,      # Keep track of the renderer scroll for parallax functionality
             '_scrolly': 0,
-            'interactive': True
+            'interactive': False
         })
 
         super(Viewable, self).__init__(id, entity, active, frequency, **data)
@@ -267,16 +268,16 @@ class Viewable(Component):
         y = (y-self.y)*self._height_src/self.height
         return x,y
 
-    def slot(self, signal, sender=None, event=None, **data):
-        """ Receives signals from the entity"""
-        if signal == Signal.touches:
-            x,y = self._convertScenePointToSprite(event.scene_x, event.scene_y)
+    def event(self, action, sx, sy):
+        """ Event processing """
+        if action < EVENT_TYPE_TOUCH_LAST:
+            x,y = self._convertScenePointToSprite(sx, sy)
             if self.hits(x,y):
                 return False, False
             return True, False
-        elif signal == Signal.scroll:
-            self._scrollx = event.x
-            self._scrolly = event.y
+        elif action == EVENT_TYPE_ETHEREAL_SCROLL:
+            self._scrollx = sx
+            self._scrolly = sy
             return True, False
-        elif signal == Signal.zoom:
+        else:
             return True, False

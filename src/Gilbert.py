@@ -16,17 +16,6 @@ from optparse import OptionParser
 class BACKENDS:
     sdl = 'sdl'
 
-# This needs to match the values defined in GameLoopBase.pxd
-
-REQUEST_NONE = 0x00000000
-REQUEST_DONE = 0x00000001
-REQUEST_SKIP = 0x00000002
-REQUEST_STOP = 0x00000004
-REQUEST_LOADIMAGE = 0x0000008
-REQUEST_ERROR = 0x0000010
-
-#from Task import Task
-    
 class Event:
     class TYPE:
         # We don't really use these
@@ -323,121 +312,6 @@ class Gilbert:
                 if entity in self.entitiesByTag[tag]:
                     self.entitiesByTag[tag].remove(entity)
 
-    def reportEvent(self, event):
-        """ Propagate an event through the entities """
-        # Do some event mapping/discarding
-        if event.type == Event.TYPE._mousedown or event.type == Event.TYPE._moztouchdown:
-            event.type = Event.TYPE.touchdown
-        elif event.type == Event.TYPE._mouseup or event.type == Event.TYPE._moztouchup:
-            event.type = Event.TYPE.touchup
-        elif event.type == Event.TYPE._mousemove or event.type == Event.TYPE._moztouchmove:
-            event.type = Event.TYPE.touchmove
-
-        continuePropagation = True
-        captureEvent = False
-   
-        if not event.ethereal and event.x != None and event.y != None:
-            # See if we have a deltax,deltay
-            if event.deltax == None or event.deltay == None:
-                if event.stream in self._touches:
-                    lastTouch = self._touches[event.stream]
-                    event.deltax = event.x - lastTouch.x
-                    event.deltay = event.y - lastTouch.y
-
-            # Walk the entities, see if the event matches one of them and inform it of the event
-#            scale_x, scale_y = self.renderer.scale
-#            # Scroll is in scene coordinates
-#            scroll_x, scroll_y = self.renderer.scroll
-            
-            event.scene_x, event.scene_y = self.renderer.screenToScene(event.x, event.y)
-            self._lastEvent = event
-
-            if not self._touchCaptured:
-#                for entity in self.entitiesByZ:
-#                    continuePropagation, captureEvent = entity.event(event)
-#                    if captureEvent:
-#                        self._touchCaptor = entity
-#                        self._touchCaptured = True
-#                    if not continuePropagation:
-#                        break
-                pass
-            elif self._touchCaptor is not None:
-                continuePropagation, captureEvent = self._touchCaptor.event(event)
-                if not captureEvent:
-                    self._touchCaptured = False
-                    self._touchCaptor = None
-
-            if continuePropagation and self._touchCaptor == None:
-                if event.deltax != None and event.deltay != None and event.type != Event.TYPE.touchdown:
-                    if self.scene is not None and self.scene.userCanScroll and event.stream == 0 and event.stream in self._touches and len(self._touches)==1:
-                        # Handle scrolling
-                        self.renderer.scrollBy(event.deltax, event.deltay)
-                        self._touchCaptured = True
-                        self._touchCaptor = None
-
-                    if self.scene is not None and self.scene.userCanZoom and len(self._touches) == 2 and (event.stream == 0 or event.stream == 1) and 0 in self._touches and 1 in self._touches:
-                        # Handle zooming
-                        prevArea = (self._touches[0].x-self._touches[1].x)**2 + (self._touches[0].y-self._touches[1].y)**2
-                        if event.stream == 0:
-                            prevTouch = self._touches[1]
-                        else:
-                            prevTouch = self._touches[0]
-
-                        currArea = (event.x-prevTouch.x)**2 +(event.y-prevTouch.y)**2
-                        zoomCenterX = (event.x + prevTouch.x)/2
-                        zoomCenterY = (event.y + prevTouch.y)/2
-                        cx,cy = self.renderer.screenToScene(zoomCenterX, zoomCenterY)
-                        self.renderer.scaleBy(currArea-prevArea)
-                        sx,sy = self.renderer.sceneToScreen(cx,cy)
-
-                        self.renderer.scrollBy(zoomCenterX-sx, zoomCenterY-sy)
-                        self._touchCaptured = True
-                        self._touchCaptor = None
-
-            if event.type == Event.TYPE.touchup:
-                # Forget about this stream as the user lift the finger/mouse button
-                self._resetStream(event.stream)
-                self._touchCaptured = False
-                self._touchCaptor = None
-            elif event.type == Event.TYPE.touchdown or event.stream in self._touches:   # Don't store touchmove events because in a pointer based platform this gives you scrolling with no mouse button pressed
-                    # Save the last touch event for the stream
-                    self._storeEvent(event)
-            
-        elif event.ethereal:
-            # Send the event to all entity until something stops it
-#            for entity in self.entitiesByZ:
-#                continuePropagation, captureEvent = entity.event(event)
-#                if captureEvent:
-#                    self._touchCaptor = entity
-#                    self._touchCaptured = True
-#                if not continuePropagation:
-#                    break
-
-            if continuePropagation:
-                if self.scene and self.scene.userCanZoom:
-                    if event.type == Event.TYPE.zoomin:
-                        if self._lastEvent:
-                            cx,cy = self.renderer.screenToScene(self._lastEvent.x, self._lastEvent.y)
-                        self.renderer.scaleByFactor(1.2)
-                        if self._lastEvent:
-                            sx,sy = self.renderer.sceneToScreen(cx,cy)
-                            self.renderer.scrollBy(self._lastEvent.x-sx, self._lastEvent.y-sy)
-                    elif event.type == Event.TYPE.zoomout:
-                        if self._lastEvent:
-                            cx,cy = self.renderer.screenToScene(self._lastEvent.x, self._lastEvent.y)
-                        self.renderer.scaleByFactor(0.8)
-                        if self._lastEvent:
-                            sx,sy = self.renderer.sceneToScreen(cx,cy)
-                            self.renderer.scrollBy(self._lastEvent.x-sx, self._lastEvent.y-sy)
-                    
-    def _storeEvent(self, event):
-        """ Store a touch/mouse event for a stream, to be used for future reference"""
-        self._touches[event.stream] = event
-
-    def _resetStream(self, stream):
-        """ Reset the last stored event for the stream"""
-        if stream in self._touches:
-            del self._touches[stream]
 
     def saveState(self):
         """ Serialize the current status of the engine """

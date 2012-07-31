@@ -145,10 +145,6 @@ class Component(object):
         """ Update the component"""
         pass
 
-    def slot(self, signal, sender=None, **data):
-        """ Receives signals from the entity"""
-        pass
-
     def run(self, command=None):
         if command != None:
             if hasattr(command, '__call__'):
@@ -158,3 +154,6 @@ class Component(object):
 
     def reload(self, url):
         pass
+
+    def event(self, action, sx, sy):
+        return True, False

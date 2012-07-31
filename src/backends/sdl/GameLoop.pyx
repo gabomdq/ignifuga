@@ -11,9 +11,11 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 
-from ignifuga.Gilbert import Gilbert, Event
-from ignifuga.Log import debug
+from ignifuga.Gilbert import Gilbert
+from ignifuga.Log import debug, error
 import time, sys
+
+DEF NUM_STREAMS = 20
 
 cdef class GameLoop(GameLoopBase):
     def __init__(self, fps = 30.0):
@@ -26,6 +28,17 @@ cdef class GameLoop(GameLoopBase):
 
         self.fw = new FileWatcher()
         self.fwli = new FileWatchListenerIgnifuga()
+
+        self.active_touches = 0
+
+        cdef int i
+        for i in range(NUM_STREAMS):
+            self.touches[i].valid = False
+
+        self.touchCaptor = None
+        self.touchCaptured = False
+        self.lastTouch.x = 0
+        self.lastTouch.y = 0
 
     cpdef run(self):
         cdef SDL_Event ev
@@ -91,39 +104,39 @@ cdef class GameLoop(GameLoopBase):
             Gilbert().endLoop()
         elif sdlev.type == SDL_MOUSEMOTION:
             mmev = <SDL_MouseMotionEvent*>sdlev
-            gev = Event(Event.TYPE._mousemove, mmev.x, mmev.y)
-            Gilbert().reportEvent(gev)
-            sys.stdout.flush()
+            if self.touches[0].valid:
+                self.handleTouch(EVENT_TOUCH_MOTION, mmev.x, mmev.y, 0)
+            elif self.touches[1].valid:
+                self.handleTouch(EVENT_TOUCH_MOTION, mmev.x, mmev.y, 1)
+            elif self.touches[2].valid:
+                self.handleTouch(EVENT_TOUCH_MOTION, mmev.x, mmev.y, 2)
+            else:
+                self.handleTouch(EVENT_TOUCH_MOTION, mmev.x, mmev.y, 0)
+
         elif sdlev.type == SDL_MOUSEBUTTONDOWN:
             mbev = <SDL_MouseButtonEvent*>sdlev
-            gev = Event(Event.TYPE._mousedown, mbev.x, mbev.y, mbev.button)
-            Gilbert().reportEvent(gev)
+            self.handleTouch(EVENT_TOUCH_DOWN, mbev.x, mbev.y, mbev.button-1)
         elif sdlev.type == SDL_MOUSEBUTTONUP:
             mbev = <SDL_MouseButtonEvent*>sdlev
-            gev = Event(Event.TYPE._mouseup, mbev.x, mbev.y, mbev.button)
-            Gilbert().reportEvent(gev)
-        elif sdlev.type == SDL_MOUSEWHEEL:
-            mwev = <SDL_MouseWheelEvent*>sdlev
-            if mwev.y > 0:
-                gev = Event(Event.TYPE.zoomin)
-            else:
-                gev = Event(Event.TYPE.zoomout)
-            Gilbert().reportEvent(gev)
+            self.handleTouch(EVENT_TOUCH_UP, mbev.x, mbev.y, mbev.button-1)
         elif sdlev.type == SDL_FINGERMOTION:
             fev = <SDL_TouchFingerEvent*>sdlev
             self.normalizeFingerEvent(fev)
-            gev = Event(Event.TYPE.touchmove, fev.x, fev.y, stream=fev.fingerId)
-            Gilbert().reportEvent(gev)
+            self.handleTouch(EVENT_TOUCH_MOTION, fev.x, fev.y, fev.fingerId)
         elif sdlev.type == SDL_FINGERDOWN:
             fev = <SDL_TouchFingerEvent*>sdlev
             self.normalizeFingerEvent(fev)
-            gev = Event(Event.TYPE.touchdown, fev.x, fev.y, stream=fev.fingerId)
-            Gilbert().reportEvent(gev)
+            self.handleTouch(EVENT_TOUCH_DOWN, fev.x, fev.y, fev.fingerId)
         elif sdlev.type == SDL_FINGERUP:
             fev = <SDL_TouchFingerEvent*>sdlev
             self.normalizeFingerEvent(fev)
-            gev = Event(Event.TYPE.touchup, fev.x, fev.y, stream=fev.fingerId)
-            Gilbert().reportEvent(gev)
+            self.handleTouch(EVENT_TOUCH_UP, fev.x, fev.y, fev.fingerId)
+        elif sdlev.type == SDL_MOUSEWHEEL:
+            mwev = <SDL_MouseWheelEvent*>sdlev
+            if mwev.y > 0:
+                self.handleEthereal(EVENT_ETHEREAL_ZOOM_IN)
+            else:
+                self.handleEthereal(EVENT_ETHEREAL_ZOOM_OUT)
         elif sdlev.type == SDL_WINDOWEVENT:
             winev = <SDL_WindowEvent*>sdlev
             if winev.event == SDL_WINDOWEVENT_SIZE_CHANGED or winev.event==SDL_WINDOWEVENT_RESIZED:
@@ -173,3 +186,101 @@ cdef class GameLoop(GameLoopBase):
 
     cpdef removeWatch(self, filename):
         self.fw.removeWatch(string(<char*>filename))
+
+
+    cdef handleTouch(self, EventType action, int x, int y, int stream):
+        if stream >=NUM_STREAMS or stream < 0:
+            error("RECEIVED AN INVALID STREAM NUMBER %d < %d < %d " % (0, stream, NUM_STREAMS ))
+            return
+
+        if action >= EVENT_TOUCH_LAST:
+            return
+
+        cdef bint continuePropagation = True, captureEvent = False
+        cdef int deltax=0, deltay=0, zoomCenterX, zoomCenterY, sx, sy, currArea, prevArea
+        cdef double cx, cy,
+        cdef Touch* lastTouch, *prevTouch
+        cdef PointD scenePoint
+
+
+        self.lastTouch.x = x
+        self.lastTouch.y = y
+
+        if self.touches[stream].valid:
+            lastTouch = &self.touches[stream]
+            deltax = x - lastTouch.x
+            deltay = y - lastTouch.y
+
+        # Check which entities/components the event applies to
+        if not self.touchCaptured:
+            continuePropagation, captureEvent, captor = self.renderer.processEvent(action, x, y)
+            self.touchCaptor = captor
+            self.touchCaptured = True
+        elif self.touchCaptor is not None:
+            continuePropagation, captureEvent = self.touchCaptor.event(action, x, y)
+            if not captureEvent:
+                self.touchCaptor = None
+                self.touchCaptured = False
+
+        # Handle zoom/scrolling
+        if continuePropagation and self.touchCaptor is None:
+            if (deltax != 0 or deltay != 0) and action != EVENT_TOUCH_DOWN:
+                if self.renderer._userCanScroll and stream == 0 and self.touches[stream].valid and self.active_touches==1:
+                    # Handle scrolling
+                    self.renderer.scrollBy(deltax, deltay)
+                    self.touchCaptured = True
+                    self.touchCaptor = None
+                elif self.renderer._userCanZoom and self.active_touches == 2 and (stream == 0 or stream == 1) and self.touches[0].valid and self.touches[1].valid:
+                    # Handle zooming
+                    prevArea = (self.touches[0].x-self.touches[0].x)**2 + (self.touches[1].y-self.touches[1].y)**2
+                    if stream == 0:
+                        prevTouch = &self.touches[1]
+                    else:
+                        prevTouch = &self.touches[0]
+
+                    currArea = (x-prevTouch.x)**2 +(y-prevTouch.y)**2
+                    zoomCenterX = (x + prevTouch.x)/2
+                    zoomCenterY = (y + prevTouch.y)/2
+                    cx,cy = self.renderer.screenToScene(zoomCenterX, zoomCenterY)
+                    self.renderer.scaleBy(currArea-prevArea)
+                    sx,sy = self.renderer.sceneToScreen(cx,cy)
+
+                    self.renderer.scrollBy(zoomCenterX-sx, zoomCenterY-sy)
+                    self.touchCaptured = True
+                    self.touchCaptor = None
+
+        # Store / remove tracked touches
+        if action == EVENT_TOUCH_UP:
+            # Forget about this stream as the user lift the finger/mouse button
+            self.touches[stream].valid = False
+            self.active_touches -= 1
+            self.touchCaptor = None
+            self.touchCaptured = False
+        elif action == EVENT_TOUCH_DOWN or self.touches[stream].valid:
+            # Don't store touchmove events because in a pointer based platform this gives you scrolling with no mouse button pressed
+            # Save the last touch event for the stream
+            if not self.touches[stream].valid:
+                self.touches[stream].valid = True
+                self.active_touches +=1
+            self.touches[stream].x = x
+            self.touches[stream].y = y
+
+    cdef handleEthereal(self, EventType action):
+        if action <= EVENT_TOUCH_LAST:
+            return
+
+        cdef double cx, cy
+        cdef int sx,sy
+
+        #Send the event to all entities until something stops it
+        self.renderer.processEvent(action, 0, 0)
+
+        if self.renderer._userCanZoom:
+            if action == EVENT_ETHEREAL_ZOOM_IN or action == EVENT_ETHEREAL_ZOOM_OUT:
+                cx,cy = self.renderer.screenToScene(self.lastTouch.x, self.lastTouch.y)
+                if action == EVENT_ETHEREAL_ZOOM_IN:
+                    self.renderer.scaleByFactor(1.2)
+                else:
+                    self.renderer.scaleByFactor(0.8)
+                sx,sy = self.renderer.sceneToScreen(cx,cy)
+                self.renderer.scrollBy(self.lastTouch.x-sx, self.lastTouch.y-sy)

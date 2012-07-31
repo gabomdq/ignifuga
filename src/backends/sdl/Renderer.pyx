@@ -162,6 +162,8 @@ cdef class Renderer:
         self.active_sprites = new deque[_Sprite]()
         self.free_sprites = new deque[Sprite_p]()
         self.dirty = True
+        self._userCanZoom = False
+        self._userCanScroll = False
 
     @cython.cdivision(True)
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil:
@@ -339,7 +341,7 @@ cdef class Renderer:
                 inc(iter)
         return False
 
-    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
+    cpdef Sprite addSprite(self,  obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
         cdef _Sprite sprite, *spritep
         cdef Sprite sprite_wrap = Sprite()
 
@@ -363,6 +365,9 @@ cdef class Renderer:
         sprite.a = <Uint8>(a*255.0)
         sprite.dirty = True
         sprite.free = False
+        sprite.interactive = interactive
+        sprite.component = <PyObject*> obj
+        Py_XINCREF(sprite.component)
 
 
         if self.free_sprites.size() > 0:
@@ -381,6 +386,7 @@ cdef class Renderer:
         cdef _Sprite *sprite = sprite_w.sprite
         cdef deque[_Sprite].iterator iter
         if self._unindexSprite(sprite):
+            Py_XDECREF(sprite.component)
             self.free_sprites.push_back(sprite)
             sprite.free = True
         return False
@@ -438,6 +444,10 @@ cdef class Renderer:
         sprite.dirty = True
         return True
 
+    cdef bint _spriteInteractive(self, _Sprite *sprite, bint interactive) nogil:
+        sprite.interactive = interactive
+        return True
+
     cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h):
         cdef _Sprite *sprite = sprite_w.sprite
         return self._spriteDst(sprite, x, y, w, h)
@@ -449,6 +459,10 @@ cdef class Renderer:
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a):
         cdef _Sprite *sprite = sprite_w.sprite
         return self._spriteColor(sprite, <Uint8>(r*255.0), <Uint8>(g*255.0), <Uint8>(b*255.0), <Uint8>(a*255.0))
+
+    cpdef bint spriteInteractive(self, Sprite sprite_w, bint interactive):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteInteractive(sprite, interactive)
 
     cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil:
         cdef int i, numsprites = self.active_sprites.size()
@@ -517,9 +531,16 @@ cdef class Renderer:
         """ Center scene around the given screen point"""
         self.scrollTo(sx-self._width/2,sy-self._height/2)
 
+    cdef PointD _screenToScene(self, int sx, int sy):
+        cdef PointD p
+        p.x = <double>(sx+self._scroll_x)/self._scale_x
+        p.y = <double>(sy+self._scroll_y)/self._scale_y
+        return p
+
     cpdef tuple screenToScene(self, int sx, int sy):
         """ Scale a point in screen coordinates to scene coordinates """
-        return <double>(sx+self._scroll_x)/self._scale_x,<double>(sy+self._scroll_y)/self._scale_y
+        cdef PointD p = self._screenToScene(sx,sy)
+        return p.x,p.y
 
     cpdef tuple sceneToScreen(self, double sx, double sy):
         """ Scale a point in scene coordinates to screen coordinates """
@@ -596,7 +617,7 @@ cdef class Renderer:
             #print "SCROLL", sx, sy
             self._scroll_x = sx
             self._scroll_y = sy
-            Gilbert().reportEvent(Event(Event.TYPE.scroll, self._scroll_x, self._scroll_y))
+            self.processEvent(EVENT_ETHEREAL_SCROLL, self._scroll_x, self._scroll_y)
 
     cpdef scaleBy(self, int delta):
         """ delta is a value in pixel area (width*height)"""
@@ -634,8 +655,19 @@ cdef class Renderer:
 
     cpdef cleanup(self):
         """ Remove free sprites if they are not in use"""
+        cdef _Sprite *sprite
+        cdef int i, numsprites
+        cdef deque[_Sprite].iterator iter, iter_end
+
         if self.active_sprites.size() == self.free_sprites.size():
             # All active sprites are freed, so we can modify pointers at will
+            iter = self.active_sprites.begin()
+            iter_end = self.active_sprites.end()
+            while iter != iter_end:
+                sprite = &deref(iter)
+                Py_XDECREF(sprite.component)
+                inc(iter)
+
             self.active_sprites.resize(0)
             self.free_sprites.resize(0)
 
@@ -665,6 +697,18 @@ cdef class Renderer:
         def __get__(self):
             return self._doublebuffered
 
+    property userCanScroll:
+        def __get__(self):
+            return self._userCanScroll
+        def __set__(self, value):
+            self._userCanScroll = value
+
+    property userCanZoom:
+        def __get__(self):
+            return self._userCanZoom
+        def __set__(self, value):
+            self._userCanZoom = value
+
     cpdef clear(self, x, y, w, h):
         self.ctx.clearRect(x,y,w,h);
 
@@ -684,6 +728,40 @@ cdef class Renderer:
             return SDL_GetWindowFlags(self.window) & SDL_WINDOW_SHOWN != 0
 
         return False
+
+
+    cdef processEvent(self, EventType action, int x, int y):
+        cdef zmap_iterator ziter, ziter_last
+        cdef deque[Sprite_p] *ds
+        cdef deque[Sprite_p].iterator iter, iter_last
+        cdef Sprite_p sprite
+        cdef bint continuePropagation = True, captureEvent = False
+        cdef object captor = None
+        cdef bint ethereal = action > EVENT_TOUCH_LAST
+
+        cdef PointD scenePoint = self._screenToScene(x,y)
+
+        ziter = self.zmap.begin()
+        ziter_last = self.zmap.end()
+        while ziter != ziter_last:
+            ds = &deref(ziter).second
+            iter = ds.begin()
+            iter_last = ds.end()
+            while iter != iter_last:
+                sprite = deref(iter)
+                if sprite.interactive or ethereal:
+                    entity = <object>sprite.component
+                    continuePropagation, captureEvent = entity.event(action, scenePoint.x, scenePoint.y)
+                    if not ethereal:
+                        if captureEvent:
+                            captor = entity
+                            break
+                        if not continuePropagation:
+                            break
+                inc(iter)
+            inc (ziter)
+
+        return continuePropagation or ethereal, captureEvent and not ethereal, captor
 
 
 # OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?

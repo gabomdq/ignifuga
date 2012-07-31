@@ -3,10 +3,18 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-
 # Ignifuga Game Engine
 # Game Loop
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
+
+cdef public enum EventType:
+    EVENT_TOUCH_DOWN = 1
+    EVENT_TOUCH_UP = 2
+    EVENT_TOUCH_MOTION = 3
+    EVENT_TOUCH_LAST = 4
+    EVENT_ETHEREAL_ZOOM_IN = 5
+    EVENT_ETHEREAL_ZOOM_OUT = 6
+    EVENT_ETHEREAL_SCROLL = 7
 
 from cpython cimport *
 from libc.stdlib cimport *

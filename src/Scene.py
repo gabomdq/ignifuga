@@ -101,8 +101,9 @@ class Scene(Entity):
 
         self._ready = True
         # Apply scaling and scrolling
-        print "scene init", self._scale, self._scrollX, self._scrollY
         self.scale = self._scale
+        self.userCanScroll = self._userCanScroll
+        self.userCanZoom = self._userCanZoom
         if self._scrollX is not None and self._scrollY is not None:
             self.scroll = self._scrollX, self._scrollY
 
@@ -149,6 +150,8 @@ class Scene(Entity):
     @userCanScroll.setter
     def userCanScroll(self, value):
         self._userCanScroll = value
+        if self._ready:
+            Gilbert().renderer.userCanScroll = value
 
     @property
     def userCanZoom(self):
@@ -156,6 +159,8 @@ class Scene(Entity):
     @userCanZoom.setter
     def userCanZoom(self, value):
         self._userCanZoom = value
+        if self._ready:
+            Gilbert().renderer.userCanZoom = value
 
     @property
     def scaleX(self):

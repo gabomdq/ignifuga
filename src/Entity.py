@@ -7,7 +7,7 @@
 # Base Entity class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Gilbert import Event, Gilbert, Signal
+from ignifuga.Gilbert import Event, Gilbert
 from ignifuga.Log import error
 from ignifuga.components.Component import Component
 from Task import *
@@ -45,10 +45,8 @@ class Entity(object):
         self._initialized = False
         self._components = {}
         self._componentsByTag = {}
-        self._componentsBySignal = {}
         self._properties = {}
         self.tags = []
-        self.signalQueue = []
         self._initFailCount = 0
         self._initialComponents = []
 
@@ -103,7 +101,6 @@ class Entity(object):
 
         self._components = {}
         self._componentsByTag = {}
-        self._componentsBySignal = {}
         self._properties = {}
         self._released = True
         self._initialComponents = []
@@ -188,7 +185,6 @@ class Entity(object):
         for key,value in data.iteritems():
             if key not in ['entities', 'components']:
                 setattr(self, key, value)
-                print self.id, key, value
 
         self._initialComponents = []
 
@@ -211,7 +207,6 @@ class Entity(object):
 #        odict['released'] = self._released
 #        odict['components'] = self._components
 #        odict['componentsByTag'] = self._componentsByTag
-#        odict['componentsBySignal'] = self._componentsBySignal
 #        odict['tags'] = self.tags
         return odict
 
@@ -341,107 +336,14 @@ class Entity(object):
         # By default we don't need an entity update loop
         STOP()
 
-    def _update(self, now, **data):
-        """ Internal update function, updates components, etc, runs IN PARALLEL with update """
-        # Dispatch signals
-        for signal in self.signalQueue:
-            self.directSignal(signal['signal'], signal['sender'], signal['target'], signal['data'])
-
-        self.signalQueue = []
-
-#        # Run the active components update loop
-#        for component in self._components.itervalues():
-#            if component.active:
-#                component.update(now, **data)
-
     # Events from the overlord
-    def event(self, event):
+    def event(self, action, x, y):
         # Handle an event, return: bool1, bool2
         #bool1: False if the event has to cancel propagation
         #bool2: True if the node wants to capture the subsequent events
-        # Send the event as directSignals to subscribed components.
 
         #Don't capture ethereal events
-        continuePropagation, captureEvent = True, False
-
-        if event.type in (Event.TYPE.touchdown, Event.TYPE.touchup, Event.TYPE.touchmove):
-            signal = Signal.touches
-        elif event.type in (Event.TYPE.zoomin, Event.TYPE.zoomout):
-            signal = Signal.zoom
-        elif event.type == Event.TYPE.scroll:
-            signal = Signal.scroll
-        else:
-            return continuePropagation, captureEvent
-
-        if signal in self._componentsBySignal:
-            for component in self._componentsBySignal[signal]:
-                continuePropagation, captureEvent = component.slot(signal, self, event=event)
-                if not continuePropagation:
-                    break
-        return continuePropagation, captureEvent
-
-
-    ###########################################################################
-    # Signal handling
-    ###########################################################################
-
-    def subscribe(self, component, signal):
-        """ Components subscribe to signals using this function """
-        if signal not in self._componentsBySignal:
-            self._componentsBySignal[signal] = []
-
-        if component not in self._componentsBySignal[signal]:
-            self._componentsBySignal[signal].append(component)
-
-    def unsubscribe(self, component, signal=None):
-        """ Components unsubscribe to signals using this function, if signal=None, unsubscribe from all signals """
-        if signal == None:
-            signals = self._componentsBySignal
-        else:
-            signals = [signal,]
-
-        for signal in signals:
-            if signal in self._componentsBySignal:
-                if component in self._componentsBySignal[signal]:
-                    self._componentsBySignal[signal].remove(component)
-                    if not self._componentsBySignal[signal]:
-                        del self._componentsBySignal[signal]
-
-    def signal(self, signal_name, sender=None, target=None, tags = [], subscribers = True, **data):
-        """ Function used to send signals to components via a queue (signals are processed in the next update) """
-        if target != None:
-            targets = [target,]
-        else:
-            targets = []
-
-        # Send to tags
-        if isinstance(tags, basestring):
-            tags = [tags,]
-        for tag in tags:
-            if tag in self._componentsByTag:
-                for component in self._componentsByTag[tag]:
-                    if component not in targets:
-                        targets.append(target)
-
-        if subscribers and signal_name in self._componentsBySignal:
-            for component in self._componentsBySignal[signal_name]:
-                if component not in targets:
-                    targets.append(component)
-
-        for target in targets:
-            self.signalQueue.append({'signal': signal_name, 'sender': sender, 'target': target, 'data': data})
-
-    def directSignal(self, signal_name, sender=None, target=None, **data):
-        """ Function used to send direct signals to components """
-        if target != None and not isinstance(target, Component):
-            if target in self._components:
-                target = self._components[target]
-            else:
-                return
-        if target.active:
-            return target.slot(signal_name, sender, **data)
-
-        return None
+        return True, False
 
     ###########################################################################
     # Properties routing

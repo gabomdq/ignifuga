@@ -9,60 +9,25 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import greenlet
-from ignifuga.Gilbert import REQUEST_DONE, REQUEST_LOADIMAGE, REQUEST_ERROR, REQUEST_STOP, REQUEST_SKIP
+from ignifuga.backends.GameLoopBase import TASK_REQUEST_DONE, TASK_REQUEST_LOADIMAGE, TASK_REQUEST_ERROR, TASK_REQUEST_STOP, TASK_REQUEST_SKIP
 
-#class Task(greenlet.greenlet):
-#    def __init__(self, entity_wr, run=None, parent=None):
-#        # A ref or weakref to the associated entity
-#        self.entity = entity_wr
-#        self.runnable = run
-#        super(Task, self).__init__(run,parent)
-#
-#    def wakeup(self, data=None):
-#        value = self.switch(data)
-#        if self.dead:
-#            req = REQUESTS.done
-#            data = value
-#        else:
-#            req, data = value
-#
-#        return req,data
-#
-#
 def DONE(data=None):
     g = greenlet.getcurrent()
-    return g.parent.switch((REQUEST_DONE, data))
+    return g.parent.switch((TASK_REQUEST_DONE, data))
 
 def ERROR(data=None):
     g = greenlet.getcurrent()
-    return g.parent.switch((REQUEST_ERROR, data))
+    return g.parent.switch((TASK_REQUEST_ERROR, data))
 
 def STOP(data=None):
     g = greenlet.getcurrent()
-    return g.parent.switch((REQUEST_STOP, data))
+    return g.parent.switch((TASK_REQUEST_STOP, data))
 
 def SKIP(data=None):
     g = greenlet.getcurrent()
-    return g.parent.switch((REQUEST_SKIP, data))
+    return g.parent.switch((TASK_REQUEST_SKIP, data))
 
 def LOAD_IMAGE(url):
     g = greenlet.getcurrent()
-    return g.parent.switch((REQUEST_LOADIMAGE, {'url': url}))
+    return g.parent.switch((TASK_REQUEST_LOADIMAGE, {'url': url}))
 
-#def LOAD_SPRITE(url):
-#    g = greenlet.getcurrent()
-#    return g.parent.switch((REQUESTS.loadSprite, {'url': url}))
-
-
-#def NATIVE_RESOLUTION(w, h, keep_aspect):
-#    g = greenlet.getcurrent()
-#    return g.parent.switch((REQUESTS.nativeResolution, (w, h, keep_aspect)))
-#
-#def SCENE_SIZE(w, h):
-#    g = greenlet.getcurrent()
-#    return g.parent.switch((REQUESTS.sceneSize, (w, h)))
-
-
-#def DIRTY_RECTS (rects):
-#    g = greenlet.getcurrent()
-#    return g.parent.switch((REQUESTS.dirtyRects, rects))

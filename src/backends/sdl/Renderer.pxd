@@ -10,11 +10,13 @@
 
 from ignifuga.backends.sdl.SDL cimport *
 from ignifuga.backends.sdl.Canvas cimport Canvas
+from ignifuga.backends.GameLoopBase cimport EventType, EVENT_ETHEREAL_SCROLL, EVENT_TOUCH_LAST
 from libc.stdlib cimport *
 from libc.string cimport *
 from libcpp.map cimport *
 from libcpp.deque cimport *
 from libcpp.pair cimport *
+from cpython cimport *
 
 cdef struct _Sprite:
     # sx,sy  -> are the source coordinates in the sprite (0,0 as the sprite will always handle its own compositing)
@@ -29,13 +31,17 @@ cdef struct _Sprite:
     int z
     Uint8 r,g,b,a
 
-    bint show, dirty, free
+    bint show, dirty, free, interactive
     SDL_Rect _src, _dst
+    PyObject *component
 
 ctypedef _Sprite* Sprite_p
 
 cdef class Sprite:
     cdef Sprite_p sprite
+
+cdef struct PointD:
+    double x,y
 
 cdef class Renderer:
     cdef Uint32 frameTimestamp
@@ -55,10 +61,11 @@ cdef class Renderer:
     cdef map[int,deque[Sprite_p]] *zmap
     cdef deque[_Sprite] *active_sprites
     cdef deque[Sprite_p] *free_sprites
-    cdef bint dirty
+    cdef bint dirty, _userCanScroll, _userCanZoom
 
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil
     cdef void _processSprites(self, bint all) nogil
+    cdef processEvent(self, EventType action, int x, int y)
 
     cpdef update(self, Uint32 now)
     cpdef getTimestamp(self)
@@ -78,23 +85,26 @@ cdef class Renderer:
     cpdef centerOnScenePoint(self, double sx, double sy)
     cpdef centerOnScreenPoint(self, int sx, int sy)
     cpdef tuple screenToScene(self, int sx, int sy)
+    cdef PointD _screenToScene(self, int sx, int sy)
     cpdef tuple sceneToScreen(self, double sx, double sy)
 
     cdef bint _indexSprite(self, _Sprite *sprite)
     cdef bint _unindexSprite(self, _Sprite *sprite)
 
-
-    cpdef Sprite addSprite(self, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a)
+    cpdef Sprite addSprite(self, obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a)
     cpdef bint removeSprite(self, Sprite sprite_w)
     cpdef bint spriteZ(self, Sprite sprite_w, int z)
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h)
     cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h)
     cpdef bint spriteRot(self, Sprite sprite_w, double angle, int centerx, int centery, int flip)
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a)
+    cpdef bint spriteInteractive(self, Sprite sprite_w, bint interactive)
     cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil
+    cdef bint _spriteInteractive(self, _Sprite *sprite, bint interactive) nogil
     cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil
+
 
     cpdef cleanup(self)
 

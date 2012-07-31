@@ -13,6 +13,24 @@ from cython.operator cimport dereference as deref, preincrement as inc #derefere
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Log import debug, error
 
+
+# Python enum exports
+EVENT_TYPE_TOUCH_DOWN = EVENT_TOUCH_DOWN
+EVENT_TYPE_TOUCH_UP = EVENT_TOUCH_UP
+EVENT_TYPE_TOUCH_MOTION = EVENT_TOUCH_MOTION
+EVENT_TYPE_TOUCH_LAST = EVENT_TOUCH_LAST
+EVENT_TYPE_ETHEREAL_ZOOM_IN = EVENT_ETHEREAL_ZOOM_IN
+EVENT_TYPE_ETHEREAL_ZOOM_OUT = EVENT_ETHEREAL_ZOOM_OUT
+EVENT_TYPE_ETHEREAL_SCROLL = EVENT_ETHEREAL_SCROLL
+
+TASK_REQUEST_NONE = REQUEST_NONE
+TASK_REQUEST_DONE = REQUEST_DONE
+TASK_REQUEST_SKIP = REQUEST_SKIP
+TASK_REQUEST_STOP = REQUEST_STOP
+TASK_REQUEST_LOADIMAGE = REQUEST_LOADIMAGE
+TASK_REQUEST_ERROR = REQUEST_ERROR
+
+
 cdef bint isdead(PyGreenlet* greenlet):
     ##define PyGreenlet_STARTED(op)    (((PyGreenlet*)(op))->stack_stop != NULL)
     ##define PyGreenlet_ACTIVE(op)     (((PyGreenlet*)(op))->stack_start != NULL)

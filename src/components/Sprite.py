@@ -11,8 +11,9 @@ from Viewable import Viewable
 from ignifuga.Task import *
 from ignifuga.Gilbert import Gilbert
 import sys
-
 from ignifuga.Gilbert import Renderer, Canvas
+from ignifuga.backends.GameLoopBase import EVENT_TYPE_TOUCH_DOWN, EVENT_TYPE_TOUCH_UP, EVENT_TYPE_TOUCH_MOTION, EVENT_TYPE_TOUCH_LAST, EVENT_TYPE_ETHEREAL_ZOOM_IN, EVENT_TYPE_ETHEREAL_ZOOM_OUT, EVENT_TYPE_ETHEREAL_SCROLL
+
 try:
     # Embedded version - Some hacking required
     from _bitarray import _bitarray
@@ -184,7 +185,7 @@ class Sprite(Viewable):
         if self._parent is not None:
             self._parent._doCompositing()
         elif self._rendererSpriteId:
-            self.renderer.spriteDst(self._rendererSpriteId, self._x, self._y, self._width_pre, self._height_pre)
+            self.renderer.spriteDst(self._rendererSpriteId, self.x, self.y, self._width_pre, self._height_pre)
 
             self.renderer.spriteRot(self._rendererSpriteId,
             self._angle,
@@ -469,7 +470,7 @@ class Sprite(Viewable):
     def show(self):
         if self._rendererSpriteId is None and self._active and self._canvas != None:
             self._updateSize()
-            self._rendererSpriteId = self.renderer.addSprite(self._canvas,
+            self._rendererSpriteId = self.renderer.addSprite(self, self.interactive, self._canvas,
                 self._z,
                 0, 0, self._width_src, self._height_src,
                 self._x, self._y, self._width_pre, self._height_pre,
@@ -518,6 +519,12 @@ class Sprite(Viewable):
 
 
 
+    def event(self, action, sx, sy):
+        """ Event processing """
+        ret = super(Sprite, self).event(action, sx, sy)
+        if action == EVENT_TYPE_ETHEREAL_SCROLL:
+            self.updateRenderer()
+        return ret
 
 class _Sprite(object):
     """ Internal sprite implementation with animation"""
