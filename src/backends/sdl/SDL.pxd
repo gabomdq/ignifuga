@@ -420,21 +420,21 @@ cdef extern from "SDL_ttf.h":
     cdef TTF_Font *  TTF_OpenFontRW(SDL_RWops *src, int freesrc, int ptsize)
     cdef TTF_Font *  TTF_OpenFontIndexRW(SDL_RWops *src, int freesrc, int ptsize, long index)
     #Set and retrieve the font style
-    #define TTF_STYLE_NORMAL    0x00
-    #define TTF_STYLE_BOLD      0x01
-    #define TTF_STYLE_ITALIC    0x02
-    #define TTF_STYLE_UNDERLINE 0x04
-    #define TTF_STYLE_STRIKETHROUGH 0x08
+    ##define TTF_STYLE_NORMAL    0x00
+    ##define TTF_STYLE_BOLD      0x01
+    ##define TTF_STYLE_ITALIC    0x02
+    ##define TTF_STYLE_UNDERLINE 0x04
+    ##define TTF_STYLE_STRIKETHROUGH 0x08
     cdef int  TTF_GetFontStyle( TTF_Font *font)
     cdef void  TTF_SetFontStyle(TTF_Font *font, int style)
     cdef int  TTF_GetFontOutline( TTF_Font *font)
     cdef void  TTF_SetFontOutline(TTF_Font *font, int outline)
 
     #Set and retrieve FreeType hinter settings */
-    #define TTF_HINTING_NORMAL    0
-    #define TTF_HINTING_LIGHT     1
-    #define TTF_HINTING_MONO      2
-    #define TTF_HINTING_NONE      3
+    ##define TTF_HINTING_NORMAL    0
+    ##define TTF_HINTING_LIGHT     1
+    ##define TTF_HINTING_MONO      2
+    ##define TTF_HINTING_NONE      3
     cdef int  TTF_GetFontHinting( TTF_Font *font)
     cdef void  TTF_SetFontHinting(TTF_Font *font, int hinting)
 
@@ -539,11 +539,11 @@ cdef extern from "SDL_ttf.h":
                             Uint16 ch, SDL_Color fg)
 
     # For compatibility with previous versions, here are the old functions */
-    #define TTF_RenderText(font, text, fg, bg)  \
+    ##define TTF_RenderText(font, text, fg, bg)  \
     #    TTF_RenderText_Shaded(font, text, fg, bg)
-    #define TTF_RenderUTF8(font, text, fg, bg)  \
+    ##define TTF_RenderUTF8(font, text, fg, bg)  \
     #    TTF_RenderUTF8_Shaded(font, text, fg, bg)
-    #define TTF_RenderUNICODE(font, text, fg, bg)   \
+    ##define TTF_RenderUNICODE(font, text, fg, bg)   \
     #    TTF_RenderUNICODE_Shaded(font, text, fg, bg)
 
     # Close an opened font file */

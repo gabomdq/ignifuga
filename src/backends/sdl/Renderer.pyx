@@ -11,6 +11,7 @@
 # xcython: profile=True
 # cython: boundscheck=False
 # cython: wraparound=False
+# encoding UTF-8
 
 from ignifuga.Gilbert import BACKENDS, Gilbert, Event
 from ignifuga.Log import Log, debug, error
@@ -20,21 +21,11 @@ from ignifuga.Rect cimport *
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
 from cython.parallel cimport parallel, prange, threadid
 cimport cython
-
-from time import time as getTime
 import sys
 
 ctypedef unsigned long ULong
 ctypedef deque[Sprite_p].iterator deque_Sprite_iterator
 ctypedef map[int,deque[Sprite_p]].iterator zmap_iterator
-
-#cdef extern from "string.h":
-#    void *memset(void *b, int c, size_t len)
-#
-#cdef extern from "stdlib.h":
-#    void *malloc(size_t) nogil
-#    void free(void *) nogil
-#    void *memcpy(void *dest, void *src, size_t n) nogil
 
 SDL_WINDOWPOS_CENTERED_MASK = 0x2FFF0000
 SDL_WINDOWPOS_UNDEFINED_MASK = 0x1FFF0000
@@ -88,29 +79,28 @@ cdef class Renderer:
         debug("WIDTH: %d HEIGHT: %d X: %d Y: %d" % (width, height, x, y))
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0)
         SDL_GL_SetAttribute(SDL_GL_RETAINED_BACKING,1)
-        if self.platform in ['win32', 'darwin', 'linux']:
-            print "CREATING FOR WIN/OSX/LINUX"
-            if fullscreen:
-                self.window = SDL_CreateWindow("Ignifuga",
-                    x, y,
-                    width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
-            else:
-                self.window = SDL_CreateWindow("Ignifuga",
-                    SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
-                    width, height, SDL_WINDOW_RESIZABLE)
-        else:
-            # Android and iOS don't care what we tell them to do, they create a full screen window anyway
-            print "CREATING FOR IOS/ANDROID"
+
+#if __OSX__ or __LINUX__ or __MINGW__
+        if fullscreen:
             self.window = SDL_CreateWindow("Ignifuga",
-                SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
-                width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
+                x, y,
+                width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
+        else:
+            self.window = SDL_CreateWindow("Ignifuga",
+                SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK, #
+                width, height, SDL_WINDOW_RESIZABLE)
+#else
+        # Android and iOS don't care what we tell them to do, they create a full screen window anyway
+        self.window = SDL_CreateWindow("Ignifuga",
+            SDL_WINDOWPOS_CENTERED_MASK, SDL_WINDOWPOS_CENTERED_MASK,
+            width, height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL)
+#endif
+
         if self.window == NULL:
             error("COULD NOT CREATE SDL WINDOW")
             error(SDL_GetError())
             sys.exit(1)
             return
-
-        #self.renderer = SDL_CreateRenderer(self.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
 
         # Find the GL renderer (useful for windows)
         cdef int num_renderers =  SDL_GetNumRenderDrivers(), renderer_index = -1, ri
@@ -132,14 +122,9 @@ cdef class Renderer:
 
         SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "1")
         SDL_GetWindowSize(self.window, &self._width, &self._height)
-
-        #renderer = cast(self.renderer, POINTER(SDL_Renderer))
-        #self._width = renderer.contents.viewport.w
-        #self._height = renderer.contents.viewport.h
-        #print "Window size: ", self._width, self._height
         SDL_GetRendererInfo(self.renderer, &self.render_info)
 
-        #if bytes(self.render_info.name) in ['opengles', 'opengles2', 'direct3d']:
+        # """if bytes(self.render_info.name) in ['opengles', 'opengles2', 'direct3d']:
         # This renderers have 2 or more separate render surfaces, we have to render the whole screen all the time
         #self._doublebuffered = True
         #else:
@@ -763,127 +748,125 @@ cdef class Renderer:
 
         return continuePropagation or ethereal, captureEvent and not ethereal, captor
 
-
-# OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?
-
-    #cpdef update(self):
-    #""" Update the screen by rendering the entities that intersect the dirty rectangles """
-    #cdef Rect nr, ir, r
-    #cdef int z
-
-    #if self.frameTimestamp == 0.0:
-    #raise Exception ('You have to call preUpdate before calling update')
-
-    #if self._target.isDoubleBuffered:
-    ## Double buffered systems force us to draw all the screen in every frame as there's no delta updating possible.
-    #self.dirtyAll()
-
-    ## In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
-    ## Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
-    ## What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
-
-    ## Let's start building a rectangle that holds the part of the scene we want to show
-    ## screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
-    #screen_w = self._width
-    #screen_h = self._height
-    #screen = Rect((self._scroll_x, self._scroll_y, screen_w, screen_h))
-
-    #rects = []
-
-    ## Apply the overall scale setting if needed.
-    #if self._scale_x != 1.0 or self._scale_y != 1.0:
-    #doScale = True
-    ## Convert screen coordinates to unscaled absolute coordinates
-    #screen.scale(1.0/self._scale_x, 1.0/self._scale_y)
-    #else:
-    #doScale = False
-
-    ## At this point, screen contains the rectangle in scene coordinates that we will show, everything that falls inside it gets on the screen.
-    ## Now we get all the dirty rectangles reported by the entities, and we determine which ones intersect with the screen, discarding everything else.
-    #if self.dirtyRects != None:
-    #for dr in self.dirtyRects:
-    ## dr is in scene coordinates
-    ## Intersect the rect with the screen rectangle in scene coordinates
-    #ir = screen.intersection(Rect(dr))
-    #if ir != None:
-    ## There's some intersection, append it to the list of rectangles to be rendered.
-    #rects.append(ir)
-    #else:
-    ## Set all the screen as dirty
-    #rects.append(screen)
-
-    #gilbert = Gilbert()
-    ## Get a list of the z index of the entities in the scenes, we will traverse it in increasing order
-    #zindexs = gilbert.entitiesByZ.keys()
-    #if len(zindexs) >0:
-    #zindexs.sort()
-
-    ## Iterate over the dirty rects that fall on the viewable area and draw them
-    #for r in rects:
-    ##print "DIRTY RECTANGLE:", r
-    ## r is in scene coordinates, already intersected with the scaled & scrolled screen rectangle
-    #for z in zindexs:
-    #for entity in gilbert.entitiesByZ[z]:
-    ## Intersect the entity rectangle with the dirty rectangle
-    ## nr is in scene coordinates
-    #nr = Rect(entity.getRect())
-    ##print entity.id, 'nr: ', nr, 'r:', r
-    ## ir is the intersection, in scene coordinates
-    #ir = r.intersection(nr)
-    ##print "Intersect r ", r, " with nr ", nr, " results in ", ir
-    #if ir != None:
-    ## There's an intersection, go over the entity areas, and see what parts of those fall inside the intersected rect.
-    ## This areas is what we end up rendering.
-    #nx, ny = entity.position
-    #for a in entity.getFrameAreas():
-    ## a is a frame area, it's format is [sx, sy, dx, dy, w, h]
-    ## sx,sy -> coordinates in the atlas
-    ## dx,dy -> entity coordinates where to put this
-    ## w,h -> size of the rectangle to blit
-    #sx,sy,dx,dy,w,h = a
-
-
-    ## Create nr, a rectangle with the destination location in scene coordinates  (scene coords = entity coords+entity position)
-    #nr = Rect((dx+nx, dy+ny, w, h))
-
-    ##print entity.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
-
-    #ir = r.intersection(nr)
-    #if ir != None:
-    ## ir is now the intersection of the frame area (moved to the proper location in the scene) with the dirty rectangle, in scene coordinates
-    #src_r = ir.copy()
-    #dst_r = ir.copy()
-
-    ## src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
-    ## We need to move it to the proper position on the source canvas
-    ## We adjust it to entity coordinates by substracting the entity position
-    ## Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
-    ## Finally we add sx,sy to put the rectangle in the correct position in the canvas
-    ## This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
-    #src_r.move(sx-nx-dx, sy-ny-dy)
-
-    ## dst_r is in scene coordinates, we will adjust it to screen coordinates
-    ## Now we apply the scale factor
-    #if doScale:
-    ##Scale the dst_r values
-    #dst_r.scale(self._scale_x, self._scale_y)
-
-    ## Apply scrolling
-    #dst_r.move(-self._scroll_x, -self._scroll_y)
-
-    ## Perform the blitting if the src and dst rectangles have w,h > 0
-    #if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
-    #if entity.center == None:
-    #self._target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, False, 0, 0, (1 if entity.fliph else 0) + (2 if entity.flipv else 0) )
-    #else:
-    #self._target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, True, entity.center[0], entity.center[1], (1 if entity.fliph else 0) + (2 if entity.flipv else 0))
-    ##raw_input("Press Enter to continue...")
-    #self._target.flip()
-    #self.dirtyNone()
-    ## Calculate how long it's been since the pre update until now.
-    #self.frameLapse = getTime() - self.frameTimestamp
-    #self.frameTimestamp = 0.0
-
+#OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?
+#    cpdef update(self):
+#    """ Update the screen by rendering the entities that intersect the dirty rectangles """
+#    cdef Rect nr, ir, r
+#    cdef int z
+#
+#    if self.frameTimestamp == 0.0:
+#    raise Exception ('You have to call preUpdate before calling update')
+#
+#    if self._target.isDoubleBuffered:
+#    # Double buffered systems force us to draw all the screen in every frame as there's no delta updating possible.
+#    self.dirtyAll()
+#
+#    # In the following, screen coordinates refers to a set of coordinates that start in 0,0 and go to (screen width-1, screen height-1)
+#    # Scene coordinates are the logical entity coordinates, which relate to the screen via scale and scroll modifiers.
+#    # What we do here is basically put everything in scene coordinates first, see what we have to render, then move those rectangles back to screen coordinates to render them.
+#
+#    # Let's start building a rectangle that holds the part of the scene we want to show
+#    # screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
+#    screen_w = self._width
+#    screen_h = self._height
+#    screen = Rect((self._scroll_x, self._scroll_y, screen_w, screen_h))
+#
+#    rects = []
+#
+#    # Apply the overall scale setting if needed.
+#    if self._scale_x != 1.0 or self._scale_y != 1.0:
+#    doScale = True
+#    # Convert screen coordinates to unscaled absolute coordinates
+#    screen.scale(1.0/self._scale_x, 1.0/self._scale_y)
+#    else:
+#    doScale = False
+#
+#    # At this point, screen contains the rectangle in scene coordinates that we will show, everything that falls inside it gets on the screen.
+#    # Now we get all the dirty rectangles reported by the entities, and we determine which ones intersect with the screen, discarding everything else.
+#    if self.dirtyRects != None:
+#    for dr in self.dirtyRects:
+#    # dr is in scene coordinates
+#    # Intersect the rect with the screen rectangle in scene coordinates
+#    ir = screen.intersection(Rect(dr))
+#    if ir != None:
+#    # There's some intersection, append it to the list of rectangles to be rendered.
+#    rects.append(ir)
+#    else:
+#    # Set all the screen as dirty
+#    rects.append(screen)
+#
+#    gilbert = Gilbert()
+#    # Get a list of the z index of the entities in the scenes, we will traverse it in increasing order
+#    zindexs = gilbert.entitiesByZ.keys()
+#    if len(zindexs) >0:
+#    zindexs.sort()
+#
+#    # Iterate over the dirty rects that fall on the viewable area and draw them
+#    for r in rects:
+#    #print "DIRTY RECTANGLE:", r
+#    # r is in scene coordinates, already intersected with the scaled & scrolled screen rectangle
+#    for z in zindexs:
+#    for entity in gilbert.entitiesByZ[z]:
+#    # Intersect the entity rectangle with the dirty rectangle
+#    # nr is in scene coordinates
+#    nr = Rect(entity.getRect())
+#    #print entity.id, 'nr: ', nr, 'r:', r
+#    # ir is the intersection, in scene coordinates
+#    ir = r.intersection(nr)
+#    #print "Intersect r ", r, " with nr ", nr, " results in ", ir
+#    if ir != None:
+#    # There's an intersection, go over the entity areas, and see what parts of those fall inside the intersected rect.
+#    # This areas is what we end up rendering.
+#    nx, ny = entity.position
+#    for a in entity.getFrameAreas():
+#    # a is a frame area, it's format is [sx, sy, dx, dy, w, h]
+#    # sx,sy -> coordinates in the atlas
+#    # dx,dy -> entity coordinates where to put this
+#    # w,h -> size of the rectangle to blit
+#    sx,sy,dx,dy,w,h = a
+#
+#
+#    # Create nr, a rectangle with the destination location in scene coordinates  (scene coords = entity coords+entity position)
+#    nr = Rect((dx+nx, dy+ny, w, h))
+#
+#    #print entity.id, ' r:', r, ' nr :', nr, 'Frame Area:', sx,sy,dx,dy,w,h
+#
+#    ir = r.intersection(nr)
+#    if ir != None:
+#    # ir is now the intersection of the frame area (moved to the proper location in the scene) with the dirty rectangle, in scene coordinates
+#    src_r = ir.copy()
+#    dst_r = ir.copy()
+#
+#    # src_r is in scene coordinates, created by intersecting the destination rectangle with the dirty rectangle in scene coordinates
+#    # We need to move it to the proper position on the source canvas
+#    # We adjust it to entity coordinates by substracting the entity position
+#    # Then, we substract the dx,dy coordinates (as they were used to construct nr and we don't need those)
+#    # Finally we add sx,sy to put the rectangle in the correct position in the canvas
+#    # This operations as completed in one step, and we end up with a source rectangle properly intersected with r, in source canvas coordinates
+#    src_r.move(sx-nx-dx, sy-ny-dy)
+#
+#    # dst_r is in scene coordinates, we will adjust it to screen coordinates
+#    # Now we apply the scale factor
+#    if doScale:
+#    #Scale the dst_r values
+#    dst_r.scale(self._scale_x, self._scale_y)
+#
+#    # Apply scrolling
+#    dst_r.move(-self._scroll_x, -self._scroll_y)
+#
+#    # Perform the blitting if the src and dst rectangles have w,h > 0
+#    if src_r.width > 0 and src_r.height >0 and dst_r.width>0 and dst_r.height > 0:
+#    if entity.center == None:
+#    self._target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, False, 0, 0, (1 if entity.fliph else 0) + (2 if entity.flipv else 0) )
+#    else:
+#    self._target.blitCanvas(entity.canvas, dst_r.left, dst_r.top, dst_r.width, dst_r.height, src_r.left, src_r.top, src_r.width, src_r.height, entity.angle, True, entity.center[0], entity.center[1], (1 if entity.fliph else 0) + (2 if entity.flipv else 0))
+#    #raw_input("Press Enter to continue...")
+#    self._target.flip()
+#    self.dirtyNone()
+#    # Calculate how long it's been since the pre update until now.
+#    self.frameLapse = getTime() - self.frameTimestamp
+#    self.frameTimestamp = 0.0
+#
 #   def reset(self):
 #            """ Reset the renderer, mark everything as clean """
 #        self.dirtyNone()

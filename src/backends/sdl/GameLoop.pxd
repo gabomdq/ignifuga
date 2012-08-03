@@ -11,8 +11,11 @@ from ignifuga.backends.sdl.SDL cimport *
 from ignifuga.Gilbert import Gilbert, Event
 from ignifuga.backends.GameLoopBase cimport *
 from ignifuga.backends.sdl.Renderer cimport Renderer, PointD
-from ignifuga.FileWatcher.FileWatcher cimport FileWatcher, FileWatchListenerIgnifuga
 from libcpp.string cimport *
+
+#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+from ignifuga.FileWatcher.FileWatcher cimport FileWatcher, FileWatchListenerIgnifuga
+#endif
 
 cdef struct Touch:
     int x, y
@@ -21,8 +24,10 @@ cdef struct Touch:
 cdef class GameLoop(GameLoopBase):
     cdef int _screen_w, _screen_h
     cdef Renderer renderer
+#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
     cdef FileWatcher *fw
     cdef FileWatchListenerIgnifuga *fwli
+#endif
     cdef Touch touches[20], lastTouch
     cdef object touchCaptor
     cdef bint touchCaptured

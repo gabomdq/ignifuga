@@ -4,6 +4,7 @@ from os.path import *
 from log import error
 from util import find_xcode, find_ios_sdk
 import multiprocessing
+from pypreprocessor import preprocessor
 
 XCODE_ROOT = None
 BEST_IOS_SDK = None
@@ -46,8 +47,14 @@ def get_target(platform, project_root = '.', dist=None, tmp=None):
 
 
 
-def prepare_linux64_env(openmp=False):
+def prepare_linux64_env(pp=None, openmp=False):
     """ Set up the environment variables for Linux64 compilation"""
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__LINUX__')
+    pp.defines.append('__LINUX64__')
+
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
@@ -58,12 +65,17 @@ def prepare_linux64_env(openmp=False):
         env['CFLAGS'] += "-fopenmp"
         env['CPPFLAGS'] += "-fopenmp"
         env['LDFLAGS'] += '-lgomp'
-    return env
+    return env, pp
 
 
-def prepare_osx_env(openmp=False):
+def prepare_osx_env(pp=None, openmp=False):
     """ Set up the environment variables for OS X compilation"""
     global XCODE_ROOT, OSX_SDK
+
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__OSX__')
 
     if XCODE_ROOT is None:
         XCODE_ROOT = find_xcode()
@@ -78,10 +90,15 @@ def prepare_osx_env(openmp=False):
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 --sysroot=%s' % OSX_SDK
-    return env
+    return env, pp
 
-def prepare_ios_env(openmp=False, sdk=None, target='3.0'):
+def prepare_ios_env(pp=None, openmp=False, sdk=None, target='3.0'):
     """ Set up the environment variables for iOS compilation"""
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__IOS__')
+
     env = deepcopy(os.environ)
     global XCODE_ROOT, BEST_IOS_SDK
 
@@ -107,12 +124,15 @@ def prepare_ios_env(openmp=False, sdk=None, target='3.0'):
     env['RANLIB'] = env['DEVROOT'] + "/usr/bin/ranlib"
     env['STRIP'] = env['DEVROOT'] + "/usr/bin/strip"
     env['LDFLAGS'] = "-L%s/usr/lib/ -isysroot %s -miphoneos-version-min=%s" % (env['SDKROOT'], env['SDKROOT'], target)
-    return env
+    return env, pp
 
 
-def prepare_android_env(openmp=False):
+def prepare_android_env(pp=None, openmp=False):
     """ Set up the environment variables for Android compilation"""
     from schafer import ANDROID_NDK, ANDROID_SDK, HOSTPYTHON, HOSTPGEN
+    if pp is None:
+        pp = preprocessor()
+    pp.defines.append('__ANDROID__')
 
     # Check that the NDK and SDK exist
     if ANDROID_NDK == None:
@@ -162,12 +182,19 @@ def prepare_android_env(openmp=False):
 #    env['CFLAGS'] += " -g -gstabs+"
 #    env['CPPFLAGS'] = " -g -gstabs+"
 
-    return env
+    return env, pp
 
 
-def prepare_mingw32_env(openmp=False):
+def prepare_mingw32_env(pp=None, openmp=False):
     """ Set up the environment variables for Mingw32 compilation"""
     from schafer import HOSTPYTHON, HOSTPGEN
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__MINGW__')
+    pp.defines.append('__MINGW32__')
+
+
     env = deepcopy(os.environ)
     #env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "win32"
@@ -190,4 +217,4 @@ def prepare_mingw32_env(openmp=False):
     env['OBJDUMP'] = "i686-w64-mingw32-objdump"
     env['RESCOMP'] = "i686-w64-mingw32-windres"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
-    return env
+    return env, pp

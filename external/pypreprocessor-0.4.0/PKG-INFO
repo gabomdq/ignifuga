@@ -1,0 +1,89 @@
+Metadata-Version: 1.0
+Name: pypreprocessor
+Version: 0.4.0
+Summary: Run c-style preprocessor directives in python modules
+Home-page: http://code.google.com/p/pypreprocessor/
+Author: Evan Plaice
+Author-email: evanplaice@gmail.com
+License: Copyright (c) 2010 Evan Plaice
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Description: ==============
+        pypreprocessor
+        ==============
+        
+        Features
+        ========
+        - support c-style directives in python
+        - can run post-processed code on-the-fly
+        - can output to a file
+        - can strip all pre-processor data from the output
+        - #defines can be set in code prior to processing
+        
+        Supported Directives
+        --------------------
+        - #define
+        - #undef
+        - #ifdef
+        - #else
+        - #endif
+        - #exclude
+        - #endexclude
+        
+        Python Interpreter Compatibility
+        --------------------------------
+        pypreprocessor itself was originally designed to provide developers
+        with a simple solution to write python 2x and python 3x code in the
+        same source file so compatibility is a must.
+        
+        Currently pypreprocessor has been tested and works in:
+        - 2.5
+        - 2.6
+        - 3.0
+        - 3.1
+        
+        2.4 support has been looked into and can easily be made possible if
+        users request it.
+        
+        There are no plans to support earlier versions of python unless
+        there is sufficient demand from users.
+        
+        Support
+        =======
+        For more extensive information on features, access to the source
+        repository, documentation, or examples of use cases involving
+        pypreprocessor be sure to visit the project's Home Page.
+        
+Keywords: python,preprocessor,meta
+Platform: all
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.0
+Classifier: Programming Language :: Python :: 3.1
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Other Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development :: Pre-processors
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Software Development :: Code Generators

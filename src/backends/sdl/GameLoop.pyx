@@ -25,9 +25,10 @@ cdef class GameLoop(GameLoopBase):
         self.paused = False
         self.ticks_second = SDL_GetPerformanceFrequency()
 
-
+#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
         self.fw = new FileWatcher()
         self.fwli = new FileWatchListenerIgnifuga()
+#endif
 
         self.active_touches = 0
 
@@ -89,7 +90,9 @@ cdef class GameLoop(GameLoopBase):
             self.frame_time = SDL_GetPerformanceCounter()-nowx
             remainingTime = self._interval  - self.frame_time / self.ticks_second
             if remainingTime > 0:
+#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
                 self.fw.update()
+#endif
                 SDL_Delay( remainingTime)
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
@@ -181,12 +184,13 @@ cdef class GameLoop(GameLoopBase):
         fev.x = fev.x * self._screen_w / 32768
         fev.y = fev.y * self._screen_h / 32768
 
+#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
     cpdef addWatch(self, filename):
-        self.fw.addWatch(string(<char*>filename), self.fwli)
+        self.fw.addWatch(string(<char*>filename), self.fwli, False)
 
     cpdef removeWatch(self, filename):
         self.fw.removeWatch(string(<char*>filename))
-
+#endif
 
     cdef handleTouch(self, EventType action, int x, int y, int stream):
         if stream >=NUM_STREAMS or stream < 0:
@@ -232,7 +236,7 @@ cdef class GameLoop(GameLoopBase):
                     self.touchCaptor = None
                 elif self.renderer._userCanZoom and self.active_touches == 2 and (stream == 0 or stream == 1) and self.touches[0].valid and self.touches[1].valid:
                     # Handle zooming
-                    prevArea = (self.touches[0].x-self.touches[0].x)**2 + (self.touches[1].y-self.touches[1].y)**2
+                    prevArea = (self.touches[0].x-self.touches[1].x)**2 + (self.touches[0].y-self.touches[1].y)**2
                     if stream == 0:
                         prevTouch = &self.touches[1]
                     else:
@@ -242,6 +246,7 @@ cdef class GameLoop(GameLoopBase):
                     zoomCenterX = (x + prevTouch.x)/2
                     zoomCenterY = (y + prevTouch.y)/2
                     cx,cy = self.renderer.screenToScene(zoomCenterX, zoomCenterY)
+                    debug("%d, %d, %d" % (currArea, prevArea, currArea-prevArea))
                     self.renderer.scaleBy(currArea-prevArea)
                     sx,sy = self.renderer.sceneToScreen(cx,cy)
 

@@ -22,6 +22,8 @@
 	James Wynn james@jameswynn.com
 */
 
+#ifndef __ANDROID__
+
 #include <FileWatcher/FileWatcherLinux.h>
 
 #if FILEWATCHER_PLATFORM == FILEWATCHER_PLATFORM_LINUX
@@ -183,3 +185,5 @@ namespace FW
 };//namespace FW
 
 #endif//FILEWATCHER_PLATFORM_LINUX
+
+#endif // ! __ANDROID__

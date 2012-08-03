@@ -24,6 +24,9 @@
 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 	THE SOFTWARE.
 */
+
+#ifndef __ANDROID__
+
 #ifndef _FW_FILEWATCHERIMPL_H_
 #define _FW_FILEWATCHERIMPL_H_
 #pragma once
@@ -77,3 +80,5 @@ namespace FW
 };//namespace FW
 
 #endif//_FW_FILEWATCHERIMPL_H_
+
+#endif // ! __ANDROID__

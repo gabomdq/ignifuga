@@ -22,6 +22,8 @@
 	James Wynn james@jameswynn.com
 */
 
+#ifndef __ANDROID__
+
 #include <FileWatcher/FileWatcherOSX.h>
 
 #if FILEWATCHER_PLATFORM == FILEWATCHER_PLATFORM_KQUEUE
@@ -403,3 +405,5 @@ namespace FW
 };//namespace FW
 
 #endif//FILEWATCHER_PLATFORM_KQUEUE
+
+#endif // ! __ANDROID__

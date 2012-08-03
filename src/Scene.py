@@ -46,31 +46,33 @@ class Scene(Entity):
 
     def reset(self):
         # Remove existing entities
-        self._ready = False
-        super(Scene, self).reset()
+        if self._ready:
+            self._ready = False
+            super(Scene, self).reset()
 
-        for entity in self.entities.itervalues():
-            entity.unregister()
-        self.entities = {}
-        self.cache_ref = None
-        if self.data_url is not None:
-            Gilbert().dataManager.removeListener(self.data_url, self)
+            for entity in self.entities.itervalues():
+                entity.unregister()
+            self.entities = {}
+            self.cache_ref = None
+            if self.data_url is not None:
+                Gilbert().dataManager.removeListener(self.data_url, self)
 
     def reload(self, source):
-        Gilbert().freezeRenderer()
-        self.reset()
+        # If the scene is not ready, ignore the reload...TODO: Should we schedule a reload for later?
+        if self._ready:
+            Gilbert().freezeRenderer()
+            self.reset()
 
-        new_data = Gilbert().dataManager.loadJsonFile(source)
-        if self.id in new_data:
-            if self.reloadPreserveCamera:
-                print "preserving camera"
-                new_data[self.id]['scale'] = self.scale
-                new_data[self.id]['scroll'] = self.scroll
-                new_data[self.id]['autoCenter'] = False
-            self.source = source
-            self.setup(**new_data[self.id])
-            self.load()
-            Gilbert().startEntity(self)
+            new_data = Gilbert().dataManager.loadJsonFile(source)
+            if self.id in new_data:
+                if self.reloadPreserveCamera:
+                    new_data[self.id]['scale'] = self.scale
+                    new_data[self.id]['scroll'] = self.scroll
+                    new_data[self.id]['autoCenter'] = False
+                self.source = source
+                self.setup(**new_data[self.id])
+                self.load()
+                Gilbert().startEntity(self)
 
     def getEntity(self, id):
         """ Retrieve an entity with a given id, return None if no entity by that id is found"""

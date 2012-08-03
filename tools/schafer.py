@@ -8,7 +8,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 # Requires: RSync, Cython, GNU Tools, MINGW32, Android SDK, etc
 
-import os, sys, shutil, shlex, imp, marshal
+import os, sys, shutil, shlex, imp, marshal, fnmatch
 from subprocess import Popen, PIPE
 from os.path import *
 from optparse import OptionParser
@@ -21,6 +21,7 @@ ROOT_DIR = abspath(join(dirname(sys.argv[0]), '..'))
 from modules.log import log, error, info
 from modules.env import *
 from modules.util import *
+from modules.pypreprocessor import preprocessor
 
 AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
 
@@ -129,7 +130,7 @@ def prepare_python(platform, ignifuga_src, python_build, env):
 
 def make_python(platform, ignifuga_src, env=os.environ):
     # Modules required by Python itself
-    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii']
+    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii', 'encodings.cp850']
     # Modules required by Ignifuga in addition to the above
     freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref', 'optparse', 'textwrap']
     # Threading
@@ -245,11 +246,29 @@ compileall.compile_dir("%s")
 # Ignifuga BUILDING
 # ===============================================================================================================
 
-def prepare_ignifuga(platform):
+def preprocess_sources(pp, folder, extensions=['pyx', 'pxd', 'py']):
+    # Preprocess files
+    sources = []
+    for extension in extensions:
+        for root, dirnames, filenames in os.walk(folder):
+            for filename in fnmatch.filter(filenames, '*.'+extension):
+                sources.append(os.path.join(root, filename))
+
+    pp.removeMeta = True
+    for source in sources:
+        log('Preprocessing %s' % basename(source))
+        pp.input = source
+        pp.output = source
+        pp.parse()
+
+
+def prepare_ignifuga(platform, pp):
     # Copy .py, .pyx .pxd .h .c .cpp files
     target = get_target(platform)
-    cmd = 'rsync -aqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --exclude tests --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
+    cmd = 'rsync -auqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --exclude tests --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+    preprocess_sources(pp, target.builds.IGNIFUGA)
+
 
 def make_glue(package, glue_h, glue_c):
     glue = """
@@ -426,17 +445,24 @@ def spawn_shell(platform):
     cmd = 'bash'
     env = os.environ
     if platform == 'android':
-        env = prepare_android_env()
+        env, pp = prepare_android_env()
     elif platform == 'mingw32':
-        env = prepare_mingw32_env()
+        env, pp = prepare_mingw32_env()
 
     info('Entering %s shell environment' % (platform,))
 
     Popen(shlex.split(cmd), cwd = target.dist, env=env).communicate()
     info('Exited from %s shell environment' % (platform,))
     
-def build_generic(options, platform, env=None):
+def build_generic(options, platform, pp, env=None):
     target = get_target(platform)
+
+    if options.release:
+        pp.defines.append('RELEASE')
+        pp.undefines.append('DEBUG')
+    else:
+        pp.undefines.append('RELEASE')
+        pp.defines.append('DEBUG')
 
     if platform in ['linux64', 'mingw32', 'osx']:
         # Android/iOS has its own skeleton set up
@@ -461,7 +487,7 @@ def build_generic(options, platform, env=None):
     # Compile Ignifuga then Python statically
     if 'ignifuga' in options.modules:
         info('Building Ignifuga')
-        prepare_ignifuga(platform)
+        prepare_ignifuga(platform, pp)
         ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA)
         info('Building Python')
         prepare_python(platform, ignifuga_src, target.builds.PYTHON, env)
@@ -472,10 +498,10 @@ def build_generic(options, platform, env=None):
 # ===============================================================================================================
 def prepare_project(src, dst):
     # Copy all .py, .pyx and .pxd files
-    cmd = 'rsync -aqPm --exclude .svn --exclude .hg --exclude build --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (src, dst)
+    cmd = 'rsync -auqPm --exclude .svn --exclude .hg --exclude build --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --exclude "*" %s/ %s' % (src, dst)
     Popen(shlex.split(cmd), cwd = src).communicate()
 
-def build_project_generic(options, platform, target, env=None):
+def build_project_generic(options, platform, target, pp, env=None):
     package = options.project.split('.')[-1]
     if package == 'ignifuga':
         error('Name your project something else than ignifuga please')
@@ -540,14 +566,14 @@ def build_linux64 (options):
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_linux64_env(options.openmp)
-    build_generic(options, platform, env)
+    env, pp = prepare_linux64_env(openmp=options.openmp)
+    build_generic(options, platform, pp, env)
 
 def build_project_linux64(options, project_root):
     platform = 'linux64'
-    env = prepare_linux64_env(options.openmp)
+    env, pp = prepare_linux64_env(openmp=options.openmp)
     target = get_target(platform, project_root)
-    build_project_generic(options, platform, target, env)
+    build_project_generic(options, platform, target, pp, env)
 
 
 # ===============================================================================================================
@@ -562,14 +588,14 @@ def build_osx (options):
     info('Building Ignifuga For OS X')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_osx_env(options.openmp)
-    build_generic(options, platform, env)
+    env, pp = prepare_osx_env(openmp=options.openmp)
+    build_generic(options, platform, pp, env)
 
 def build_project_osx(options, project_root):
     platform = 'osx'
-    env = prepare_osx_env(options.openmp)
+    env, pp = prepare_osx_env(openmp=options.openmp)
     target = get_target(platform, project_root)
-    build_project_generic(options, platform, target, env)
+    build_project_generic(options, platform, target, pp, env)
 
 # ===============================================================================================================
 # iOS
@@ -589,15 +615,15 @@ def build_ios (options):
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For iOS')
-    env = prepare_ios_env(options.openmp, options.iossdk, options.iostarget)
+    env, pp = prepare_ios_env(None, options.openmp, options.iossdk, options.iostarget)
     prepare_ios_skeleton()
-    build_generic(options, platform, env)
+    build_generic(options, platform, pp, env)
 
 def build_project_ios(options, project_root):
     platform = 'ios'
-    env = prepare_ios_env(options.openmp, options.iossdk, options.iostarget)
+    env, pp = prepare_ios_env(None, options.openmp, options.iossdk, options.iostarget)
     target = get_target(platform, project_root)
-    build_project_generic(options, platform, target, env)
+    build_project_generic(options, platform, target, pp, env)
 
 
 # ===============================================================================================================
@@ -617,15 +643,15 @@ def build_android (options):
     if options.main != None and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Android')
-    env = prepare_android_env(options.openmp)
+    env, pp = prepare_android_env(openmp=options.openmp)
     prepare_android_skeleton()
-    build_generic(options, platform, env)
+    build_generic(options, platform, pp, env)
 
 def build_project_android(options, project_root):
     platform = 'android'
-    env = prepare_android_env(options.openmp)
+    env, pp = prepare_android_env(openmp=options.openmp)
     target = get_target(platform, project_root)
-    build_project_generic(options, platform, target, env)
+    build_project_generic(options, platform, target, pp, env)
 
 # ===============================================================================================================
 # Windows - Mingw32
@@ -639,14 +665,14 @@ def build_mingw32 (options):
     info('Building Ignifuga For Windows 32 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env = prepare_mingw32_env(options.openmp)
-    build_generic(options, platform, env)
+    env, pp = prepare_mingw32_env(openmp=options.openmp)
+    build_generic(options, platform, pp, env)
 
 def build_project_mingw32(options, project_root):
     platform = 'mingw32'
-    env = prepare_mingw32_env(options.openmp)
+    env, pp = prepare_mingw32_env(openmp=options.openmp)
     target = get_target(platform, project_root)
-    build_project_generic(options, platform, target, env)
+    build_project_generic(options, platform, target, pp, env)
 
 # ===============================================================================================================
 # MAIN
@@ -704,6 +730,9 @@ if __name__ == '__main__':
     parser.add_option("--openmp",
         action="store_true", dest="openmp", default=False,
         help="Use OPENMP if available for the target")
+    parser.add_option("--release",
+        action="store_true", dest="release", default=False,
+        help="Build the engine in release mode (more optimized, less logging, no hot reloading, etc)")
 
     (options, args) = parser.parse_args()
 

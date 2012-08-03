@@ -174,6 +174,7 @@ class Gilbert:
 
         (options, args) = self.parser.parse_args()
 
+
         # Set up dynamic imports
         global GameLoop
         global DataManager

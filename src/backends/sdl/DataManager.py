@@ -15,6 +15,14 @@ from SDL import *
 from ignifuga.backends.DataManagerBase import *
 from Canvas import Canvas
 from Font import Font
+from os.path import abspath, join, dirname, getmtime
+
+#if __LINUX__ or __OSX__ or __MINGW__
+ROOT_DIR = abspath(dirname(sys.argv[0]))
+#else
+ROOT_DIR = ''
+#endif
+
 
 def sanitizeData (k,v, p=True):
     """ Sanitize data, convert keys in the data to str"""
@@ -35,21 +43,40 @@ def sanitizeData (k,v, p=True):
     return key, value
 
 class DataManager(DataManagerBase):
+    def __init__(self):
+        super(DataManager, self).__init__()
+        self.watches = []
+        self.mtimes = {}
+
     def loadSceneData(self, filename):
-        url = 'data/scenes/'+filename+'.json'
+        url = join('data','scenes',filename+'.json')
         return url, self.loadJsonFile(url)
 
     def loadJsonFile(self, url):
         if url not in self.cache:
-            data = json.loads(readFile(url))
+            data = json.loads(readFile(join(ROOT_DIR, url)))
             ret_data = {}
             for k,v in data.items():
                 key, value = sanitizeData(k,v)
                 ret_data[key] = value
 
             self.cache[url] = ret_data
-            Gilbert().gameLoop.addWatch(url)
 
+
+#if DEBUG and (__LINUX__ or __OSX__)
+            watchURL = join(ROOT_DIR, url)
+#endif
+
+#if DEBUG and __MINGW__
+            watchURL = dirname(join(ROOT_DIR, url))
+            self.mtimes[url] = getmtime(join(ROOT_DIR, url))
+#endif
+
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+            if watchURL not in self.watches:
+                Gilbert().gameLoop.addWatch(watchURL)
+                self.watches.append(watchURL)
+#endif
         return self.cache[url]
 
     def getImage(self, url):
@@ -62,8 +89,22 @@ class DataManager(DataManagerBase):
                     error('Error loading embedded data with id: %s', url)
                     return None
             else:
-                self.cache[url] = Canvas(srcURL=url)
-                Gilbert().gameLoop.addWatch(url)
+                self.cache[url] = Canvas(srcURL=join(ROOT_DIR, url))
+
+#if DEBUG and __LINUX__
+                watchURL = join(ROOT_DIR, url)
+#endif
+
+#if DEBUG and __MINGW__
+                watchURL = dirname(join(ROOT_DIR, url))
+                self.mtimes[url] = getmtime(join(ROOT_DIR, url))
+#endif
+
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+                if watchURL not in self.watches:
+                    Gilbert().gameLoop.addWatch(watchURL)
+                    self.watches.append(watchURL)
+#endif
 
         return self.cache[url]
 
@@ -74,7 +115,31 @@ class DataManager(DataManagerBase):
         return self.cache[cache_url]
 
     def urlReloaded(self, url):
+#if  __MINGW__
+        # On Windows, we monitor directories, not individual files, so from the files that we know exist in that dir
+        # we check which ones where modified
+        if url.startswith(ROOT_DIR):
+            url = url[len(ROOT_DIR)+1:]
+
         reload = []
+        for cache_url in self.cache.iterkeys():
+            if dirname(cache_url) == url:
+                reload.append(cache_url)
+
+        for cache_url in reload:
+            new_mtime = getmtime(join(ROOT_DIR, cache_url))
+            if new_mtime > self.mtimes[cache_url]:
+                self.mtimes[cache_url] = new_mtime
+                self._urlReloaded(cache_url)
+#else
+        self._urlReloaded(url)
+#endif
+
+    def _urlReloaded(self, url):
+        reload = []
+        if url.startswith(ROOT_DIR):
+            url = url[len(ROOT_DIR)+1:]
+
         if url in self.cache:
             if url in self.notifications:
                 for ref in self.notifications[url]:

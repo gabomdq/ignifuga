@@ -35,7 +35,7 @@ cdef bint isdead(PyGreenlet* greenlet):
     ##define PyGreenlet_STARTED(op)    (((PyGreenlet*)(op))->stack_stop != NULL)
     ##define PyGreenlet_ACTIVE(op)     (((PyGreenlet*)(op))->stack_start != NULL)
 
-    #if (PyGreenlet_ACTIVE(self) || !PyGreenlet_STARTED(self)):
+    ##if (PyGreenlet_ACTIVE(self) || !PyGreenlet_STARTED(self)):
     if greenlet.stack_start != NULL or greenlet.stack_stop == NULL:
         return False
 

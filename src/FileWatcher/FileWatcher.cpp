@@ -20,6 +20,8 @@
 	THE SOFTWARE.
 */
 
+#ifndef __ANDROID__
+
 #include <FileWatcher/FileWatcher.h>
 #include <FileWatcher/FileWatcherImpl.h>
 
@@ -81,3 +83,5 @@ namespace FW
 	}
 
 };//namespace FW
+
+#endif // ! __ANDROID__

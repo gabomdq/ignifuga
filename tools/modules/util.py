@@ -232,7 +232,7 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
 
     log ('Installing development packages')
     if system == 'Linux':
-        cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib'
+        cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib libgc1c2'
         Popen(shlex.split(cmd)).communicate()
     elif system == 'Darwin':
         check_xcode()

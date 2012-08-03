@@ -30,7 +30,7 @@ class Log:
     #        Log.singleton = object.__new__(typ, *args, **kwargs)
     #        Log.init(Log.singleton)
     #    return Log.singleton
-    
+
     def __init__(self, logLevel = 10):
         self.logLevel = logLevel
         
