@@ -20,8 +20,6 @@
 	THE SOFTWARE.
 */
 
-#ifndef __ANDROID__
-
 #include <FileWatcher/FileWatcherWin32.h>
 
 #if FILEWATCHER_PLATFORM == FILEWATCHER_PLATFORM_WIN32
@@ -274,5 +272,3 @@ namespace FW
 };//namespace FW
 
 #endif//_WIN32
-
-#endif // ! ANDROID

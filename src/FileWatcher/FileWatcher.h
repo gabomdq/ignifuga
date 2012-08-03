@@ -26,7 +26,6 @@
 	THE SOFTWARE.
 */
 
-#ifndef __ANDROID__
 #ifndef _FW_FILEWATCHER_H_
 #define _FW_FILEWATCHER_H_
 #pragma once
@@ -34,9 +33,13 @@
 #include <string>
 #include <stdexcept>
 
+#if FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
+
 extern "C" {
 #include "SDL2/SDL.h"
 }
+
+#endif
 
 namespace FW
 {
@@ -145,7 +148,7 @@ namespace FW
 		virtual void handleFileAction(WatchID watchid, const String& dir, const String& filename, Action action) = 0;
 
 	};//class FileWatchListener
-
+#if FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
 	class FileWatchListenerIgnifuga : public FileWatchListener
 	{
 	    void handleFileAction(WatchID watchid, const String& dir, const String& filename, Action action) {
@@ -157,9 +160,7 @@ namespace FW
             SDL_PushEvent(&event);
 	    }
 	};
-
+#endif // FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
 };//namespace FW
 
 #endif//_FW_FILEWATCHER_H_
-
-#endif // !__ANDROID__

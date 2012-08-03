@@ -26,7 +26,6 @@
 	THE SOFTWARE.
 */
 
-#ifndef __ANDROID__
 #ifndef _FW_FILEWATCHERWIN32_H_
 #define _FW_FILEWATCHERWIN32_H_
 #pragma once
@@ -85,5 +84,3 @@ namespace FW
 #endif//FILEWATCHER_PLATFORM_WIN32
 
 #endif//_FW_FILEWATCHERWIN32_H_
-
-#endif // ! ANDROID
