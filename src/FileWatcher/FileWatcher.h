@@ -44,7 +44,7 @@
 
 #if defined(_WIN32)
 #	define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_WIN32
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
 #	define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_LINUX
 #elif (defined(__APPLE_CC__) || defined(BSD)) && TARGET_OS_IPHONE == 0 && TARGET_IPHONE_SIMULATOR == 0
 #   define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_KQUEUE
