@@ -39,6 +39,7 @@ def make(env, target):
     # Build zlib
     if isfile(join(target.dist, 'lib', 'libz.a')):
         os.remove(join(target.dist, 'lib', 'libz.a'))
+
     if not isfile(join(target.builds.ZLIB, 'Makefile')):
         cmd = './configure --static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
@@ -153,6 +154,10 @@ def make(env, target):
 
     # Build SDL
     if not isfile(join(sdl_build_armv6, 'Makefile')):
+        # Disable IPHONE_TOUCH_EFFICIENT_DANGEROUS on SDL
+        cmd = SED_CMD + '-e "s|^#define IPHONE_TOUCH_EFFICIENT_DANGEROUS|//#define IPHONE_TOUCH_EFFICIENT_DANGEROUS|g" %s' % join (sdl_build_armv6, 'src', 'video', 'uikit', 'SDL_uikitview.h')
+        Popen(shlex.split(cmd), env=env).communicate()
+
         cmd = './configure --host=armv6-apple-darwin --enable-silent-rules CFLAGS="%s -arch armv6" LDFLAGS="-arch armv6 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], target.dist)
         Popen(shlex.split(cmd), cwd = sdl_build_armv6, env=env).communicate()
         # Replace the auto generated config file for a hand made one
@@ -248,6 +253,10 @@ def make(env, target):
 
     # Build SDL
     if not isfile(join(sdl_build_armv7, 'Makefile')):
+        # Disable IPHONE_TOUCH_EFFICIENT_DANGEROUS on SDL
+        cmd = SED_CMD + '-e "s|^#define IPHONE_TOUCH_EFFICIENT_DANGEROUS|//#define IPHONE_TOUCH_EFFICIENT_DANGEROUS|g" %s' % join (sdl_build_armv7, 'src', 'video', 'uikit', 'SDL_uikitview.h')
+        Popen(shlex.split(cmd), env=env).communicate()
+
         cmd = './configure --host=armv7-apple-darwin --enable-silent-rules CFLAGS="%s -arch armv7" LDFLAGS="-arch armv7 -static-libgcc" --disable-shared --enable-static --prefix="%s"'% (env['CFLAGS'], target.dist)
         Popen(shlex.split(cmd), cwd = sdl_build_armv7, env=env).communicate()
         # Replace the auto generated config file for a hand made one

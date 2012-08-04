@@ -32,8 +32,11 @@ def make(options, env, target, sources, cython_src, cfiles):
     for cfile in cfiles:
         local_cfiles.append(basename(cfile))
 
-    #if not isdir(ios_project):
-    cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s/ %s' % (target.dist, ios_project)
+    if isdir(ios_project):
+        cmd = 'rm -rf %s' % ios_project
+        Popen(shlex.split(cmd), cwd = target.dist).communicate()
+
+    cmd = 'rsync -auqPm --exclude .svn --exclude .hg %s/ %s' % (target.dist, ios_project)
     Popen(shlex.split(cmd), cwd = target.dist).communicate()
     # Modify the skeleton to suit the project
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))

@@ -418,8 +418,9 @@ def cythonize(build_dir, package_name, skip=[]):
         if f not in cfiles:
             d = f[len(build_dir)+1:].replace(os.sep, '+')
             cfile = join(cython_src, d)
-            cmd = 'cp -u %s %s' % (f, cfile)
-            Popen(shlex.split(cmd), cwd = build_dir).communicate()
+            if not isfile(cfile) or getmtime(f) > getmtime(cfile):
+                cmd = 'cp %s %s' % (f, cfile)
+                Popen(shlex.split(cmd), cwd = build_dir).communicate()
             cfiles.append(cfile)
     
     return cfiles, glue_h, glue_c

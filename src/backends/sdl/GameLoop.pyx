@@ -25,7 +25,7 @@ cdef class GameLoop(GameLoopBase):
         self.paused = False
         self.ticks_second = SDL_GetPerformanceFrequency()
 
-#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
         self.fw = new FileWatcher()
         self.fwli = new FileWatchListenerIgnifuga()
 #endif
@@ -90,7 +90,7 @@ cdef class GameLoop(GameLoopBase):
             self.frame_time = SDL_GetPerformanceCounter()-nowx
             remainingTime = self._interval  - self.frame_time / self.ticks_second
             if remainingTime > 0:
-#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 self.fw.update()
 #endif
                 SDL_Delay( remainingTime)
@@ -105,6 +105,7 @@ cdef class GameLoop(GameLoopBase):
 
         if sdlev.type == SDL_QUIT:
             Gilbert().endLoop()
+#if __LINUX__ or __OSX_ or __MINGW__
         elif sdlev.type == SDL_MOUSEMOTION:
             mmev = <SDL_MouseMotionEvent*>sdlev
             if self.touches[0].valid:
@@ -122,6 +123,7 @@ cdef class GameLoop(GameLoopBase):
         elif sdlev.type == SDL_MOUSEBUTTONUP:
             mbev = <SDL_MouseButtonEvent*>sdlev
             self.handleTouch(EVENT_TOUCH_UP, mbev.x, mbev.y, mbev.button-1)
+#endif
         elif sdlev.type == SDL_FINGERMOTION:
             fev = <SDL_TouchFingerEvent*>sdlev
             self.normalizeFingerEvent(fev)
@@ -184,7 +186,7 @@ cdef class GameLoop(GameLoopBase):
         fev.x = fev.x * self._screen_w / 32768
         fev.y = fev.y * self._screen_h / 32768
 
-#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
     cpdef addWatch(self, filename):
         self.fw.addWatch(string(<char*>filename), self.fwli, False)
 
@@ -194,6 +196,7 @@ cdef class GameLoop(GameLoopBase):
 
     cdef handleTouch(self, EventType action, int x, int y, int stream):
         if stream >=NUM_STREAMS or stream < 0:
+            #NOTE: This code requires that SDL for iOS is compiled with #undef IPHONE_TOUCH_EFFICIENT_DANGEROUS
             error("RECEIVED AN INVALID STREAM NUMBER %d < %d < %d " % (0, stream, NUM_STREAMS ))
             return
 
@@ -246,19 +249,19 @@ cdef class GameLoop(GameLoopBase):
                     zoomCenterX = (x + prevTouch.x)/2
                     zoomCenterY = (y + prevTouch.y)/2
                     cx,cy = self.renderer.screenToScene(zoomCenterX, zoomCenterY)
-                    debug("%d, %d, %d" % (currArea, prevArea, currArea-prevArea))
                     self.renderer.scaleBy(currArea-prevArea)
                     sx,sy = self.renderer.sceneToScreen(cx,cy)
-
                     self.renderer.scrollBy(zoomCenterX-sx, zoomCenterY-sy)
+
                     self.touchCaptured = True
                     self.touchCaptor = None
 
         # Store / remove tracked touches
         if action == EVENT_TOUCH_UP:
             # Forget about this stream as the user lift the finger/mouse button
-            self.touches[stream].valid = False
-            self.active_touches -= 1
+            if self.touches[stream].valid:
+                self.touches[stream].valid = False
+                self.active_touches -= 1
             self.touchCaptor = None
             self.touchCaptured = False
         elif action == EVENT_TOUCH_DOWN or self.touches[stream].valid:
@@ -267,8 +270,9 @@ cdef class GameLoop(GameLoopBase):
             if not self.touches[stream].valid:
                 self.touches[stream].valid = True
                 self.active_touches +=1
-            self.touches[stream].x = x
-            self.touches[stream].y = y
+
+        self.touches[stream].x = x
+        self.touches[stream].y = y
 
     cdef handleEthereal(self, EventType action):
         if action <= EVENT_TOUCH_LAST:

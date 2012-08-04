@@ -34,6 +34,7 @@
 #	define FILEWATCHER_IMPL FileWatcherLinux
 #endif
 
+#if FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
 namespace FW
 {
 
@@ -81,3 +82,5 @@ namespace FW
 	}
 
 };//namespace FW
+
+#endif // FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE

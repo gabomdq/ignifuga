@@ -63,11 +63,11 @@ class DataManager(DataManagerBase):
             self.cache[url] = ret_data
 
 
-#if DEBUG and (__LINUX__ or __OSX__)
+#if DEBUG and __LINUX__
             watchURL = join(ROOT_DIR, url)
 #endif
 
-#if DEBUG and __MINGW__
+#if DEBUG and (__MINGW__ or __OSX__)
             watchURL = dirname(join(ROOT_DIR, url))
             self.mtimes[url] = getmtime(join(ROOT_DIR, url))
 #endif
@@ -95,7 +95,7 @@ class DataManager(DataManagerBase):
                 watchURL = join(ROOT_DIR, url)
 #endif
 
-#if DEBUG and __MINGW__
+#if DEBUG and (__MINGW__ or __OSX__)
                 watchURL = dirname(join(ROOT_DIR, url))
                 self.mtimes[url] = getmtime(join(ROOT_DIR, url))
 #endif
@@ -116,7 +116,7 @@ class DataManager(DataManagerBase):
 
     def urlReloaded(self, url):
 #if  __MINGW__
-        # On Windows, we monitor directories, not individual files, so from the files that we know exist in that dir
+        # On Windows and OSX, we monitor directories, not individual files, so from the files that we know exist in that dir
         # we check which ones where modified
         if url.startswith(ROOT_DIR):
             url = url[len(ROOT_DIR)+1:]

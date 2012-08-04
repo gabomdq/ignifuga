@@ -13,7 +13,7 @@ from ignifuga.backends.GameLoopBase cimport *
 from ignifuga.backends.sdl.Renderer cimport Renderer, PointD
 from libcpp.string cimport *
 
-#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
 from ignifuga.FileWatcher.FileWatcher cimport FileWatcher, FileWatchListenerIgnifuga
 #endif
 
@@ -24,7 +24,7 @@ cdef struct Touch:
 cdef class GameLoop(GameLoopBase):
     cdef int _screen_w, _screen_h
     cdef Renderer renderer
-#if __DEBUG__ and (__LINUX__ or __OSX__ or __MINGW__)
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
     cdef FileWatcher *fw
     cdef FileWatchListenerIgnifuga *fwli
 #endif

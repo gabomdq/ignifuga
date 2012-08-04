@@ -33,6 +33,26 @@
 #include <string>
 #include <stdexcept>
 
+#define FILEWATCHER_PLATFORM_NONE 0
+#define FILEWATCHER_PLATFORM_WIN32 1
+#define FILEWATCHER_PLATFORM_LINUX 2
+#define FILEWATCHER_PLATFORM_KQUEUE 3
+
+#if defined(__APPLE_CC__) || defined(BSD)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(_WIN32)
+#	define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_WIN32
+#elif defined(__linux__)
+#	define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_LINUX
+#elif (defined(__APPLE_CC__) || defined(BSD)) && TARGET_OS_IPHONE == 0 && TARGET_IPHONE_SIMULATOR == 0
+#   define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_KQUEUE
+#else
+#   define FILEWATCHER_PLATFORM FILEWATCHER_PLATFORM_NONE
+#endif
+
+
 #if FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
 
 extern "C" {
