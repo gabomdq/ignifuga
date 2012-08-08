@@ -220,10 +220,6 @@ class Gilbert:
         # These dictionaries keep weakrefs via WeakSet, contain the current scene entities
         self.entitiesByTag = {}
 
-        # These keep weakrefs in the key and via Task
-        #self.loading = {}
-        #self.running = {}
-
         self._touches = {}
         self._touchCaptured = False
         self._touchCaptor = None
@@ -304,9 +300,9 @@ class Gilbert:
     def refreshEntityTags(self, entity, added_tags=[], removed_tags=[]):
         for tag in added_tags:
             if tag not in self.entitiesByTag:
-                self.entitiesByTag[tag] = [] #set() #weakref.WeakSet()
+                self.entitiesByTag[tag] = weakref.WeakSet()
             if entity not in self.entitiesByTag[tag]:
-                self.entitiesByTag[tag].append(entity)
+                self.entitiesByTag[tag].add(entity)
 
         for tag in removed_tags:
             if tag in self.entitiesByTag:
@@ -399,30 +395,18 @@ class Gilbert:
         debug('Waiting for entities to finish loading/running')
         tries = 0
         self.gameLoop.freezeRenderer = True
-#        while self.loading or self.running:
-#            self.update(wrapup=True)
-#            tries += 1
-#            if tries > 100:
-#                debug('Still waiting for loading entities: %s' % self.loading)
-#                debug('Still waiting for running entities: %s' % self.running)
-#                tries = 0
-
 
         if self.scene is not None:
             self.scene.reset()
 
         del self.scene
         del self.entitiesByTag
-        #del self.loading
-        #del self.running
 
         # Really remove nodes and data
         gc.collect()
 
         self.scene = None
         self.entitiesByTag = {}
-        #self.loading = {}
-        #self.running = {}
 
         # Clean up cache
         # Do not clean the cache here, there may be useful data for other scenes -> self.dataManager.cleanup()

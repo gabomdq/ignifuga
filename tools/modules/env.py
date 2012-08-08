@@ -126,13 +126,27 @@ def prepare_ios_env(pp=None, openmp=False, sdk=None, target='3.0'):
     env['LDFLAGS'] = "-L%s/usr/lib/ -isysroot %s -miphoneos-version-min=%s" % (env['SDKROOT'], env['SDKROOT'], target)
     return env, pp
 
-
-def prepare_android_env(pp=None, openmp=False):
+ANDROID_VALID_GCC = ['4.4.3', '4.6']
+def prepare_android_env(pp=None, openmp=False, api_level=10, gcc='4.4.3'):
     """ Set up the environment variables for Android compilation"""
     from schafer import ANDROID_NDK, ANDROID_SDK, HOSTPYTHON, HOSTPGEN
     if pp is None:
         pp = preprocessor()
     pp.defines.append('__ANDROID__')
+
+    try:
+        api_level = int(api_level)
+    except:
+        error("Invalid Android API Level, please provide an integer >= 10")
+        exit()
+
+    if api_level < 10:
+        error("Invalid Android Target API Level Selected (it has to be >=10)")
+        exit()
+
+    target = 'android-%d' % api_level
+
+    env = deepcopy(os.environ)
 
     # Check that the NDK and SDK exist
     if ANDROID_NDK == None:
@@ -142,13 +156,23 @@ def prepare_android_env(pp=None, openmp=False):
         error('No Android SDK location provided (use command line parameters or environment variable ANDROID_SDK)')
         exit()
 
-    if not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")):
+    if not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-%s/prebuilt/linux-x86/bin" % gcc)):
         error('Can not locate Valid Android NDK at %s, install or update it' % (ANDROID_NDK,))
         exit()
     if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
         error('Can not locate Android SDK at %s' % ANDROID_SDK)
         exit()
-    env = deepcopy(os.environ)
+
+    # Check GCC version selected
+    # NDK rev >= 8b has GCC 4.4.3 and 4.6
+    if gcc not in ANDROID_VALID_GCC:
+        error("Invalid GCC version. Please select one of: %s", ANDROID_VALID_GCC)
+
+    if not isdir(join(ANDROID_NDK, 'toolchains', 'arm-linux-androideabi-'+gcc)):
+        error("Your Android NDK does not have a GCC version %s" % gcc)
+        exit()
+    env['GCC_VERSION'] = gcc
+
     if 'JAVA_HOME' not in os.environ:
         env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
 
@@ -156,15 +180,28 @@ def prepare_android_env(pp=None, openmp=False):
         error('Can not locate JAVA at %s . Please set the JAVA_HOME environment variable accordingly' % (env['JAVA_HOME'],))
         exit()
 
-    env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
+    env['PATH'] = "%s/toolchains/arm-linux-androideabi-%s/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, gcc, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "armeabi"
     env['SDK'] = ANDROID_SDK
     env['NDK'] = ANDROID_NDK
     env['STL'] = 'gnu'
+    env['TARGET'] = target
 
 
     #env['ARCH'] = "armeabi-v7a"
-    env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" % (ANDROID_NDK)
+    if api_level > 13:
+        env['SYSROOT'] = "%s/platforms/android-14/arch-arm" % ANDROID_NDK
+    elif api_level > 9:
+        env['SYSROOT'] = "%s/platforms/android-9/arch-arm" % ANDROID_NDK
+    else:
+        error("INVALID API LEVEL")
+        exit()
+
+    if not isdir(env['SYSROOT']):
+        error("Could not find platform files at %s" % env['SYSROOT'])
+        exit()
+
+    env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s" % (env['SYSROOT'])
 
     if env['ARCH'] == "armeabi-v7a":
         env['CFLAGS']+=" -march=armv7-a -mfloat-abi=softfp -mfpu=vfp -mthumb"
@@ -196,9 +233,7 @@ def prepare_mingw32_env(pp=None, openmp=False):
 
 
     env = deepcopy(os.environ)
-    #env['PATH'] = "%s/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "win32"
-    #env['CFLAGS'] ="-I %s" % (join(target.builds.PYTHON, 'PC'),)
     # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
     # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
     # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should

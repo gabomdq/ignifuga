@@ -136,6 +136,42 @@ def find_ios_sdk(major=5):
                 if v.group(1) >= major:
                     return v.group(1)+'.'+v.group(2)
 
+def validate_android_api_level(level, ANDROID_SDK):
+    try:
+        api_level = int(level)
+    except:
+        error("Invalid Android API Level, please provide an integer >= 10")
+        exit()
+
+    if api_level < 10:
+        error("Invalid Android Target API Level Selected (it has to be >=10)")
+        exit()
+
+    tool = check_tool('android', False)
+    if tool is None:
+        tool = join(ANDROID_SDK, 'tools', 'android')
+        if not isfile(tool):
+            error("Could not find the 'android' tool from the Android SDK. Try executing schafer -D to install the SDK")
+            exit()
+    # Check that the api level exists
+    cmd = '%s list targets' % tool
+    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
+    api_level_valid = False
+    available_targets = []
+    for line in output:
+        if 'android-%d' % api_level in line:
+            api_level_valid = True
+            break
+        if 'android-' in line:
+            available_targets.append(line.split(' ')[-1])
+
+    if not api_level_valid:
+        if available_targets:
+            error("You don't have the API Level SDK files for the android-%d target (Currently available levels: %s). Please run the %s tool and install it from there" % (api_level, ' '.join(available_targets), tool))
+        else:
+            error("You don't have any API Level SDK files. Please run the %s tool and install it from there" % (tool,))
+        exit()
+
 def check_host_tools():
     """ Check if the required host tools are present """
     from schafer import HOSTPYTHON, HOSTPGEN, ROOT_DIR, HOST_DIST_DIR, prepare_python
@@ -281,8 +317,7 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
 
     # Android SDK and NDK
     if ANDROID_NDK == None or not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or\
-       not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/bin")) if system=='Linux' else\
-    not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin")) if system == 'Darwin' else False:
+       not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3")):
         log('Installing Android NDK to %s' % ANDROID_NDK)
         if system == 'Linux':
             cmd = 'wget %s' % ANDROID_NDK_URL[system]

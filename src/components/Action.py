@@ -395,6 +395,21 @@ class Action(Component):
 
         return self
 
+    def free(self, **kwargs):
+        for action in self._runWith:
+            action.free()
+
+        if self._runNext is not None:
+            self._runNext.free()
+
+        self._tasks = {}
+        self._targets = []
+        self._runWith = []
+        self._runNext = None
+        self._initParams = {}
+
+        super(Action, self).free(**kwargs)
+
     def __getstate__(self):
         odict = self.__dict__.copy()
         # Remove non pickable elements

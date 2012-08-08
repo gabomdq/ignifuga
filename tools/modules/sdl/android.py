@@ -18,7 +18,10 @@ def prepare(env, target):
     patch_target = not isdir(target.builds.SDL) # Keep count if we are starting from scratch to avoid rebuilding excessively too many files
     prepare_source('SDL Android Skeleton', join(SOURCES['SDL'], 'android-project'), target.builds.SDL)
     if patch_target:
-        cmd = SED_CMD + """'s|^target=.*|target=android-7|g' %s""" % (join(target.builds.SDL, 'default.properties'),)
+        cmd = SED_CMD + """'s|^target=.*|target=%s|g' %s""" % (env['TARGET'], join(target.builds.SDL, 'default.properties'),)
+        Popen(shlex.split(cmd), cwd = target.builds.SDL).communicate()
+        # Future proof patching (default.properties is now called project.properties), this may fail harmlessly in current SDL versions
+        cmd = SED_CMD + """'s|^target=.*|target=%s|g' %s""" % (env['TARGET'], join(target.builds.SDL, 'project.properties'),)
         Popen(shlex.split(cmd), cwd = target.builds.SDL).communicate()
         if isdir(join(target.builds.SDL, 'jni', 'src')):
             shutil.rmtree(join(target.builds.SDL, 'jni', 'src'))
@@ -42,12 +45,19 @@ def prepare(env, target):
         os.makedirs(join(target.builds.SDL, 'jni', 'freetype'))
         shutil.copy(join(ROOT_DIR, 'external', 'Android.mk.freetype'), join(target.builds.SDL, 'jni', 'freetype', 'Android.mk'))
 
+    # Update projects files - required in case SDL project files become outdated.
+    if isfile(join(target.builds.SDL, 'build.xml')):
+        os.unlink(join(target.builds.SDL, 'build.xml'))
+    cmd = 'android update project -t %s -p %s' % (env['TARGET'], target.builds.SDL)
+    Popen(shlex.split(cmd)).communicate()
+
+
 def make(env, target):
     ncpu = multiprocessing.cpu_count()
     # Build freetype
     if not isfile(join(target.builds.FREETYPE, 'config.mk')):
         cflags = env['CFLAGS'] + ' -std=gnu99'
-        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" CFLAGS="%s" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/android-5/arch-arm --prefix="%s"'% (cflags, ANDROID_NDK,target.dist)
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" CFLAGS="%s" --without-bzip2 --host=arm-eabi --build=i686-pc-linux-gnu --disable-shared --enable-static --with-sysroot=%s/platforms/%s/arch-arm --prefix="%s"'% (cflags, ANDROID_NDK, env['TARGET'], target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()

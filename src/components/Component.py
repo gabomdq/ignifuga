@@ -139,6 +139,8 @@ class Component(object):
 
     def free(self, **kwargs):
         """ Release component data here """
+        print "free component", self.id
+        self._entity = None
         pass
 
     def update(self, now, **kwargs):

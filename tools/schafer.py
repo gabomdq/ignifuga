@@ -643,14 +643,16 @@ def build_android (options):
     target = get_target(platform)
     if options.main != None and check_ignifuga_libraries(platform):
         return
+    validate_android_api_level(options.androidtarget, ANDROID_SDK)
     info('Building Ignifuga For Android')
-    env, pp = prepare_android_env(openmp=options.openmp)
+    env, pp = prepare_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
     prepare_android_skeleton()
     build_generic(options, platform, pp, env)
 
 def build_project_android(options, project_root):
     platform = 'android'
-    env, pp = prepare_android_env(openmp=options.openmp)
+    validate_android_api_level(options.androidtarget, ANDROID_SDK)
+    env, pp = prepare_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -734,6 +736,12 @@ if __name__ == '__main__':
     parser.add_option("--release",
         action="store_true", dest="release", default=False,
         help="Build the engine in release mode (more optimized, less logging, no hot reloading, etc)")
+    parser.add_option("--android-target",
+        default="10", dest="androidtarget",
+        help="Android SDK API Level to use for building the APP (minimum API Level 10), default: 10")
+    parser.add_option("--android-gcc",
+        default="4.4.3", dest="androidgcc",
+        help="Android GCC Version to use (usually 4.4.3, you can try 4.6 if you have the NDK v >=8b), default=4.4.3")
 
     (options, args) = parser.parse_args()
 

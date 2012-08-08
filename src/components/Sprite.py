@@ -584,7 +584,7 @@ class _Sprite(object):
         self._lapse = 1000/self._rate
         self._lastUpdate = 0.0
         self._colormod = (1.0, 1.0, 1.0, 1.0)
-        self.renderer = Renderer()
+        self.renderer = Gilbert().renderer
 
         # Get the w,h from the first frame which should be a full frame
         sx,sy,dx,dy,w,h = self._frames[0][0]

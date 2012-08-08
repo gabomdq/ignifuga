@@ -24,24 +24,34 @@ def prepare(env, target, ignifuga_src, python_build):
     cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.android.diff'), python_build)
     Popen(shlex.split(cmd)).communicate()
 
+    # Figure out where the STL headers are
+    if env['STL'] == 'gnu':
+        ndk_sources_base = join(env['NDK'], 'sources/cxx-stl/gnu-libstdc++')
+        if not isdir(join(ndk_sources_base, 'include')):
+            ndk_sources_base = join(env['NDK'], 'sources/cxx-stl/gnu-libstdc++/%s' % env['GCC_VERSION'])
+            if not isdir(join(ndk_sources_base, 'include')):
+                error("Could not find GNU STL headers location")
+                exit()
+            else:
+                log("Using STL headers from GCC %s for Android NDK rev >=8b" % env['GCC_VERSION'])
+        else:
+            log("Using STL headers from GCC 4.4.3 for Android NDK rev <= 8")
+
+        stlflags = '-I%s -I%s -L%s -lgnustl_static' % (join(ndk_sources_base, 'include'),
+                                            join(ndk_sources_base, 'libs/armeabi/include'),
+                                            join(ndk_sources_base, 'libs/armeabi'))
+    else:
+        # Untested! Probably does not work!
+        stlflags = '-I%s -lstlport_shared' % (join(env['NDK'], 'sources/cxx-stl/stlport/stlport'), )
+
+
     # ldl is required by SDL dynamic library loading
     # llog, lz, lc are required by STL and Ignifuga logging
-
-    if env['STL'] == 'gnu':
-        ignifuga_module = "\nignifuga %s -I%s -I%s -I%s -L%s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lstdc++ -lc -lgcc\n" % (' '.join(ignifuga_src),
-                                                                  target.builds.IGNIFUGA,
-                                                                  join(env['NDK'], 'sources/cxx-stl/gnu-libstdc++/include'),
-                                                                  join(env['NDK'], 'sources/cxx-stl/gnu-libstdc++/libs/armeabi/include'),
-                                                                  join(env['NDK'], 'sources/cxx-stl/gnu-libstdc++/libs/armeabi'),
-                                                                  join(target.builds.SDL, 'libs', 'armeabi'),
-                                                                  sdlflags)
-    else:
-        ignifuga_module = "\nignifuga %s -I%s -I%s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -lstlport_shared -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
-                                                             target.builds.IGNIFUGA,
-                                                             join(env['NDK'], 'sources/cxx-stl/stlport/stlport'),
-                                                             join(target.builds.SDL, 'libs', 'armeabi'),
-                                                             sdlflags)
-
+    ignifuga_module = "\nignifuga %s -I%s %s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
+                                                                                                                                                           target.builds.IGNIFUGA,
+                                                                                                                                                           stlflags,
+                                                                                                                                                           join(target.builds.SDL, 'libs', 'armeabi'),
+                                                                                                                                                           sdlflags)
     return ignifuga_module
 
 
@@ -53,9 +63,9 @@ def make(env, target, freeze_modules, frozen_file):
         # I use -Wl,--allow-shlib-undefined to simplify some link dependencies that we don't need to specify right now
         # TODO: Remove -Wl,--allow-shlib-undefined at some point and link Python like a boss
         if env['STL'] == 'gnu':
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CPPFLAGS="-fexceptions -frtti" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, target.dist,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CPPFLAGS="-fexceptions -frtti" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
         else:
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s/platforms/android-5/arch-arm" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (ANDROID_NDK, HOSTPYTHON, HOSTPGEN, target.dist,)
+            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()

@@ -46,23 +46,29 @@ def make(options, env, target, sources, cython_src, cfiles):
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
     cmd = SED_CMD + "'s|\[\[LOCAL_SRC_FILES\]\]|%s|g' %s" % (' '.join(local_cfiles), join(jni_src, 'Android.mk'))
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
+
+    cmd = SED_CMD + "'s|\[\[TARGET\]\]|%s|g' %s" % (env['TARGET'], join(android_project, 'project.properties'))
+    Popen(shlex.split(cmd), cwd = jni_src).communicate()
+    cmd = SED_CMD + "'s|\[\[TARGET\]\]|%s|g' %s" % (env['TARGET'], join(android_project, 'jni', 'Application.mk'))
+    Popen(shlex.split(cmd), cwd = jni_src).communicate()
+
     if options.androidkeystore != None:
         # Uncomment
-        cmd = SED_CMD + "'s|#key.store=|key.store=|g' %s" % (join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|#key.store=|key.store=|g' %s" % (join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|#key.alias=|key.alias=|g' %s" % (join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|#key.alias=|key.alias=|g' %s" % (join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
 
         # Replace the key store and key alias
-        cmd = SED_CMD + "'s|key.store=.*|key.store=%s|g' %s" % (options.androidkeystore, join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|key.store=.*|key.store=%s|g' %s" % (options.androidkeystore, join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|key.alias=.*|key.alias=%s|g' %s" % (options.androidkeyalias, join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|key.alias=.*|key.alias=%s|g' %s" % (options.androidkeyalias, join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
     else:
         # Comment out the relevant lines
-        cmd = SED_CMD + "'s|^key.store=|#key.store=|g' %s" % (join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|^key.store=|#key.store=|g' %s" % (join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
-        cmd = SED_CMD + "'s|^key.alias=|#key.alias=|g' %s" % (join(android_project, 'build.properties'))
+        cmd = SED_CMD + "'s|^key.alias=|#key.alias=|g' %s" % (join(android_project, 'ant.properties'))
         Popen(shlex.split(cmd), cwd = jni_src).communicate()
 
     # Make the correct structure inside src
@@ -85,6 +91,12 @@ def make(options, env, target, sources, cython_src, cfiles):
     for asset in options.assets:
         cmd = 'rsync -aqPm --exclude .svn --exclude .hg %s %s' % (asset, join(android_project, 'assets'))
         Popen(shlex.split(cmd)).communicate()
+
+    # Update projects files in case something is outdated vs the Android SDK tools
+    if isfile(join(platform_build, 'android_project', 'build.xml')):
+        os.unlink(join(platform_build, 'android_project', 'build.xml'))
+    cmd = 'android update project -t %s -n %s -p %s' % (env['TARGET'], options.project, join(platform_build, 'android_project'))
+    Popen(shlex.split(cmd)).communicate()
 
     # Build it
     cmd = 'ndk-build'

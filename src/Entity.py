@@ -13,6 +13,7 @@ from ignifuga.components.Component import Component
 from Task import *
 
 import weakref,traceback
+from copy import deepcopy
 
 
 
@@ -85,6 +86,7 @@ class Entity(object):
             self.id = hash(self)
 
     def __del__(self):
+        print "__del__", self.id
         if not self._released:
             self.__free__()
 
@@ -93,8 +95,12 @@ class Entity(object):
         If we wait to do what's done here in __del__ the cycle of dependencies is never broken and the data
         won't be garbage collected. It should be only called from __del__ or unregister """
 
+        print "Releasing", self.id
         if self._released:
             error("Node %s released more than once" % self.id)
+
+        self._data = {}
+        self.scene = None
 
         for component in self._components.itervalues():
             component.free()
@@ -104,6 +110,7 @@ class Entity(object):
         self._properties = {}
         self._released = True
         self._initialComponents = []
+
 
     def __str__(self):
         return "Entity with ID %s (%s)" % (self.id,hash(self))
@@ -124,8 +131,8 @@ class Entity(object):
                     failcount[component] += 1
 
                 if failcount[component] >= 10:
-                    #error('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
-                    #error(traceback.format_exc())
+                    debug('Temporarily failed initializing Entity %s because of component %s' % (self.id, component))
+                    debug(traceback.format_exc())
                     self._initFailCount+=1
                     if self._initFailCount > 10:
                         self._initFailCount = 0
@@ -146,7 +153,7 @@ class Entity(object):
 #        Gilbert().registerNode(self)
 
     def setup(self, **data):
-        self._data = data
+        self._data = deepcopy(data)
 
     def reset(self):
         Gilbert().gameLoop.stopEntity(self)
