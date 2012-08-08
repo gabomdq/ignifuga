@@ -44,6 +44,7 @@ cdef struct PointD:
     double x,y
 
 cdef class Renderer:
+    cdef bint released
     cdef Uint32 frameTimestamp
     cdef tuple nativeResolution
     # Scale factor = screen/scene
@@ -67,6 +68,7 @@ cdef class Renderer:
     cdef void _processSprites(self, bint all) nogil
     cdef processEvent(self, EventType action, int x, int y)
 
+    cpdef free(self)
     cpdef update(self, Uint32 now)
     cpdef getTimestamp(self)
     cpdef checkRate(self, Uint32 lastTime, Uint32 rate)

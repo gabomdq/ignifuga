@@ -88,6 +88,11 @@ class Sprite(Viewable):
     def free(self, **kwargs):
         self.hide()
         self._tmpcanvas = None
+        self._overlays = {}
+        self.sprite = None
+        self._canvas = None
+        self._atlas = None
+        self._spriteData = None
         Gilbert().dataManager.removeListener(self.file, self)
         super(Sprite, self).free(**kwargs)
 

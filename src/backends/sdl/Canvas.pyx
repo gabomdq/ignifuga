@@ -128,7 +128,7 @@ cdef class Canvas (CanvasBase):
             self._surfacesw = NULL
 
     def __dealloc__(self):
-        debug( ">>>CANVAS DEALLOC %s (URL: %s) <<<" % (self, self._srcURL))
+        #debug( ">>>CANVAS DEALLOC %s (URL: %s) <<<" % (self, self._srcURL))
         self.free()
 
     cpdef blitCanvas(self, CanvasBase canvasbase, int dx=0, int dy=0, int dw=-1, int dh=-1, int sx=0, int sy=0, int sw=-1, int sh=-1, int blend=-1):

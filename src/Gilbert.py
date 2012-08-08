@@ -261,7 +261,6 @@ class Gilbert:
         self.gameLoop.run()
 
         # Engine is exiting from here onwards
-
         debug('Saving state')
         self.saveState()
 
@@ -270,26 +269,57 @@ class Gilbert:
             from backends.sdl import terminateBackend
 
         self.resetScenes()
+        self.renderer.free()
+        del self.renderer
+        self.gameLoop.free()
+        del self.gameLoop
+
         # DEBUG - See what's holding on to what
+        gc.collect()
+        debug("--------->GC REMNANTS<------------")
         objs = gc.get_objects()
         for n in objs:
             if isinstance(n, Entity) or isinstance(n,Component):
+                debug ('=================================================================')
                 debug ('%s: %s' % (n.__class__.__name__, n))
-                for ref in gc.get_referrers(n):
-                    if ref != objs:
+                referrers = gc.get_referrers(n)
+                for ref in referrers:
+                    if ref != objs and ref != referrers:
                         debug('    REFERRER: %s %s'  % (ref.__class__, id(ref)))
                         if isinstance(ref, dict):
-                            debug("    DICT: %s" % ref.keys())
+                            debug("    DICT: %s" % ref)
                         elif isinstance(ref, list):
                             debug("    LIST: %s items" % len(ref))
                         elif isinstance(ref, tuple):
                             debug("    TUPLE: %s" % str(ref))
+                            referrers1 = gc.get_referrers(ref)
+                            debug("NUMBER OF REFERRERS", len(referrers1))
+                            for ref1 in referrers1:
+                                if ref1 != referrers and ref1 != objs:
+                                    debug(ref1)
+
+                            del referrers1
+                        elif callable(ref):
+                            debug("    INSTANCEMETHOD: %s %s" % (hash(ref), str(ref)))
+                            referrers1 = gc.get_referrers(ref)
+                            debug("NUMBER OF REFERRERS", len(referrers1))
+                            for ref1 in referrers1:
+                                if ref1 != referrers and ref1 != objs:
+                                    debug(ref1)
+
+                            del referrers1
                         else:
                             debug("    OTHER: %s" % str(ref))
+
+                del referrers
+
+                debug ('=================================================================')
+                debug(' ')
+
+        del objs
         self.dataManager.cleanup(True)
         # Break any remaining cycles that prevent garbage collection
         del self.dataManager
-        del self.renderer
         debug('Terminating backend %s' % (self.backend,))
         terminateBackend()
 
@@ -404,7 +434,6 @@ class Gilbert:
 
         # Really remove nodes and data
         gc.collect()
-
         self.scene = None
         self.entitiesByTag = {}
 

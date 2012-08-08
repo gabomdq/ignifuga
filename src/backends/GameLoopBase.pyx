@@ -36,7 +36,10 @@ cdef bint isdead(PyGreenlet* greenlet):
     ##define PyGreenlet_ACTIVE(op)     (((PyGreenlet*)(op))->stack_start != NULL)
 
     ##if (PyGreenlet_ACTIVE(self) || !PyGreenlet_STARTED(self)):
-    if greenlet.stack_start != NULL or greenlet.stack_stop == NULL:
+    ##if greenlet.stack_start != NULL or greenlet.stack_stop == NULL:
+        #return False
+
+    if PyGreenlet_ACTIVE(greenlet) or not PyGreenlet_STARTED(greenlet):
         return False
 
     return True
@@ -49,6 +52,7 @@ cdef class GameLoopBase(object):
         self.fps = fps
         self.frame_time = 0
         self.freezeRenderer = True
+        self.released = False
 
         self.loading = new deque[_Task]()
         self.loading_tmp = new deque[_Task]()
@@ -57,46 +61,49 @@ cdef class GameLoopBase(object):
 
         PyGreenlet_Import()
         self.main_greenlet = PyGreenlet_GetCurrent()
-        Py_XINCREF(<PyObject*>self.main_greenlet)
 
     def __dealloc__(self):
-        debug("Releasing Game Loop data")
+        self.free()
 
+    cpdef free(self):
         cdef _Task *task
         cdef task_iterator iter
 
+        if not self.released:
+            debug("Releasing Game Loop data")
+            # Release sprites in use
+            iter = self.loading.begin()
+            while iter != self.loading.end():
+                task = &deref(iter)
+                self.taskDecRef(task)
+                inc(iter)
 
-        Py_XDECREF(<PyObject*>self.main_greenlet)
+            iter = self.loading_tmp.begin()
+            while iter != self.loading_tmp.end():
+                task = &deref(iter)
+                self.taskDecRef(task)
+                inc(iter)
 
-        # Release sprites in use
-        iter = self.loading.begin()
-        while iter != self.loading.end():
-            task = &deref(iter)
-            self.taskDecRef(task)
-            inc(iter)
+            iter = self.running.begin()
+            while iter != self.running.end():
+                task = &deref(iter)
+                self.taskDecRef(task)
+                inc(iter)
 
-        iter = self.loading_tmp.begin()
-        while iter != self.loading_tmp.end():
-            task = &deref(iter)
-            self.taskDecRef(task)
-            inc(iter)
+            iter = self.running_tmp.begin()
+            while iter != self.running_tmp.end():
+                task = &deref(iter)
+                self.taskDecRef(task)
+                inc(iter)
 
-        iter = self.running.begin()
-        while iter != self.running.end():
-            task = &deref(iter)
-            self.taskDecRef(task)
-            inc(iter)
+            Py_CLEAR(self.main_greenlet)
 
-        iter = self.running_tmp.begin()
-        while iter != self.running_tmp.end():
-            task = &deref(iter)
-            self.taskDecRef(task)
-            inc(iter)
+            del self.loading
+            del self.loading_tmp
+            del self.running
+            del self.running_tmp
 
-        del self.loading
-        del self.loading_tmp
-        del self.running
-        del self.running_tmp
+            self.released = True
 
     def run(self):
         raise Exception('not implemented')
@@ -111,13 +118,14 @@ cdef class GameLoopBase(object):
     cpdef startEntity(self, entity, bint load_phase=True):
         """ Put an entity in the loading or running queue"""
         cdef _Task new_task, *taskp
-        cdef PyObject *obj = <PyObject*> entity
-
 
         new_task.release = False
         new_task.req = REQUEST_NONE
-        new_task.entity = obj
+        new_task.entity = <PyObject*> entity
+        Py_XINCREF(new_task.entity)
+
         # Note: Got to do this assignment with an intermediary object, otherwise Cython just can't take it!
+        runnable = None
         if load_phase:
             runnable = entity.init
         else:
@@ -125,10 +133,8 @@ cdef class GameLoopBase(object):
 
         new_task.runnable = <PyObject*>runnable
         new_task.data = NULL
-        Py_XINCREF(new_task.entity)
         Py_XINCREF(new_task.runnable)
         new_task.greenlet = PyGreenlet_New(new_task.runnable, self.main_greenlet )
-        Py_XINCREF(<PyObject*>new_task.greenlet)
 
         # We don't directly add new tasks to self.loading or self.running to avoid invalidating iterators or pointers in self.update
         # Instead, we add them to a temporary list which will be processed in self.update.
@@ -136,6 +142,8 @@ cdef class GameLoopBase(object):
             self.loading_tmp.push_back(new_task)
         else:
             self.running_tmp.push_back(new_task)
+
+        del runnable
 
     cpdef startComponent(self, component):
         """ Components hit the ground running, their initialization was handled by their entity"""
@@ -170,9 +178,10 @@ cdef class GameLoopBase(object):
 
     cdef taskDecRef (self, _Task* taskp):
         Py_XDECREF(taskp.data)
-        Py_XDECREF(<PyObject*>taskp.greenlet)
-        Py_XDECREF(taskp.runnable)
         Py_XDECREF(taskp.entity)
+        Py_XDECREF(taskp.greenlet)
+        Py_XDECREF(taskp.runnable)
+
 
     cpdef update(self, int now=0, bint wrapup=False):
         """ Update everything, then render the scene
@@ -182,6 +191,7 @@ cdef class GameLoopBase(object):
         cdef _Task *taskp
         cdef deque[_Task].iterator iter, iter_end
         cdef PyObject *entity
+        cdef bint task_ret
 
         # Add loading and running tasks from the temporary queues
         while self.loading_tmp.size() > 0:
@@ -198,7 +208,9 @@ cdef class GameLoopBase(object):
 
         while iter != iter_end:
             taskp = &deref(iter)
-            if taskp.release or not self._processTask(taskp, now, wrapup, True):
+            task_ret = self._processTask(taskp, now, wrapup, True)
+
+            if isdead(taskp.greenlet):
                 # Remove the task from the loading deque, start it in the running deque
 
                 # Release the reference we held to data
@@ -224,9 +236,10 @@ cdef class GameLoopBase(object):
         iter_end = self.running.end()
         while iter != iter_end:
             taskp = &deref(iter)
-            if taskp.release or not self._processTask(taskp, now, wrapup, False):
-                # Remove the task from the indexes
+            task_ret = self._processTask(taskp, now, wrapup, False)
 
+            if isdead(taskp.greenlet):
+                # Remove the task from the indexes
                 # Release the reference we held to data
                 self.taskDecRef(taskp)
                 iter = self.running.erase(iter)
@@ -244,11 +257,11 @@ cdef class GameLoopBase(object):
         retp = PyGreenlet_Switch(task.greenlet, args, kwargs)
         if task.release:
             # The task was marked for release at some point during the switch, don't use it further
+            Py_XDECREF(retp)
             return False
 
         ret = None
         if retp != NULL:
-            Py_XINCREF(retp)
             ret = <object>retp
 
         if isdead(task.greenlet) or ret is None:
@@ -267,11 +280,15 @@ cdef class GameLoopBase(object):
             Py_XDECREF(retp)
             return True
 
+        Py_XDECREF(retp)
         return False
 
 
     cdef bint _processTask(self, _Task *task, int now=0, bint wrapup=False, bint init=False):
         cdef PyObject *args, *kwargs
+
+
+        # Prepare some standard arguments
         if init:
             # Init functions have the format self.init(**data), so we pass now in the kwargs
             kw_data = {'now':now}
@@ -284,40 +301,17 @@ cdef class GameLoopBase(object):
             data = (now,)
             args = <PyObject*>data
 
-        cdef PyObject *retp
-        if task.req == REQUEST_NONE:
-            if self._doSwitch(task, args, kwargs):
-                if init and task.req == REQUEST_ERROR:
-                    # There was a problem with initialization, let's try again from scratch
-                    Py_XDECREF(<PyObject*>task.greenlet)
-                    task.req = REQUEST_NONE
-                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
-                    Py_XINCREF(<PyObject*>task.greenlet)
-                    return True
-            else:
-                return False
 
-        if task.req == REQUEST_DONE:
-            if init:
-                # Entity is ready, start the update loop for it
-                return False
-            else:
-                if wrapup:
-                    return False
-                else:
-                    # Restart the update loop
-                    Py_XDECREF(<PyObject*>task.greenlet)
-                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
-                    Py_XINCREF(<PyObject*>task.greenlet)
-                    return self._doSwitch(task, args, kwargs)
-        elif task.req == REQUEST_SKIP:
-            # Normal operation continues
+        # This is for tasks on their way out! They've been marked for release but we have to keep them looping until they die
+        if task.release and not isdead(task.greenlet):
+            return self._doSwitch(task, args, kwargs)
+
+        # Prepare data
+        cdef PyObject *retp
+        if task.req == REQUEST_SKIP:
+            # Do not switch to the task in this round
             task.req = REQUEST_NONE
             return True
-        elif task.req == REQUEST_STOP:
-            # Stop entity from updating
-            task.release = True
-            return False
         elif task.req == REQUEST_LOADIMAGE:
             # Load an image
             data = <object>task.data
@@ -325,18 +319,67 @@ cdef class GameLoopBase(object):
                 # Try to load an image
                 img = (Gilbert().dataManager.getImage(data['url']),)
                 if img is not None:
-                    return self._doSwitch(task, <PyObject*>img, NULL)
-                return True
+                    args = <PyObject*>img
+                    kwargs = NULL
             else:
                 # URL is invalid, just keep going
                 task.req = REQUEST_NONE
-                return True
+
+        # Do the actual switching passing the data to the greenlet
+        if self._doSwitch(task, args, kwargs):
+            # Process some return values stored in task.req
+            if task.req == REQUEST_ERROR:
+                if init:
+                    # There was a problem with initialization, let's try again from scratch
+                    Py_CLEAR(task.greenlet)
+                    task.req = REQUEST_NONE
+                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
+                    return True
+            elif task.req == REQUEST_DONE:
+                if not init and not wrapup:
+                    # Restart the update loop
+                    task.req = REQUEST_NONE
+                    Py_CLEAR(task.greenlet)
+                    task.greenlet = PyGreenlet_New(task.runnable, self.main_greenlet)
+                    return True
+            elif task.req == REQUEST_STOP:
+                # Stop entity from updating
+                task.release = True
+                task.req = REQUEST_NONE
         else:
-            # Unrecognized request
-            return self._doSwitch(task, args, kwargs)
+            return False
+
 
     cpdef addWatch(self, filename):
         raise Exception('not implemented')
 
     cpdef removeWatch(self, filename):
         raise Exception('not implemented')
+
+#    cpdef checkStatus(self):
+#        cdef _Task *task
+#        cdef task_iterator iter
+#
+#        iter = self.loading.begin()
+#        while iter != self.loading.end():
+#            task = &deref(iter)
+#            print "LOADING TASK RUNNABLE", <object> task.runnable
+#            inc(iter)
+#
+#        iter = self.loading_tmp.begin()
+#        while iter != self.loading_tmp.end():
+#            task = &deref(iter)
+#            print "LOADING TMP TASK RUNNABLE", <object> task.runnable
+#            inc(iter)
+#
+#        iter = self.running.begin()
+#        while iter != self.running.end():
+#            task = &deref(iter)
+#            print "RUNNING TASK RUNNABLE", <object> task.runnable
+#            inc(iter)
+#
+#        iter = self.running_tmp.begin()
+#        while iter != self.running_tmp.end():
+#            task = &deref(iter)
+#            print "RUNNING TMP TASK RUNNABLE", <object> task.runnable
+#            inc(iter)

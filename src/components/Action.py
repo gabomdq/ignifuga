@@ -34,7 +34,7 @@ class Action(Component):
             'targets': targets,
         }
 
-        self._tasks = data
+        self._tasks = deepcopy(data)
         self._targets = []
         self._runWith = []     # Action/s to be run in parallel to this one
         self._runNext = None    # Action to be run after this one
@@ -56,13 +56,13 @@ class Action(Component):
             for rw in runWith:
                 if 'targets' not in rw:
                     rw['targets'] = targets
-                action = Action(root=False, entity=entity, active=False, **rw)
+                action = Action(root=False, entity=entity, active=False, **deepcopy(rw))
                 self._runWith.append(action)
 
         if runNext != None:
             if 'targets' not in runNext:
                 runNext['targets'] = targets
-            self._runNext = Action(root=False, entity=entity, active=False, **runNext)
+            self._runNext = Action(root=False, entity=entity, active=False, **deepcopy(runNext))
 
         self.reset()
         super(Action, self).__init__(id, entity, active, frequency, **data)
@@ -118,10 +118,10 @@ class Action(Component):
 
         # Process runWith and runNext
         for action in self._runWith:
-            action.init(**kwargs)
+            action.init(**deepcopy(kwargs))
 
         if self._runNext is not None:
-            self._runNext.init(**kwargs)
+            self._runNext.init(**deepcopy(kwargs))
 
         super(Action, self).init(**kwargs)
 
@@ -396,16 +396,18 @@ class Action(Component):
         return self
 
     def free(self, **kwargs):
+        #print "RELEASING ACTION", self.id
         for action in self._runWith:
             action.free()
+        self._runWith = []
 
         if self._runNext is not None:
             self._runNext.free()
+            self._runNext = None
 
         self._tasks = {}
         self._targets = []
-        self._runWith = []
-        self._runNext = None
+
         self._initParams = {}
 
         super(Action, self).free(**kwargs)
@@ -425,7 +427,7 @@ class Action(Component):
         self._startTime = None
         for a in self._runWith:
             a.unfreeze()
-        if self._runNext != None:
+        if self._runNext is not None:
             self._runNext.unfreeze()
 
     def __repr__(self):
@@ -437,7 +439,7 @@ class Action(Component):
                 retval += '* ' + str(a)
             retval += "\n"
         
-        if self._runNext != None:
+        if self._runNext is not None:
             for l in str(self._runNext).split('\n'):
                 retval += '---->' + l + '\n'
             

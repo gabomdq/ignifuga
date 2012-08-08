@@ -8,7 +8,7 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 from ignifuga.Gilbert import Event, Gilbert
-from ignifuga.Log import error
+from ignifuga.Log import error, debug
 from ignifuga.components.Component import Component
 from Task import *
 
@@ -86,16 +86,14 @@ class Entity(object):
             self.id = hash(self)
 
     def __del__(self):
-        print "__del__", self.id
         if not self._released:
-            self.__free__()
+            self.free()
 
-    def __free__(self):
+    def free(self):
         """ This free function exists to break the dependency cycle among entities, components, etc
         If we wait to do what's done here in __del__ the cycle of dependencies is never broken and the data
         won't be garbage collected. It should be only called from __del__ or unregister """
 
-        print "Releasing", self.id
         if self._released:
             error("Node %s released more than once" % self.id)
 
@@ -166,7 +164,7 @@ class Entity(object):
 
         # Break dependency cycles
         if not self._released:
-            self.__free__()
+            self.free()
 
     ###########################################################################
     # Persistence, serialization related functions

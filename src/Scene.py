@@ -42,7 +42,10 @@ class Scene(Entity):
         self.reset()
         super(Scene, self).__del__()
 
-
+    def free(self):
+        # Scenes are not released as they are re entrant
+        super(Scene, self).free()
+        self._released = False
 
     def reset(self):
         # Remove existing entities
@@ -56,6 +59,8 @@ class Scene(Entity):
             self.cache_ref = None
             if self.data_url is not None:
                 Gilbert().dataManager.removeListener(self.data_url, self)
+
+            self.free()
 
     def reload(self, source):
         # If the scene is not ready, ignore the reload...TODO: Should we schedule a reload for later?

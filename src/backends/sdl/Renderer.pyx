@@ -36,6 +36,8 @@ cdef class Renderer:
         cdef int display = 0, x, y
         cdef char *metamode
 
+        self.released = False
+
         self.nativeResolution = (None, None)
         self._scale_x = 1.0
         self._scale_y = 1.0
@@ -657,18 +659,26 @@ cdef class Renderer:
             self.free_sprites.resize(0)
 
     def __dealloc__(self):
-        debug('Releasing Sprites')
+        self.free()
 
-        # Release sprites
-        del self.zmap
-        del self.active_sprites
-        del self.free_sprites
+    cpdef free(self):
+        if not self.released:
+            debug('Releasing Sprites')
+            # Release sprites
 
-        debug('Releasing SDL renderer')
-        if self.renderer != NULL:
-            SDL_DestroyRenderer(self.renderer)
-        if self.window != NULL:
-            SDL_DestroyWindow(self.window)
+            del self.active_sprites
+            del self.free_sprites
+            del self.zmap
+
+            debug('Releasing SDL renderer')
+            if self.renderer != NULL:
+                SDL_DestroyRenderer(self.renderer)
+                self.renderer = NULL
+            if self.window != NULL:
+                SDL_DestroyWindow(self.window)
+                self.window = NULL
+
+            self.released = True
 
     property width:
         def __get__(self):

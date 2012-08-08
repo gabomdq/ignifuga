@@ -27,25 +27,27 @@ cdef extern from "Python.h":
     struct _frame
 
 cdef extern from "Modules/greenlet.h":
-    cdef struct _greenlet
-    cdef struct _greenlet:
-        PyObject head
-        char* stack_start
-        char* stack_stop
-        char* stack_copy
-        long stack_saved
-        _greenlet* stack_prev
-        _greenlet* parent
-        PyObject* run_info
-        _frame* top_frame
-        int recursion_depth
-        PyObject* weakreflist
+#    cdef struct _greenlet:
+#        PyObject head
+#        char* stack_start
+#        char* stack_stop
+#        char* stack_copy
+#        long stack_saved
+#        _greenlet* stack_prev
+#        _greenlet* parent
+#        PyObject* run_info
+#        _frame* top_frame
+#        int recursion_depth
+#        PyObject* weakreflist
 
-    ctypedef _greenlet PyGreenlet
+    #ctypedef _greenlet PyGreenlet
+    ctypedef PyObject PyGreenlet
     PyGreenlet * PyGreenlet_New(PyObject *run, PyGreenlet *parent)
     PyGreenlet * PyGreenlet_GetCurrent()
     PyObject * PyGreenlet_Switch(PyGreenlet *greenlet, PyObject *args, PyObject *kwargs)
     void PyGreenlet_Import()
+    bint PyGreenlet_ACTIVE(PyGreenlet *greenlet)
+    bint PyGreenlet_STARTED(PyGreenlet *greenlet)
 
 ctypedef enum REQUESTS:
     REQUEST_NONE = 0x00000000
@@ -70,7 +72,7 @@ ctypedef PyObject* PyObject_p
 ctypedef deque[_Task].iterator task_iterator
 
 cdef class GameLoopBase(object):
-    cdef public bint quit, paused, freezeRenderer
+    cdef public bint quit, paused, freezeRenderer, released
     cdef public double _fps
     cdef str platform
     cdef deque[_Task] *loading, *loading_tmp, *running, *running_tmp
@@ -88,3 +90,5 @@ cdef class GameLoopBase(object):
     cpdef addWatch(self, filename)
     cpdef removeWatch(self, filename)
     cdef taskDecRef (self, _Task* taskp)
+    cpdef free(self)
+    #cpdef checkStatus(self)

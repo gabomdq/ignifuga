@@ -34,6 +34,7 @@ class Component(object):
 
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
         self._id = id if id != None else hash(self)
+        self.released = False
         self._entity = None
         self._active = False
         self._initiallyActive = active
@@ -139,9 +140,14 @@ class Component(object):
 
     def free(self, **kwargs):
         """ Release component data here """
-        print "free component", self.id
-        self._entity = None
-        pass
+        if self.released:
+            error('Released %s more than once' % self.id)
+        else:
+            self.tags = []
+            self.entityTags = []
+            self.properties = []
+            self._entity = None
+            self.released = True
 
     def update(self, now, **kwargs):
         """ Update the component"""
