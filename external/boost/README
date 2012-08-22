@@ -1,0 +1,8 @@
+Minimal Boost::Python, required to compile Rocket with Python bindings
+
+Sources extracted from v 1.5.0 of Boost
+
+python/src is copied as is from boost/libs/python/src 
+python/includes comes from boost/boost, with the following removed: aios, fusion, phoenix, spirit, test
+
+Edited python/detail/endian.hpp to add || defined(ANDROID) on line 70
