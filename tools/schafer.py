@@ -45,6 +45,8 @@ SOURCES['ZLIB'] = join(ROOT_DIR, 'external', 'zlib')
 SOURCES['GREENLET'] = join(ROOT_DIR, 'external', 'greenlet')
 SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
 SOURCES['IGNIFUGA'] = join(ROOT_DIR, 'src')
+SOURCES['ROCKET'] = join(ROOT_DIR, 'external', 'Rocket')
+SOURCES['BOOST'] = join(ROOT_DIR, 'external', 'boost')
 
 ########################################################################################################################
 
@@ -128,9 +130,9 @@ def prepare_python(platform, ignifuga_src, python_build, env):
         shutil.copy(join(SOURCES['BITARRAY'], '_bitarray.c'), join(python_build, 'Modules'))
 
 
-def make_python(platform, ignifuga_src, env=os.environ):
+def make_python(platform, ignifuga_src, options, env=os.environ):
     # Modules required by Python itself
-    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii', 'encodings.cp850']
+    freeze_modules = ['site','os','posixpath','stat','genericpath','warnings','linecache','types','UserDict','_abcoll','abc','_weakrefset','copy_reg','traceback','sysconfig','re','sre_compile','sre_parse','sre_constants','codecs', 'encodings','encodings.aliases','encodings.utf_8', 'encodings.ascii', 'encodings.cp850', 'encodings.cp437']
     # Modules required by Ignifuga in addition to the above
     freeze_modules += ['base64', 'struct', 'json', 'json.decoder', 'json.encoder', 'json.scanner', 'json.tool', 'encodings.hex_codec', 'platform', 'string', 'pickle', 'StringIO', 'copy', 'weakref', 'optparse', 'textwrap']
     # Threading
@@ -140,8 +142,7 @@ def make_python(platform, ignifuga_src, env=os.environ):
 
     target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])
-    mod.make(env, target, freeze_modules, join(target.builds.PYTHON, 'Python', 'frozen.c'))
-
+    mod.make(env, target, options, freeze_modules, join(target.builds.PYTHON, 'Python', 'frozen.c'))
 
 def make_python_freeze(platform, modules, frozen_file):
     """Get a list of python native modules, return them frozen"""
@@ -262,12 +263,34 @@ def preprocess_sources(pp, folder, extensions=['pyx', 'pxd', 'py']):
         pp.parse()
 
 
-def prepare_ignifuga(platform, pp):
+def prepare_ignifuga(platform, pp, options):
     # Copy .py, .pyx .pxd .h .c .cpp files
+    log("Preparing Ignifuga source code")
     target = get_target(platform)
-    cmd = 'rsync -auqPm --exclude .svn --exclude host --exclude tmp --exclude dist --exclude external --exclude tools --exclude tests --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
+    excludes = ''
+    if not options.rocket:
+        excludes += '--exclude Rocket*'
+
+    cmd = 'rsync -auqPm --exclude .svn %s --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.hpp" --include "*.inl" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (excludes, SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+
+
+    # Copy Rocket from external
+    if options.rocket:
+        log("Preparing libRocket source code")
+        cmd = 'rsync -auqPm %s/Source/ %s' % (SOURCES['ROCKET'], join(target.builds.IGNIFUGA, 'Rocket'))
+        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        cmd = 'rsync -auqPm %s/Include/Rocket/ %s' % (SOURCES['ROCKET'], join(target.builds.IGNIFUGA, 'Rocket'))
+        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+
+        log("Preparing boost::python source code")
+        cmd = 'rsync -auqPm %s/python/src/ %s' % (SOURCES['BOOST'], join(target.builds.IGNIFUGA, 'boost'))
+        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        cmd = 'rsync -auqPm %s/python/include/ %s' % (SOURCES['BOOST'], join(target.builds.IGNIFUGA, 'boost'))
+        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+
     preprocess_sources(pp, target.builds.IGNIFUGA)
+
 
 
 def make_glue(package, glue_h, glue_c):
@@ -295,10 +318,10 @@ init%s(){
 
     return glue
 
-def make_ignifuga(build_dir):
-    return cythonize(build_dir, 'ignifuga')
+def make_ignifuga(build_dir, options):
+    return cythonize(build_dir, 'ignifuga', options)
     
-def cythonize(build_dir, package_name, skip=[]):
+def cythonize(build_dir, package_name, options, skip=[]):
     files = []
     cfiles = []
     updatedfiles = []
@@ -407,12 +430,24 @@ def cythonize(build_dir, package_name, skip=[]):
             glue_h += "extern void init%s(void);\n" % (package.replace('.', '_'))
             glue_c += '    PyImport_AppendInittab("%s", init%s);\n' % (package, package.replace('.', '_'))
 
+
+    if options.rocket:
+        # Special case: add libRocket to the glue
+        glue_h += "extern void init_rocketcore(void);\n"
+        glue_c += '    PyImport_AppendInittab("_rocketcore", init_rocketcore);\n'
+
+        glue_h += "extern void init_rocketcontrols(void);\n"
+        glue_c += '    PyImport_AppendInittab("_rocketcontrols", init_rocketcontrols);\n'
+
     # Make package xxx_glue.c with no frozen modules
     glue = make_glue(package_name, glue_h, glue_c)
     f = open(join(cython_src, package_name+'_glue.c'), 'w')
     f.write(glue)
     f.close()
     cfiles.append(join(cython_src, package_name+'_glue.c'))
+
+    # We have to flatten CPP files as well, because this will all be compiled using Python's build system
+    # which is "flat structure" oriented, ie all .o files end up in python/Modules
 
     for f in locate('*.cpp', build_dir, [cython_src, join(build_dir, 'android_project')]):
         if f not in cfiles:
@@ -465,6 +500,11 @@ def build_generic(options, platform, pp, env=None):
         pp.undefines.append('RELEASE')
         pp.defines.append('DEBUG')
 
+    if options.rocket:
+        pp.defines.append('ROCKET')
+    else:
+        pp.undefines.append('ROCKET')
+
     if platform in ['linux64', 'mingw32', 'osx']:
         # Android/iOS has its own skeleton set up
         cmd = 'mkdir -p "%s"' % target.dist
@@ -488,11 +528,11 @@ def build_generic(options, platform, pp, env=None):
     # Compile Ignifuga then Python statically
     if 'ignifuga' in options.modules:
         info('Building Ignifuga')
-        prepare_ignifuga(platform, pp)
-        ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA)
+        prepare_ignifuga(platform, pp, options)
+        ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA, options)
         info('Building Python')
         prepare_python(platform, ignifuga_src, target.builds.PYTHON, env)
-        make_python(platform, ignifuga_src, env)
+        make_python(platform, ignifuga_src, options, env)
 
 # ===============================================================================================================
 # USER PROJECT BUILDS
@@ -521,7 +561,7 @@ def build_project_generic(options, platform, target, pp, env=None):
 
     # Prepare and cythonize project sources
     prepare_project(target.project_root, platform_build)
-    cfiles, glue_h, glue_c = cythonize(platform_build, package, [options.main,])
+    cfiles, glue_h, glue_c = cythonize(platform_build, package, options, [options.main,])
 
     # Cythonize main file
     main_file_ct = getctime(main_file)
@@ -742,6 +782,12 @@ if __name__ == '__main__':
     parser.add_option("--android-gcc",
         default="4.4.3", dest="androidgcc",
         help="Android GCC Version to use (usually 4.4.3, you can try 4.6 if you have the NDK v >=8b), default=4.4.3")
+    parser.add_option("--disable-rocket",
+        action="store_false", dest="rocket", default=True,
+        help="Disable LibRocket integration (by default it is integrated)")
+    parser.add_option("--enable-valgrind",
+        action="store_true", dest="valgrind", default=False,
+        help="Create a Valgrind friendly build (although much slower)")
 
     (options, args) = parser.parse_args()
 

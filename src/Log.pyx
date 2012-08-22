@@ -16,20 +16,14 @@ import sys
 cpdef debug (msg):
     Log().debug(msg)
     
-def info (msg):
+cpdef info (msg):
     Log().info(msg)
     
-def error (msg):
+cpdef error (msg):
     Log().error(msg)
     
 class Log:
     __metaclass__ = Singleton
-    #singleton = None
-    #def __new__(typ, *args, **kwargs):
-    #    if Log.singleton is None:
-    #        Log.singleton = object.__new__(typ, *args, **kwargs)
-    #        Log.init(Log.singleton)
-    #    return Log.singleton
 
     def __init__(self, logLevel = 10):
         self.logLevel = logLevel

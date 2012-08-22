@@ -13,6 +13,7 @@ from ..log import log, error
 from schafer import SOURCES, SED_CMD
 from ..util import prepare_source
 import multiprocessing
+from shutil import copyfile
 
 def prepare(env, target):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
@@ -107,6 +108,11 @@ def make(env, target):
     else:
         error('Problem building SDL')
         exit()
+
+    # Copy SDL_gl*funcs.h to the include dir so we can use them from libRocket
+#    copyfile(join(target.builds.SDL, 'src', 'render', 'opengl', 'SDL_glfuncs.h'), join(target.dist, 'include', 'SDL2', 'SDL_glfuncs.h'))
+#    copyfile(join(target.builds.SDL, 'src', 'render', 'opengles', 'SDL_glesfuncs.h'), join(target.dist, 'include', 'SDL2', 'SDL_glesfuncs.h'))
+#    copyfile(join(target.builds.SDL, 'src', 'render', 'opengles2', 'SDL_gles2funcs.h'), join(target.dist, 'include', 'SDL2', 'SDL_gles2funcs.h'))
 
     # Build SDL_Image
     if isfile(join(target.dist, 'lib', 'libSDL2_image.a')):

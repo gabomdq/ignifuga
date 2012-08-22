@@ -12,7 +12,7 @@
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Log import debug, error
-
+#import traceback
 
 # Python enum exports
 EVENT_TYPE_TOUCH_DOWN = EVENT_TOUCH_DOWN
@@ -252,6 +252,7 @@ cdef class GameLoopBase(object):
 
     cdef bint _doSwitch(self, _Task *task, PyObject *args, PyObject *kwargs):
         cdef PyObject *retp = NULL
+        #cdef PyObject *exc_type=NULL, *exc_value=NULL, *exc_tb=NULL
 
         # Switch to the greenlet
         retp = PyGreenlet_Switch(task.greenlet, args, kwargs)
@@ -265,6 +266,16 @@ cdef class GameLoopBase(object):
             ret = <object>retp
 
         if isdead(task.greenlet) or ret is None:
+            # Check if there was an exception
+#            PyGreenlet_GET_EXCEPTION(task.greenlet, exc_type, exc_value, exc_tb)
+#            if exc_type != NULL and exc_value != NULL and exc_tb != NULL:
+#                error("Exception while processing task")
+#                e_type = <object> exc_type
+#                e_value = <object> exc_value
+#                e_tb = <object> exc_tb
+#                error(traceback.format_exception(e_type, e_value, e_tb))
+#                exit(1)
+
             # The greenlet is dead, assume it was done
             task.req = REQUEST_DONE
             Py_XDECREF(task.data)

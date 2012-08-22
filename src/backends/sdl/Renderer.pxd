@@ -11,6 +11,9 @@
 from ignifuga.backends.sdl.SDL cimport *
 from ignifuga.backends.sdl.Canvas cimport Canvas
 from ignifuga.backends.GameLoopBase cimport EventType, EVENT_ETHEREAL_SCROLL, EVENT_TOUCH_LAST
+#if ROCKET
+from ignifuga.backends.sdl.Rocket cimport *
+#endif
 from libc.stdlib cimport *
 from libc.string cimport *
 from libcpp.map cimport *
@@ -63,6 +66,11 @@ cdef class Renderer:
     cdef deque[_Sprite] *active_sprites
     cdef deque[Sprite_p] *free_sprites
     cdef bint dirty, _userCanScroll, _userCanZoom
+
+#if ROCKET
+    # Rocket context
+    cdef Context *rocketCtx
+#endif
 
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil
     cdef void _processSprites(self, bint all) nogil

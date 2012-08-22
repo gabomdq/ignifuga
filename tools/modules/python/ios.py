@@ -26,7 +26,7 @@ def prepare(env, target, ignifuga_src, python_build):
     return ignifuga_module
 
 
-def make(env, target, freeze_modules, frozen_file):
+def make(env, target, options, freeze_modules, frozen_file):
     make_python_freeze('ios', freeze_modules, frozen_file)
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         # sdl2-config --static-libs flags are not really useful for iOS, as they are OS X oriented, so we forge them by hand
@@ -34,7 +34,7 @@ def make(env, target, freeze_modules, frozen_file):
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
         sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
 
-        cmd = './configure --enable-silent-rules LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" LDFLAGS="-arch armv6 -arch armv7 -static-libgcc %s %s" CPPFLAGS="-arch armv6 -arch armv7 %s" CFLAGS="-arch armv6 -arch armv7 %s %s" HOSTPYTHON=%s HOSTPGEN=%s --disable-toolbox-glue --host=arm-apple-darwin --disable-shared --prefix="%s"'% (env['LDFLAGS'], sdlldflags, env['CFLAGS'], env['CFLAGS'], sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
+        cmd = './configure --enable-silent-rules LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" LDFLAGS="-arch armv6 -arch armv7 -static-libgcc %s %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -arch armv6 -arch armv7 %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -arch armv6 -arch armv7 %s %s" HOSTPYTHON=%s HOSTPGEN=%s --disable-toolbox-glue --host=arm-apple-darwin --disable-shared --prefix="%s"'% (env['LDFLAGS'], sdlldflags, env['CFLAGS'], env['CFLAGS'], sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()

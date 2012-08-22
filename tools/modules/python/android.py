@@ -47,15 +47,16 @@ def prepare(env, target, ignifuga_src, python_build):
 
     # ldl is required by SDL dynamic library loading
     # llog, lz, lc are required by STL and Ignifuga logging
-    ignifuga_module = "\nignifuga %s -I%s %s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
+    ignifuga_module = "\nignifuga %s -I%s -I%s %s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
                                                                                                                                                            target.builds.IGNIFUGA,
+                                                                                                                                                           join(target.builds.FREETYPE, 'include'),
                                                                                                                                                            stlflags,
                                                                                                                                                            join(target.builds.SDL, 'libs', 'armeabi'),
                                                                                                                                                            sdlflags)
     return ignifuga_module
 
 
-def make(env, target, freeze_modules, frozen_file):
+def make(env, target, options, freeze_modules, frozen_file):
 
     # Android is built in shared mode
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
@@ -63,9 +64,9 @@ def make(env, target, freeze_modules, frozen_file):
         # I use -Wl,--allow-shlib-undefined to simplify some link dependencies that we don't need to specify right now
         # TODO: Remove -Wl,--allow-shlib-undefined at some point and link Python like a boss
         if env['STL'] == 'gnu':
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CPPFLAGS="-fexceptions -frtti" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
+            cmd = './configure --enable-silent-rules CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -fexceptions -frtti" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
         else:
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--allow-shlib-undefined" CFLAGS="-mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
+            cmd = './configure --enable-silent-rules CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()

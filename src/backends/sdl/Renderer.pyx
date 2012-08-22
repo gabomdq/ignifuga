@@ -152,6 +152,33 @@ cdef class Renderer:
         self._userCanZoom = False
         self._userCanScroll = False
 
+#if ROCKET
+        # Initialize Rocket
+        debug('Starting Rocket')
+        self.rocketCtx = initRocket(self.renderer, self.window)
+        debug('Rocket started')
+
+        debug('Loading fonts')
+        cdef bytes fontname = b"data/Delicious-Roman.otf"
+        LoadFontFace(String(<char*>fontname))
+#        fontname = b"data/Delicious-Bold.otf"
+#        LoadFontFace(String(<char*>fontname))
+#        fontname = b"data/Delicious-BoldItalic.otf"
+#        LoadFontFace(String(<char*>fontname))
+#        fontname = b"data/Delicious-Italic.otf"
+#        LoadFontFace(String(<char*>fontname))
+#        fontname = b"fonts/teenbold.ttf"
+#        LoadFontFace(String(<char*>fontname))
+
+        debug('Loading Rocket Doc')
+        cdef bytes filename = b"data/test.rml"
+        cdef ElementDocument *doc = self.rocketCtx.LoadDocument( String(<char*>filename) )
+        debug('Focusing Rocket Doc')
+        doc.Show(FOCUS)
+#endif
+
+        debug('Renderer initialized')
+
     @cython.cdivision(True)
     cdef void _processSprite(self, Sprite_p sprite, SDL_Rect *screen, bint doScale) nogil:
         cdef _Sprite out
@@ -278,7 +305,6 @@ cdef class Renderer:
         # Let's start building a rectangle that holds the part of the scene we want to show
         # screen is the rectangle that holds the piece of scene that we will show. We still have to apply scaling to it.
 
-
         cdef zmap_iterator ziter, ziter_last
         cdef deque[Sprite_p] *ds
         cdef deque[Sprite_p].iterator iter, iter_last
@@ -301,6 +327,12 @@ cdef class Renderer:
                     SDL_RenderCopyEx(self.renderer, sprite.texture, &sprite._src, &sprite._dst, sprite.angle, &sprite.center, sprite.flip)
                 inc(iter)
             inc (ziter)
+
+#if ROCKET
+        self.rocketCtx.Update()
+        self.rocketCtx.Render()
+#endif
+
         self.flip()
 
     cdef bint _indexSprite(self, _Sprite* sprite):
@@ -678,7 +710,12 @@ cdef class Renderer:
                 SDL_DestroyWindow(self.window)
                 self.window = NULL
 
+#if ROCKET
+            stopRocket(self.rocketCtx)
+#endif
             self.released = True
+
+
 
     property width:
         def __get__(self):

@@ -50,6 +50,7 @@ class Action(Component):
         self._running = False
         self._root = root
         self._cancelUpdate = False
+        self._freePending = False
 
         # Process runWith and runNext
         if runWith != None:
@@ -235,11 +236,8 @@ class Action(Component):
                 self._runNext.stop()
             self.reset()
 
-            # The associated entity doesnt need to get a callback, it polls the action status on each update
-            self.run(self._onStop)
-            # We will be removed from the update list when update finishes.
-            if self._root:
-                self._cancelUpdate = True
+            # Signal the update loop to stop
+            self._cancelUpdate = True
 
     def update(self, now, **kwargs):
         """ Update the action, now is a integer in milliseconds, dt is float specifying elapsed seconds """
@@ -260,7 +258,8 @@ class Action(Component):
 
             # Pass the torch to our parallel action
             for a in self._runWith:
-                a.update(now)
+                if a is not None:
+                    a.update(now)
                 
             # If we are finished and our parallel action is finished too, pass the torch to the next action
             parallelActionsFinished = True
@@ -280,13 +279,13 @@ class Action(Component):
                         
                     # After updating the next action, we check again
                     # If the action that comes next has stopped, stop everything as we reached the end of the line
-                    if not self._runNext.isRunning:
-                        self.stop()
+                    # WARNING: self._runNext may have turned None here after running update!
+                    if self._runNext and not self._runNext.isRunning:
+                        self._running = False
                 else:
                     # No action follows ourselves, and we are done, so we stop here.
-                    self.stop()
+                    self._running = False
 
-            # Check if we need to loop the action
             if not self._running:
                 # Check if we need to loop the action
                 self._loop+=1
@@ -300,9 +299,19 @@ class Action(Component):
                     self.run(self._onLoop)
                 else:
                     self._loop = 0
-                    if self._root and self._cancelUpdate == True:
-                        self._cancelUpdate = False
-                        STOP()
+                    # Stop the update loop
+                    self._cancelUpdate = True
+
+        # Handle exiting of the action (via stop() or by the natural course of the action)
+        if self._cancelUpdate:
+            self.run(self._onStop)
+            self._cancelUpdate = False
+            self._running = False
+            # The root action needs to start the freeing chaing and signal that we don't want to be updated anymore
+            if self._root:
+                if self._freePending:
+                    self.free()
+                return STOP()
 
     def _step(self, dt):
         """ Increase parameters by delta time (in seconds, elapsed since the start of the action) """
@@ -396,7 +405,11 @@ class Action(Component):
         return self
 
     def free(self, **kwargs):
-        #print "RELEASING ACTION", self.id
+        if self._running:
+            self._freePending = True
+            self.stop()
+            return
+
         for action in self._runWith:
             action.free()
         self._runWith = []
@@ -409,7 +422,7 @@ class Action(Component):
         self._targets = []
 
         self._initParams = {}
-
+        self._freePending = False
         super(Action, self).free(**kwargs)
 
     def __getstate__(self):

@@ -47,6 +47,7 @@ import javax.microedition.khronos.egl.*;
 import android.app.*;
 import android.content.*;
 import android.view.*;
+import android.view.inputmethod.InputMethodManager;
 import android.os.*;
 import android.util.Log;
 import android.graphics.*;
@@ -147,14 +148,32 @@ public class SDLActivity extends WallpaperService {
     }
 
     // Messages from the SDLMain thread
-    static int COMMAND_CHANGE_TITLE = 1;
+    static final int COMMAND_CHANGE_TITLE = 1;
+    static final int COMMAND_KEYBOARD_SHOW = 2;
 
     // Handler for the messages
     Handler commandHandler = new Handler() {
         public void handleMessage(Message msg) {
-            if (msg.arg1 == COMMAND_CHANGE_TITLE) {
-                //setTitle((String)msg.obj);
-            }
+            switch (msg.arg1) {
+            case COMMAND_CHANGE_TITLE:
+                 setTitle((String)msg.obj);
+                break;
+            case COMMAND_KEYBOARD_SHOW:
+                InputMethodManager manager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (manager != null) {
+                    switch (((Integer)msg.obj).intValue()) {
+                    case 0:
+                        manager.hideSoftInputFromWindow(mSurface.getWindowToken(), 0);
+                        break;
+                    case 1:
+                        manager.showSoftInput(mSurface, 0);
+                        break;
+                    case 2:
+                        manager.toggleSoftInputFromWindow(mSurface.getWindowToken(), 0, 0);
+                        break;
+                    }
+                }
+               break;
         }
     };
 
@@ -195,6 +214,10 @@ public class SDLActivity extends WallpaperService {
     public static void setActivityTitle(String title) {
         // Called from SDLMain() thread and can't directly affect the view
         mSingleton.sendCommand(COMMAND_CHANGE_TITLE, title);
+    }
+
+    public static void sendMessage(int command, int param) {
+        mSingleton.sendCommand(command, Integer.valueOf(param));
     }
 
     public static Context getContext() {

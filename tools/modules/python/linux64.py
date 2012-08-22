@@ -21,7 +21,7 @@ def prepare(env, target, ignifuga_src, python_build):
     ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
-def make(env, target, freeze_modules, frozen_file):
+def make(env, target, options, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
@@ -31,8 +31,11 @@ def make(env, target, freeze_modules, frozen_file):
         # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
         #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
         # Mostly static, minus pthread and dl - Linux
-        cmd = './configure --enable-silent-rules LDFLAGS="%s -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="%s -static -fPIC" CFLAGS="%s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'%\
+        # http://wiki.python.org/moin/DebuggingWithGdb -> -g -fno-inline -fno-strict-aliasing
+        cmd = './configure --enable-silent-rules LDFLAGS="%s -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s -static -fPIC" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'%\
               (env['LDFLAGS'], env['CPPFLAGS'], sdlcflags,sdlldflags,target.dist,)
+        if options.valgrind:
+            cmd += ' --with-valgrind'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
         # Patch the Makefile to optimize the static libraries inclusion... - Linux
         cmd = SED_CMD + '"s|^LIBS=.*|LIBS=-static-libgcc -static-libstdc++ -Wl,-Bstatic -lutil -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic %s -lpthread -ldl |g" %s' % (env['LDFLAGS'], join(target.builds.PYTHON, 'Makefile'))

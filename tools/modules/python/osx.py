@@ -21,14 +21,16 @@ def prepare(env, target, ignifuga_src, python_build):
     ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
-def make(env, target, freeze_modules, frozen_file):
+def make(env, target, options, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
         sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] #.replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
         sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         # As static as possible
-        cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="%s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
+        cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
+        if options.valgrind:
+            cmd += ' --with-valgrind'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
     make_python_freeze('osx', freeze_modules, frozen_file)
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):

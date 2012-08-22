@@ -48,6 +48,7 @@ cdef extern from "Modules/greenlet.h":
     void PyGreenlet_Import()
     bint PyGreenlet_ACTIVE(PyGreenlet *greenlet)
     bint PyGreenlet_STARTED(PyGreenlet *greenlet)
+    void PyGreenlet_GET_EXCEPTION(PyGreenlet *greenlet, PyObject *type, PyObject *value, PyObject *tb)
 
 ctypedef enum REQUESTS:
     REQUEST_NONE = 0x00000000

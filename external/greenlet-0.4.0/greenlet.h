@@ -36,7 +36,7 @@ typedef struct _greenlet {
 #define PyGreenlet_STARTED(op)    (((PyGreenlet*)(op))->stack_stop != NULL)
 #define PyGreenlet_ACTIVE(op)     (((PyGreenlet*)(op))->stack_start != NULL)
 #define PyGreenlet_GET_PARENT(op) (((PyGreenlet*)(op))->parent)
-
+#define PyGreenlet_GET_EXCEPTION(op, type, value, tb) type=((PyGreenlet*)(op))->exc_type;value=((PyGreenlet*)(op))->exc_value;tb=((PyGreenlet*)(op))->exc_traceback;
 #if (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 7) || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 1) || PY_MAJOR_VERSION > 3
 #define GREENLET_USE_PYCAPSULE
 #endif

@@ -405,6 +405,8 @@ cdef extern from "SDL.h":
     cdef int SDL_GL_SetAttribute(SDL_GLattr attr, int value)
     cdef int SDL_GetNumRenderDrivers()
     cdef int SDL_GetRenderDriverInfo(int index, SDL_RendererInfo* info)
+    cdef int SDL_GL_BindTexture(SDL_Texture *texture, float *texw, float *texh)
+    cdef int SDL_GL_UnbindTexture(SDL_Texture *texture)
 
 
 cdef extern from "SDL_image.h":
