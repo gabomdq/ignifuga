@@ -314,7 +314,9 @@ void RocketSDLRenderInterfaceOpenGLES2::RenderGeometry(Rocket::Core::Vertex* ver
     if(sdl_texture) SDL_GL_UnbindTexture(sdl_texture);
     else render_data.glEnableVertexAttribArray(ROCKETGLUE_ATTRIBUTE_TEXCOORD);
 
-    /* Draw a fake point just outside the screen to let SDL know that it needs to reset its state in case it wants to render a texture */
+    /* Reset blending and draw a fake point just outside the screen to let SDL know that it needs to reset its state in case it wants to render a texture */
+    render_data.glDisable(GL_BLEND);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     SDL_RenderDrawPoint(renderer, -1, -1);
 
 }
