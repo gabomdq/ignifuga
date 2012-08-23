@@ -8,6 +8,7 @@
 # libRocket Cython wrapper
 from libcpp cimport bool
 from ignifuga.backends.sdl.SDL cimport *
+from cpython cimport *
 
 
 cdef extern from "Rocket/Core/ElementDocument.h" namespace "Rocket::Core::ElementDocument":
@@ -32,24 +33,24 @@ cdef extern from "Rocket/Core/ElementDocument.h" namespace "Rocket::Core":
         void Close()
         #Element* CreateElement( String& name)
         #ElementText* CreateTextNode( String& text)
-        bool IsModal()
+        bint IsModal()
         #virtual void LoadScript(Stream* stream,  String& source_name)
         void UpdateLayout()
         void UpdatePosition()
-        void LockLayout(bool lock)
+        void LockLayout(bint lock)
 
 cdef extern from "Rocket/Core/String.h" namespace "Rocket::Core":
     cdef cppclass String:
         String(char* string)
 
 cdef extern from "Rocket/Core/FontDatabase.h" namespace "Rocket::Core::FontDatabase":
-    bool LoadFontFace(String& file_name) # static method of Rocket::Core::FontDatabase
+    bint LoadFontFace(String& file_name) # static method of Rocket::Core::FontDatabase
 
 cdef extern from "Rocket/Core/Context.h" namespace "Rocket::Core":
 
     cdef cppclass Context:
-        bool Update()
-        bool Render()
+        bint Update()
+        bint Render()
         ElementDocument* CreateDocument(String& tag)
         ElementDocument* LoadDocument(String& document_path)
         ElementDocument* LoadDocumentFromMemory(String& string)
@@ -60,4 +61,5 @@ cdef extern from "Rocket/Core/Context.h" namespace "Rocket::Core":
 cdef extern from "backends/sdl/RocketGlue.hpp":
     Context* initRocket(SDL_Renderer *renderer, SDL_Window *window)
     void stopRocket(Context *mainCtx)
+    PyObject* GetDocumentNamespace(ElementDocument* document)
 

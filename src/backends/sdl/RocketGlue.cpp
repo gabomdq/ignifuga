@@ -3,6 +3,8 @@
 #include "backends/sdl/RocketGlueGLES.hpp"
 #include "backends/sdl/RocketGlueGLES2.hpp"
 
+#include <Rocket/Core/Python/ElementDocumentWrapper.h>
+
 #if defined(ANDROID)
 #include <android/log.h>
 #endif
@@ -504,6 +506,15 @@ Rocket::Core::Input::KeyModifier RocketConvertSDLmod( Uint16 sdl ) {
 
 int RocketConvertSDLButton( Uint8 sdlButton ) {
 	return sdlButton - 1;
+}
+
+
+PyObject* GetDocumentNamespace(Rocket::Core::ElementDocument * document) {
+    Rocket::Core::Python::ElementDocumentWrapper* documentw = dynamic_cast< Rocket::Core::Python::ElementDocumentWrapper* > (document);
+	if (!documentw) return NULL;
+	PyObject *pynamespace = documentw->GetModuleNamespace();
+	Py_INCREF(pynamespace);
+	return pynamespace;
 }
 
 

@@ -5,6 +5,7 @@
 #include "SDL.h"
 #include "SDL_config.h"
 #include "SDL_image.h"
+#include "Python.h"
 
 #include <Rocket/Core/RenderInterface.h>
 #include <Rocket/Core/Platform.h>
@@ -13,7 +14,6 @@
 #include <Rocket/Core/FileInterface.h>
 #include <Rocket/Controls.h>
 
-
 Rocket::Core::Context* initRocket(SDL_Renderer *renderer, SDL_Window *window);
 void stopRocket(Rocket::Core::Context *mainCtx);
 
@@ -21,6 +21,7 @@ int SDLKeyToRocketInput(SDL_Keycode sdlkey);
 Rocket::Core::Input::KeyModifier RocketConvertSDLmod( Uint16 sdl );
 int RocketConvertSDLButton( Uint8 sdlButton );
 void InjectRocket( Rocket::Core::Context* context, SDL_Event& event );
+PyObject* GetDocumentNamespace(Rocket::Core::ElementDocument *document);
 
 /* Glue for the system interface */
 class RocketSDLSystemInterface : public Rocket::Core::SystemInterface

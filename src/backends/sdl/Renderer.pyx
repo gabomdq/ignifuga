@@ -22,6 +22,7 @@ from cython.operator cimport dereference as deref, preincrement as inc #derefere
 from cython.parallel cimport parallel, prange, threadid
 cimport cython
 import sys
+from cpython cimport *
 
 ctypedef unsigned long ULong
 ctypedef deque[Sprite_p].iterator deque_Sprite_iterator
@@ -170,11 +171,25 @@ cdef class Renderer:
 #        fontname = b"fonts/teenbold.ttf"
 #        LoadFontFace(String(<char*>fontname))
 
+        # These two imports are done here to ensure the Rocket <-> Python bindings are prepared to be used
+        # They should NOT be imported elsewhere before than here, after the Rocket core initialization is done
+        import _rocketcore
+        import _rocketcontrols
+
         debug('Loading Rocket Doc')
         cdef bytes filename = b"data/test.rml"
         cdef ElementDocument *doc = self.rocketCtx.LoadDocument( String(<char*>filename) )
+
+        cdef PyObject *nms = GetDocumentNamespace(doc)
+        dnms = <object> nms
+        Py_XDECREF(nms)
+
+        dnms['gilbertOwner'] = self
+
         debug('Focusing Rocket Doc')
         doc.Show(FOCUS)
+
+
 #endif
 
         debug('Renderer initialized')
