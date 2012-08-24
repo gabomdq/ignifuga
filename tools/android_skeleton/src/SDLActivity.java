@@ -488,6 +488,9 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     // Sensors
     private static SensorManager mSensorManager;
 
+    // Keep track of the surface size to normalize touch events
+    private static float mWidth, mHeight;
+
     // Startup    
     public SDLSurface(Context context) {
         super(context);
@@ -499,7 +502,11 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         setOnKeyListener(this); 
         setOnTouchListener(this);   
 
-        mSensorManager = (SensorManager)context.getSystemService("sensor");  
+        mSensorManager = (SensorManager)context.getSystemService("sensor");
+
+        // Some arbitrary defaults to avoid a potential division by zero
+        mWidth = 1.0f;
+        mHeight = 1.0f;
     }
 
     // Called when we have a valid drawing surface
@@ -568,6 +575,9 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             Log.v("SDL", "pixel format unknown " + format);
             break;
         }
+
+        mWidth = (float) width;
+        mHeight = (float) height;
         SDLActivity.onNativeResize(width, height, sdlFormat);
         Log.v("SDL", "Window size:" + width + "x"+height);
 
@@ -607,8 +617,8 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
              int pointerFingerId = event.getPointerId(actionPointerIndex);
              int action = event.getActionMasked();
 
-             float x = event.getX(actionPointerIndex);
-             float y = event.getY(actionPointerIndex);
+             float x = event.getX(actionPointerIndex) / mWidth;
+             float y = event.getY(actionPointerIndex) / mHeight;
              float p = event.getPressure(actionPointerIndex);
 
              if (action == MotionEvent.ACTION_MOVE && pointerCount > 1) {
@@ -616,8 +626,8 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 // changed since prev event.
                 for (int i = 0; i < pointerCount; i++) {
                     pointerFingerId = event.getPointerId(i);
-                    x = event.getX(i);
-                    y = event.getY(i);
+                    x = event.getX(i) / mWidth;
+                    y = event.getY(i) / mHeight;
                     p = event.getPressure(i);
                     SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
                 }

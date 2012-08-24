@@ -338,12 +338,20 @@ public class SDLActivity extends WallpaperService {
         private EGLConfig   mEGLConfig;
         private int mGLMajor, mGLMinor;
 
+        // Keep track of the surface size to normalize touch events
+        private float mWidth, mHeight;
+
         // Sensors
         //private static SensorManager mSensorManager;
 
         // Startup
         public SDLEngine() {
             super();
+
+            // Some arbitrary defaults to avoid a potential division by zero
+            mWidth = 1.0;
+            mHeight = 1.0;
+            
             /*getHolder().addCallback(this);
 
             setFocusable(true);
@@ -455,6 +463,8 @@ public class SDLActivity extends WallpaperService {
                 //Log.v("SDL", "pixel format unknown " + format);
                 break;
             }
+            mWidth = (float) width;
+            mHeight = (float) height;
             SDLActivity.onNativeResize(width, height, sdlFormat);
             //Log.v("SDL", "Window size:" + width + "x"+height);
 
@@ -619,8 +629,8 @@ public class SDLActivity extends WallpaperService {
              int pointerFingerId = event.getPointerId(actionPointerIndex);
              int action = event.getActionMasked();
 
-             float x = event.getX(actionPointerIndex);
-             float y = event.getY(actionPointerIndex);
+             float x = event.getX(actionPointerIndex) / mWidth;
+             float y = event.getY(actionPointerIndex) / mHeight;
              float p = event.getPressure(actionPointerIndex);
 
              if (action == MotionEvent.ACTION_MOVE && pointerCount > 1) {
@@ -628,8 +638,8 @@ public class SDLActivity extends WallpaperService {
                 // changed since prev event.
                 for (int i = 0; i < pointerCount; i++) {
                     pointerFingerId = event.getPointerId(i);
-                    x = event.getX(i);
-                    y = event.getY(i);
+                    x = event.getX(i) / mWidth;
+                    y = event.getY(i) / mHeight;
                     p = event.getPressure(i);
                     SDLActivity.onNativeTouch(touchDevId, pointerFingerId, action, x, y, p);
                 }
