@@ -14,8 +14,8 @@
 #include <Rocket/Core/FileInterface.h>
 #include <Rocket/Controls.h>
 
-Rocket::Core::Context* initRocket(SDL_Renderer *renderer, SDL_Window *window);
-void stopRocket(Rocket::Core::Context *mainCtx);
+Rocket::Core::Context* RocketInit(SDL_Renderer *renderer, SDL_Window *window);
+void RocketFree(Rocket::Core::Context *mainCtx);
 
 int SDLKeyToRocketInput(SDL_Keycode sdlkey);
 Rocket::Core::Input::KeyModifier RocketConvertSDLmod( Uint16 sdl );

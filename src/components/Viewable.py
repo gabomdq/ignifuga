@@ -80,13 +80,6 @@ class Viewable(Component):
                     for component in components:
                         if component != self and component.active:
                             component.active = False
-                    self.entity.subscribe(self, Signal.touches)
-                    self.entity.subscribe(self, Signal.zoom)
-                    self.entity.subscribe(self, Signal.scroll)
-                else:
-                    self.entity.unsubscribe(self, Signal.touches)
-                    self.entity.unsubscribe(self, Signal.zoom)
-                    self.entity.unsubscribe(self, Signal.scroll)
 
     # The current full image frame (not the animation atlas, but the consolidated final viewable image)
     @property

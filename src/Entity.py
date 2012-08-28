@@ -121,6 +121,7 @@ class Entity(object):
             try:
                 component.init(**data)
             except Exception, ex:
+                #debug(traceback.format_exc())
                 # Something failed, try it again later
                 self._initialComponents.append(component)
                 if component not in failcount:

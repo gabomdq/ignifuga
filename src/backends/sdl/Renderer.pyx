@@ -153,44 +153,11 @@ cdef class Renderer:
         self._userCanZoom = False
         self._userCanScroll = False
 
-#if ROCKET
-        # Initialize Rocket
-        debug('Starting Rocket')
-        self.rocketCtx = initRocket(self.renderer, self.window)
-        debug('Rocket started')
-
-        debug('Loading fonts')
-        cdef bytes fontname = b"data/Delicious-Roman.otf"
-        LoadFontFace(String(<char*>fontname))
-#        fontname = b"data/Delicious-Bold.otf"
-#        LoadFontFace(String(<char*>fontname))
-#        fontname = b"data/Delicious-BoldItalic.otf"
-#        LoadFontFace(String(<char*>fontname))
-#        fontname = b"data/Delicious-Italic.otf"
-#        LoadFontFace(String(<char*>fontname))
-#        fontname = b"fonts/teenbold.ttf"
-#        LoadFontFace(String(<char*>fontname))
-
-        # These two imports are done here to ensure the Rocket <-> Python bindings are prepared to be used
-        # They should NOT be imported elsewhere before than here, after the Rocket core initialization is done
-        import _rocketcore
-        import _rocketcontrols
-
-        debug('Loading Rocket Doc')
-        cdef bytes filename = b"data/test.rml"
-        cdef ElementDocument *doc = self.rocketCtx.LoadDocument( String(<char*>filename) )
-
-        cdef PyObject *nms = GetDocumentNamespace(doc)
-        dnms = <object> nms
-        Py_XDECREF(nms)
-
-        dnms['gilbertOwner'] = self
-
-        debug('Focusing Rocket Doc')
-        doc.Show(FOCUS)
-
-
-#endif
+        #if ROCKET
+        self.rocket = Rocket()
+        self.rocket.init(self.renderer, self.window)
+        print "ROCKET RENDERER", self.rocket
+        #endif
 
         debug('Renderer initialized')
 
@@ -344,8 +311,8 @@ cdef class Renderer:
             inc (ziter)
 
 #if ROCKET
-        self.rocketCtx.Update()
-        self.rocketCtx.Render()
+        self.rocket.update()
+        self.rocket.render()
 #endif
 
         self.flip()
@@ -620,6 +587,10 @@ cdef class Renderer:
             #debug("windowResized: requesting new scroll point %dx%d" %(new_sx,new_sy))
             self.scrollTo(new_sx, new_sy)
 
+            #if ROCKET
+            self.rocket.resize(self._width, self._height)
+            #endif
+
     cpdef scrollBy(self, int deltax, int deltay):
         """ Scroll the screen by deltax,deltay. deltax/y are in screen coordinates"""
         cdef int sx = self._scroll_x - deltax
@@ -726,7 +697,7 @@ cdef class Renderer:
                 self.window = NULL
 
 #if ROCKET
-            stopRocket(self.rocketCtx)
+            self.rocket.free()
 #endif
             self.released = True
 

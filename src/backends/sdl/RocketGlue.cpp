@@ -22,7 +22,7 @@ static RocketSDLRenderInterfaceOpenGLES *rocketRenderGLES=NULL;
 static RocketSDLRenderInterfaceOpenGLES2 *rocketRenderGLES2=NULL;
 #endif
 
-Rocket::Core::Context* initRocket(SDL_Renderer *renderer, SDL_Window *window)
+Rocket::Core::Context* RocketInit(SDL_Renderer *renderer, SDL_Window *window)
 {
 	/* Setup rocket */
 	bool renderSystemReady = false;
@@ -80,7 +80,7 @@ Rocket::Core::Context* initRocket(SDL_Renderer *renderer, SDL_Window *window)
 }
 
 
-void stopRocket(Rocket::Core::Context *mainCtx) {
+void RocketFree(Rocket::Core::Context *mainCtx) {
 	mainCtx->RemoveReference();
 	Rocket::Core::Shutdown();
 	if (rocketSys) {

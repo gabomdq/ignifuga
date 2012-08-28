@@ -103,6 +103,10 @@ cdef class GameLoop(GameLoopBase):
         cdef SDL_TouchFingerEvent *fev
         cdef SDL_UserEvent *uev
 
+        #if ROCKET
+        self.renderer.rocket.PushSDLEvent(sdlev)
+        #endif
+
         if sdlev.type == SDL_QUIT:
             Gilbert().endLoop()
 #if __LINUX__ or __OSX_ or __MINGW__
