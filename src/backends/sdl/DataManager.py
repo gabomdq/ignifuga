@@ -15,7 +15,7 @@ from SDL import *
 from ignifuga.backends.DataManagerBase import *
 from Canvas import Canvas
 from Font import Font
-from os.path import abspath, join, dirname, getmtime
+from os.path import abspath, join, dirname, getmtime, isfile, isdir
 
 #if __LINUX__ or __OSX__ or __MINGW__
 ROOT_DIR = abspath(dirname(sys.argv[0]))
@@ -48,6 +48,35 @@ class DataManager(DataManagerBase):
         self.watches = []
         self.mtimes = {}
 
+    def _urlToWatchUrl(self, url):
+        #if DEBUG and __LINUX__
+        watchURL = join(ROOT_DIR, url)
+        if not isfile(watchURL):
+            return None
+        #endif
+
+        #if DEBUG and (__MINGW__ or __OSX__)
+        watchURL = dirname(join(ROOT_DIR, url))
+        if not isfile(watchURL):
+            return None
+        self.mtimes[url] = getmtime(join(ROOT_DIR, url))
+        #endif
+
+        return watchURL
+
+    def addListener(self, url, obj):
+        #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+        watchURL = self._urlToWatchUrl(url)
+        if watchURL is not None and watchURL not in self.watches:
+            Gilbert().gameLoop.addWatch(watchURL)
+            self.watches.append(watchURL)
+        #endif
+        super(DataManager, self).addListener(url, obj)
+
+    def removeListener(self, url, obj):
+        # TODO: Remove watcher
+        super(DataManager, self).removeListener(url, obj)
+
     def loadSceneData(self, filename):
         url = join('data','scenes',filename+'.json')
         return url, self.loadJsonFile(url)
@@ -62,17 +91,8 @@ class DataManager(DataManagerBase):
 
             self.cache[url] = ret_data
 
-
-#if DEBUG and __LINUX__
-            watchURL = join(ROOT_DIR, url)
-#endif
-
-#if DEBUG and (__MINGW__ or __OSX__)
-            watchURL = dirname(join(ROOT_DIR, url))
-            self.mtimes[url] = getmtime(join(ROOT_DIR, url))
-#endif
-
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+            watchURL = self._urlToWatchUrl(url)
             if watchURL not in self.watches:
                 Gilbert().gameLoop.addWatch(watchURL)
                 self.watches.append(watchURL)
@@ -91,16 +111,8 @@ class DataManager(DataManagerBase):
             else:
                 self.cache[url] = Canvas(srcURL=join(ROOT_DIR, url))
 
-#if DEBUG and __LINUX__
-                watchURL = join(ROOT_DIR, url)
-#endif
-
-#if DEBUG and (__MINGW__ or __OSX__)
-                watchURL = dirname(join(ROOT_DIR, url))
-                self.mtimes[url] = getmtime(join(ROOT_DIR, url))
-#endif
-
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+                watchURL = self._urlToWatchUrl(url)
                 if watchURL not in self.watches:
                     Gilbert().gameLoop.addWatch(watchURL)
                     self.watches.append(watchURL)
@@ -115,6 +127,7 @@ class DataManager(DataManagerBase):
         return self.cache[cache_url]
 
     def urlReloaded(self, url):
+        print "urlReloaded", url
 #if  __MINGW__
         # On Windows and OSX, we monitor directories, not individual files, so from the files that we know exist in that dir
         # we check which ones where modified
@@ -140,19 +153,19 @@ class DataManager(DataManagerBase):
         if url.startswith(ROOT_DIR):
             url = url[len(ROOT_DIR)+1:]
 
-        if url in self.cache:
-            if url in self.notifications:
-                for ref in self.notifications[url]:
-                    if hasattr(ref, 'reload') and ref not in reload:
-                        reload.append(ref)
+        if url in self.notifications:
+            for ref in self.notifications[url]:
+                if hasattr(ref, 'reload') and ref not in reload:
+                    reload.append(ref)
 
+        if url in self.cache:
             if isinstance(self.cache[url], Canvas):
                 # Reload the canvas before issuing the notifications
                 self.cache[url].reload(url)
             else:
                 del self.cache[url]
 
-            for ref in reload:
-                ref.reload(url)
+        for ref in reload:
+            ref.reload(url)
 
 

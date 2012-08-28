@@ -114,7 +114,18 @@ class Entity(object):
         return "Entity with ID %s (%s)" % (self.id,hash(self))
 
     def init(self,**data):
-        """ Initialize the required external data """
+        """ Initialize the required external data, take into account that this function may be called more than once if initialization fails """
+        if not self._initialComponents and 'components' in self._data:
+            if isinstance(self._data['components'], dict):
+                for c_id, c_data in self._data['components'].iteritems():
+                    c_data['id'] = c_id
+                    c_data['entity'] = self
+                    self._initialComponents.append(Component.create(**c_data))
+            elif isinstance(self._data['components'], list):
+                for c_data in self._data['components']:
+                    c_data['entity'] = self
+                    self._initialComponents.append(Component.create(**c_data))
+
         failcount = {}
         while self._initialComponents:
             component = self._initialComponents.pop(0)
@@ -176,7 +187,7 @@ class Entity(object):
             if not hasattr(self, key):
                 setattr(self, key, value)
 
-    def load(self, data = None):
+    def load(self):
         """ Load components from given data
         data has the format may be:
         { 'components': [{'id':'something', 'type':'position','x':1.0,'y':1.0}, {id:'somethingelse', 'type':'sprite',image:'test.png'}, etc], otherdata }
@@ -184,26 +195,12 @@ class Entity(object):
 
         The key of each entry
         """
-        if data is None:
-            data = self._data
-
         #Load attributes from data
-        for key,value in data.iteritems():
+        for key,value in self._data.iteritems():
             if key not in ['entities', 'components']:
                 setattr(self, key, value)
 
         self._initialComponents = []
-
-        if 'components' in data:
-            if isinstance(data['components'], dict):
-                for c_id, c_data in data['components'].iteritems():
-                    c_data['id'] = c_id
-                    c_data['entity'] = self
-                    self._initialComponents.append(Component.create(**c_data))
-            elif isinstance(data['components'], list):
-                for c_data in data['components']:
-                    c_data['entity'] = self
-                    self._initialComponents.append(Component.create(**c_data))
 
     def __getstate__(self):
         odict = self.__dict__.copy()

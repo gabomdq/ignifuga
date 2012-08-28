@@ -74,6 +74,7 @@ cdef class _RocketComponent:
 
     cpdef loadDocument(self, filename):
         cdef bytes bFilename = bytes(filename)
+        # TODO: Load this through the DataManager and use Rocket's LoadDocumentFromMemory
         self.doc = self.rocket.loadDocument(bFilename)
 
     cpdef loadFont(self, filename):
@@ -124,6 +125,7 @@ class RocketComponent(Viewable, _RocketComponent):
 
         self.unloadDocument()
         self.loadDocument(self.file)
+        Gilbert().dataManager.addListener(self.file, self)
         self.docCtx = self.getContext()
         self.docCtx['parent'] = self
         self.docCtx['gilbert'] = Gilbert()
@@ -136,11 +138,27 @@ class RocketComponent(Viewable, _RocketComponent):
         del self.docCtx['parent']
         self.docCtx = None
         self.unloadDocument()
-        #Gilbert().dataManager.removeListener(self.file, self)
+        Gilbert().dataManager.removeListener(self.file, self)
         super(RocketComponent, self).free(**kwargs)
+
+    def reload(self, url):
+        self.unloadDocument()
+        self.file = url
+        self.loadDocument(self.file)
+        if self._visible:
+            self.show()
 
     def update(self, now, **data):
         #STOP()
         return
+
+    @Viewable.visible.setter
+    def visible(self, value):
+        if value != self._visible:
+            self._visible = value
+            if self._visible:
+                self.show()
+            else:
+                self.hide()
 
 #endif

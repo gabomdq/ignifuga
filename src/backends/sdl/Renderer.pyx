@@ -156,7 +156,6 @@ cdef class Renderer:
         #if ROCKET
         self.rocket = Rocket()
         self.rocket.init(self.renderer, self.window)
-        print "ROCKET RENDERER", self.rocket
         #endif
 
         debug('Renderer initialized')

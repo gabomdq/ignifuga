@@ -118,19 +118,17 @@ void InjectRocket( Rocket::Core::Context* context, SDL_Event& event )
 		case SDL_KEYDOWN:
 			{			
 			SDL_Keycode sdlkey = event.key.keysym.sym;
-			wchar_t c;
-			c = static_cast<wchar_t>(event.key.keysym.unicode);
-			
 			int key = SDLKeyToRocketInput(sdlkey);
 			context->ProcessKeyDown( KeyIdentifier( key ), RocketConvertSDLmod( event.key.keysym.mod ) );
-			
-			if( event.key.keysym.unicode != 0 && event.key.keysym.unicode != 8 )
-				context->ProcessTextInput( c );
-			
-			std::wcout << "Rocket: " << key << " " << "SDL: " << SDL_GetKeyName( event.key.keysym.sym )
-				<< " SDL unicode: " << event.key.keysym.unicode << " " << c << std::endl;
 			}
 			break;
+		case SDL_TEXTINPUT:
+		    {
+		    SDL_TextInputEvent *tiev = (SDL_TextInputEvent *)&event;
+		    /*if( c != 0 && c != 8 )*/ context->ProcessTextInput(Rocket::Core::String(tiev->text));
+		    }
+		    break;
+
 		case SDL_KEYUP:
 			context->ProcessKeyUp( KeyIdentifier( event.key.keysym.scancode ), RocketConvertSDLmod( event.key.keysym.mod ) );
 			break;
@@ -566,13 +564,21 @@ void RocketSDLRenderInterface::ReleaseCompiledGeometry(Rocket::Core::CompiledGeo
 // Called by Rocket when a texture is required by the library.
 bool RocketSDLRenderInterface::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rocket::Core::Vector2i& texture_dimensions, const Rocket::Core::String& source)
 {
+    // TODO: Load this through the Ignifuga's DataManager, probably through a Canvas, it probably requires that we convert DataManager into a Cython class
+    // TODO: Support hot reloading if possible...via whole document reloading maybe?
 	SDL_Surface *surface = IMG_Load(source.CString());
-	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+	if (surface) {
+	    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
 
-   	texture_handle = (Rocket::Core::TextureHandle) texture;
-   	texture_dimensions = Rocket::Core::Vector2i(surface->w, surface->h);
-   	SDL_FreeSurface(surface);
-	return true;
+   	    if (texture) {
+   	        texture_handle = (Rocket::Core::TextureHandle) texture;
+   	        texture_dimensions = Rocket::Core::Vector2i(surface->w, surface->h);
+   	        SDL_FreeSurface(surface);
+   	    }
+   	    return true;
+   	}
+
+   	return false;
 }
 
 // Called by Rocket when a texture is required to be built from an internally-generated sequence of pixels.
