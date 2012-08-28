@@ -5,8 +5,12 @@
 
 #include <Rocket/Core/Python/ElementDocumentWrapper.h>
 
-#if defined(ANDROID)
+#if defined(__ANDROID__)
 #include <android/log.h>
+#endif
+
+#if defined(__APPLE_CC__) || defined(BSD)
+#include <TargetConditionals.h>
 #endif
 
 static RocketSDLSystemInterface *rocketSys=NULL;
@@ -132,6 +136,41 @@ void InjectRocket( Rocket::Core::Context* context, SDL_Event& event )
 		case SDL_KEYUP:
 			context->ProcessKeyUp( KeyIdentifier( event.key.keysym.scancode ), RocketConvertSDLmod( event.key.keysym.mod ) );
 			break;
+
+        #if defined(__ANDROID__) || ((defined(__APPLE_CC__) || defined(BSD)) && (TARGET_OS_IPHONE == 1 || TARGET_IPHONE_SIMULATOR == 1))
+        /*
+         * Android or iOS should handle touches
+         * We use the first finger press as a mouse pointer linked to mouse button 0 (left button)
+         *
+         */
+        case SDL_FINGERMOTION:
+            if (event.tfinger.fingerId == 0) {
+                const Rocket::Core::Vector2i& size = context->GetDimensions();
+                int x = event.tfinger.x * size.x / 32768;
+                int y = event.tfinger.y * size.y / 32768;
+                context->ProcessMouseMove( x, y, Rocket::Core::Input::KeyModifier(0) );
+            }
+            break;
+        case SDL_FINGERDOWN:
+            if (event.tfinger.fingerId == 0) {
+                const Rocket::Core::Vector2i& size = context->GetDimensions();
+                int x = event.tfinger.x * size.x / 32768;
+                int y = event.tfinger.y * size.y / 32768;
+                context->ProcessMouseMove( x, y, Rocket::Core::Input::KeyModifier(0) );
+                context->ProcessMouseButtonDown( 0, Rocket::Core::Input::KeyModifier(0) );
+            }
+            break;
+        case SDL_FINGERUP:
+            if (event.tfinger.fingerId == 0) {
+                const Rocket::Core::Vector2i& size = context->GetDimensions();
+                int x = event.tfinger.x * size.x / 32768;
+                int y = event.tfinger.y * size.y / 32768;
+                context->ProcessMouseMove( x, y, Rocket::Core::Input::KeyModifier(0) );
+                context->ProcessMouseButtonUp( 0, Rocket::Core::Input::KeyModifier(0) );
+            }
+            break;
+        #else
+        // Desktop systems handle mouse events
 		case SDL_MOUSEMOTION:
 			context->ProcessMouseMove( event.motion.x, event.motion.y, RocketConvertSDLmod( SDL_GetModState() ) );
 			break;
@@ -141,6 +180,14 @@ void InjectRocket( Rocket::Core::Context* context, SDL_Event& event )
 		case SDL_MOUSEBUTTONUP:
 			context->ProcessMouseButtonUp( RocketConvertSDLButton(event.button.button), RocketConvertSDLmod( SDL_GetModState() ) );
 			break;
+		case SDL_MOUSEWHEEL:
+		    context->ProcessMouseWheel(event.wheel.y, RocketConvertSDLmod( SDL_GetModState() ) );
+		    break;
+
+		#endif // defined(__ANDROID__) || ((defined(__APPLE_CC__) || defined(BSD)) && (TARGET_OS_IPHONE == 1 || TARGET_IPHONE_SIMULATOR == 1))
+
+		default:
+        	break;
 		}
 	}
 

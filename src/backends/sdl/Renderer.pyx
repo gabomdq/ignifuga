@@ -458,6 +458,26 @@ cdef class Renderer:
 
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a):
         cdef _Sprite *sprite = sprite_w.sprite
+        if r < 0:
+            r = 0
+        elif r > 1.0:
+            r = 1.0
+
+        if g < 0:
+            g = 0
+        elif g > 1.0:
+            g = 1.0
+
+        if b < 0:
+            b = 0
+        elif b > 1.0:
+            b = 1.0
+
+        if a < 0:
+            a = 0
+        elif a > 1.0:
+            a = 1.0
+
         return self._spriteColor(sprite, <Uint8>(r*255.0), <Uint8>(g*255.0), <Uint8>(b*255.0), <Uint8>(a*255.0))
 
     cpdef bint spriteInteractive(self, Sprite sprite_w, bint interactive):

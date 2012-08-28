@@ -57,7 +57,7 @@ class DataManager(DataManagerBase):
 
         #if DEBUG and (__MINGW__ or __OSX__)
         watchURL = dirname(join(ROOT_DIR, url))
-        if not isfile(watchURL):
+        if not isdir(watchURL):
             return None
         self.mtimes[url] = getmtime(join(ROOT_DIR, url))
         #endif
@@ -127,7 +127,6 @@ class DataManager(DataManagerBase):
         return self.cache[cache_url]
 
     def urlReloaded(self, url):
-        print "urlReloaded", url
 #if  __MINGW__
         # On Windows and OSX, we monitor directories, not individual files, so from the files that we know exist in that dir
         # we check which ones where modified

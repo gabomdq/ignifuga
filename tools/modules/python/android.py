@@ -61,8 +61,6 @@ def make(env, target, options, freeze_modules, frozen_file):
     # Android is built in shared mode
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         # __android_log is used in the interpreter itself (under PySys_WriteStdout and PySys_WriteStderr), so we need to link explicitly to it
-        # I use -Wl,--allow-shlib-undefined to simplify some link dependencies that we don't need to specify right now
-        # TODO: Remove -Wl,--allow-shlib-undefined at some point and link Python like a boss
         if env['STL'] == 'gnu':
             cmd = './configure --enable-silent-rules CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -fexceptions -frtti" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -mandroid -fomit-frame-pointer --sysroot %s" HOSTPYTHON=%s HOSTPGEN=%s --host=arm-eabi --build=i686-pc-linux-gnu --enable-shared --prefix="%s"'% (env['SYSROOT'], HOSTPYTHON, HOSTPGEN, target.dist,)
         else:

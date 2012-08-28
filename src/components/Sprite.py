@@ -231,7 +231,6 @@ class Sprite(Viewable):
 
     @Viewable.alpha.setter
     def alpha(self, value):
-        #print "SETTING ALPHA", value
         Viewable.alpha.fset(self,value)
         self.updateRenderer()
 

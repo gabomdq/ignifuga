@@ -7,11 +7,99 @@
 # Base Action class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-import pickle
+import pickle, math
 from copy import deepcopy
 from Component import Component
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Task import STOP
+
+
+# Tweening functions, based on several sources but most seem to cite Robert Penner's equations (http://www.robertpenner.com/easing/)
+# A nice graph of these functions: http://jqueryui.com/demos/effect/easing.html
+# IN_XXX functions are straight up transitions
+# OUT_XXX functions are inverted amplitude wise, so if an IN_XXX function goes from 0 to 1, the equivalent OUT_XXX will go from 1 to 0
+# TODO: Add the INOUT AND OUTIN combinations
+
+def EASING_LINEAR(init, dest, step, relative):
+    if relative:
+        return init + (dest*step)
+    else:
+        return init+(dest-init)*step
+
+# Exponential functions
+def EASING_INEXPO(init, dest, step, relative):
+    step = 2**(10 * (step-1.0))
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTEXPO(init, dest, step, relative):
+    step = 1.001 * -((2**(-10 * step)) + 1)
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Quadratic functions
+def EASING_INQUAD(init, dest, step, relative):
+    step *= step
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTQUAD(init, dest, step, relative):
+    step = -step*(step-2)
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Cubic functions
+
+def EASING_INCUBIC(init, dest, step, relative):
+    step = step**3
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTCUBIC(init, dest, step, relative):
+    step = (step-1)**3+1
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Quaternary functions
+def EASING_INQUART(init, dest, step, relative):
+    step = step**4
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTQUART(init, dest, step, relative):
+    step = (step-1)**4-1
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Quinternary functions
+def EASING_INQUINT(init, dest, step, relative):
+    step = step**5
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTQUINT(init, dest, step, relative):
+    step = (step-1)**5+1
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Elastic
+def EASING_INELASTIC(init, dest, step, relative):
+    if step == 0.0 or step == 1.0:
+        return EASING_LINEAR(init, dest, step, relative)
+    p=0.3
+    s = p/4
+    step -= 1
+    step = -(2**(10*step)) * math.sin((step-s)*(2*math.pi)/p )
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTELASTIC(init, dest, step, relative):
+    if step == 0.0 or step == 1.0:
+        return EASING_LINEAR(init, dest, step, relative)
+    p=0.3
+    s = p/4
+    step = 1.0 + (2**(-10*step)) * math.sin((step-s)*(2*math.pi)/p )
+    return EASING_LINEAR(init, dest, step, relative)
+
+# Elastic
+def EASING_INBACK(init, dest, step, relative):
+    s = 1.70158;
+    step = step * ((s+1) - s)
+    return EASING_LINEAR(init, dest, step, relative)
+
+def EASING_OUTBACK(init, dest, step, relative):
+    s = 1.70158;
+    step = ((step-1)*((s+1) + s) + 1)
+    return EASING_LINEAR(init, dest, step, relative)
 
 class Action(Component):
     """
@@ -28,7 +116,7 @@ class Action(Component):
              If the action is owned by an entity, targets can be a list with None (to mark the owner entity), a Component instance or a component id
              If the action is owned by a scene, targets can be a list with None (to mark the owner scene), a component or entity instance, or an entity or component id (ie entity.component)
     """
-    def __init__(self, id=None, entity=None, active=True, targets=None, frequency=15.0, duration=0.0, relative=False, increase='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
+    def __init__(self, id=None, entity=None, active=True, targets=None, frequency=15.0, duration=0.0, relative=False, easing='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
         # Store some parameters for use in the actual initialization
         self._initParams = {
             'targets': targets,
@@ -42,7 +130,12 @@ class Action(Component):
         self._duration = float(duration*1000)
         self._loop = 0
         self._relative = relative
-        self._increase = increase.lower()
+        self._easing = easing.lower()
+        self._easingFunc = EASING_LINEAR
+        ef = "EASING_" + easing.upper()
+        if ef in globals():
+            self._easingFunc = globals()[ef]
+
         self._onStop = onStop
         self._onStart = onStart
         self._onLoop = onLoop
@@ -316,15 +409,12 @@ class Action(Component):
     def _step(self, dt):
         """ Increase parameters by delta time (in seconds, elapsed since the start of the action) """
         if dt < self._duration:
-            step = self._modifyStep(dt/self._duration)
+            step = dt/self._duration
             for target in self._tasksStatus:
                 for task in self._tasksStatus[target]:
                     init = self._tasksStatus[target][task]['initValue']
                     dest = self._tasksStatus[target][task]['targetValue']
-                    if self._relative:
-                        setattr(target, task, init + (dest*step))
-                    else:
-                        setattr(target, task, init+(dest-init)*step)
+                    setattr(target, task, self._easingFunc(init, dest, step, self._relative))
         else:
             # The action should stop, set everything at their final value
             for target in self._tasksStatus:
@@ -337,16 +427,6 @@ class Action(Component):
                         setattr(target, task, dest)
                     
             self._done = True
-            
-    def _modifyStep(self, step):
-        """ Apply a modification to the stepping value according to the increase type
-            step values: 0 >= step >= 1
-        """
-        if self._increase == 'square':
-            return step*step
-        
-        # Default to linear stepping
-        return step
 
     @property    
     def isRunning(self):

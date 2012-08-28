@@ -7,20 +7,11 @@
 #if !SDL_RENDER_DISABLED && SDL_VIDEO_RENDER_OGL
 RocketSDLRenderInterfaceOpenGL::RocketSDLRenderInterfaceOpenGL(SDL_Renderer *r, SDL_Window *w) : RocketSDLRenderInterface(r,w)
 {
-    /* Use SDL infrastructure to call SDL functions */
-
-    #if SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_PANDORA || __SDL_NOGETPROCADDR__
-    #define SDL_PROC(ret,func,params) render_data.func=func;
-    #else
-    #define SDL_PROC(ret,func,params) \
-        do { \
-            render_data.func = (ret(*)params)SDL_GL_GetProcAddress(#func);\
-            if ( ! render_data.func ) { \
-                printf("Couldn't load GL function %s: %s\n", #func, SDL_GetError());fflush(stdout); \
-                return; \
-            } \
-        } while ( 0 );
-    #endif
+    /* Use SDL infrastructure to call SDL functions
+     MingW thinks his too smart for us, but there's ways around its pedantic implementation that prevents casting void* to a function pointer
+     See: http://stackoverflow.com/questions/1096341/function-pointers-casting-in-c
+     */
+    #define SDL_PROC SDL_PROC_CPP
     #define ROCKET_OPENGL
     #include "backends/sdl/RocketGLFuncs.hpp"
     #undef SDL_PROC

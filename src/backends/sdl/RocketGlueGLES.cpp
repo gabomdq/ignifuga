@@ -7,20 +7,7 @@
 #if !SDL_RENDER_DISABLED && SDL_VIDEO_RENDER_OGL_ES
 RocketSDLRenderInterfaceOpenGLES::RocketSDLRenderInterfaceOpenGLES(SDL_Renderer *r, SDL_Window *w) : RocketSDLRenderInterface(r,w)
 {
-    /* Use SDL infrastructure to call SDL functions */
-
-    #if SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_PANDORA || __SDL_NOGETPROCADDR__
-    #define SDL_PROC(ret,func,params) render_data.func=func;
-    #else
-    #define SDL_PROC(ret,func,params) \
-        do { \
-            render_data.func = (ret(*)params)SDL_GL_GetProcAddress(#func);\
-            if ( ! render_data.func ) { \
-                printf("Couldn't load GLES function %s: %s\n", #func, SDL_GetError());fflush(stdout); \
-                return; \
-            } \
-        } while ( 0 );
-    #endif
+    #define SDL_PROC SDL_PROC_CPP
     #define ROCKET_OPENGLES
     #include "backends/sdl/RocketGLFuncs.hpp"
     #undef SDL_PROC

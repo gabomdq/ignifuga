@@ -4,6 +4,11 @@
 #include "backends/sdl/RocketGlue.hpp"
 
 #if !SDL_RENDER_DISABLED && SDL_VIDEO_RENDER_OGL
+
+#if __MINGW32__ || __MINGW64__
+#define GL_GLEXT_PROTOTYPES
+#endif
+
 #include "SDL_opengl.h"
 
 typedef struct

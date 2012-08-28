@@ -7,6 +7,33 @@
 #include "SDL_image.h"
 #include "Python.h"
 
+#if SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_PANDORA || __SDL_NOGETPROCADDR__
+#define SDL_PROC_CPP(ret,func,params) render_data.func=func;
+#else // SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_PANDORA || __SDL_NOGETPROCADDR__
+#if __MINGW32__ || __MINGW64__
+#define SDL_PROC_CPP(ret,func,params) \
+    do { \
+        *reinterpret_cast<void**>(&render_data.func) = SDL_GL_GetProcAddress(#func);\
+        if ( ! render_data.func ) { \
+            printf("Couldn't load GL function %s: %s\n", #func, SDL_GetError());fflush(stdout); \
+            return; \
+        } \
+    } while ( 0 );
+#else // __MINGW32__ || __MINGW64__
+#define SDL_PROC_CPP(ret,func,params) \
+    do { \
+        render_data.func = (ret(*)params)SDL_GL_GetProcAddress(#func);\
+        if ( ! render_data.func ) { \
+            printf("Couldn't load GL function %s: %s\n", #func, SDL_GetError());fflush(stdout); \
+            return; \
+        } \
+    } while ( 0 );
+#endif // __MINGW32__ || __MINGW64__
+
+#endif // SDL_VIDEO_DRIVER_UIKIT || SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_PANDORA || __SDL_NOGETPROCADDR__
+
+
+
 #include <Rocket/Core/RenderInterface.h>
 #include <Rocket/Core/Platform.h>
 #include <Rocket/Core.h>
@@ -36,6 +63,7 @@ class RocketSDLSystemInterface : public Rocket::Core::SystemInterface
 
 class RocketSDLFileInterface : public Rocket::Core::FileInterface {
     public:
+        // TODO: At the very least communicate to Ignifuga's DataManager so we can attempt to hot reload css/images/etc
 	    virtual Rocket::Core::FileHandle Open(const Rocket::Core::String& path) {
 	        return (Rocket::Core::FileHandle)SDL_RWFromFile(path.CString(), "r");
 	    }
