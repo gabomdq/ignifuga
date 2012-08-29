@@ -56,10 +56,11 @@ class DataManager(DataManagerBase):
         #endif
 
         #if DEBUG and (__MINGW__ or __OSX__)
-        watchURL = dirname(join(ROOT_DIR, url))
-        if not isdir(watchURL):
+        watchURL = join(ROOT_DIR, url)
+        if not isfile(watchURL):
             return None
-        self.mtimes[url] = getmtime(join(ROOT_DIR, url))
+        self.mtimes[url] = getmtime(watchURL)
+        watchURL = dirname(watchURL)
         #endif
 
         return watchURL
