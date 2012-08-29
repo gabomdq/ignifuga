@@ -10,7 +10,7 @@ import os, shlex, shutil
 from os.path import *
 from subprocess import Popen, PIPE
 from ..log import log, error
-from schafer import prepare_source, make_python_freeze, SED_CMD
+from schafer import prepare_source, make_python_freeze, SED_CMD, PATCHES_DIR
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 import multiprocessing
 
@@ -18,6 +18,11 @@ def prepare(env, target, ignifuga_src, python_build):
     # Get some required flags
     sdlflags = get_sdl_flags(target)
     freetypeflags = get_freetype_flags(target)
+
+    # Patch some problems with cross compilation
+    cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.osx.diff'), python_build)
+    Popen(shlex.split(cmd)).communicate()
+
     ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 

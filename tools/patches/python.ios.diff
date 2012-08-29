@@ -144,10 +144,9 @@ diff -Naur a/configure.orig b/configure
  then
 
  $as_echo "#define PY_FORMAT_LONG_LONG \"ll\"" >>confdefs.h
-
-diff -Naur Python-2.7.1.orig/Include/pyport.h Python-2.7.1/Include/pyport.h
---- Python-2.7.1.orig/Include/pyport.h	2010-09-14 18:10:22.000000000 +0200
-+++ Python-2.7.1/Include/pyport.h	2011-05-13 12:24:53.000000000 +0200
+diff -Naur pyport.h a/Include/pyport.patched.h
+--- a/Include/pyport.h	2012-08-29 00:04:03.000000000 -0300
++++ b/Include/pyport.patched.h	2012-08-29 00:44:17.000000000 -0300
 @@ -186,9 +186,11 @@
  #endif
 
@@ -162,3 +161,18 @@ diff -Naur Python-2.7.1.orig/Include/pyport.h Python-2.7.1/Include/pyport.h
 
  #if SIZEOF_PID_T > SIZEOF_LONG
  #   error "Python doesn't support sizeof(pid_t) > sizeof(long)"
+@@ -670,7 +672,7 @@
+ #endif
+ #endif
+
+-
++#if 0 // Causes problems with Boost::Python, see http://bugs.python.org/issue10910
+ #if defined(__APPLE__)
+ # define _PY_PORT_CTYPE_UTF8_ISSUE
+ #endif
+@@ -693,7 +695,7 @@
+ #undef toupper
+ #define toupper(c) towupper(btowc(c))
+ #endif
+-
++#endif

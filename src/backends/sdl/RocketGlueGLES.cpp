@@ -52,6 +52,12 @@ void RocketSDLRenderInterfaceOpenGLES::RenderGeometry(Rocket::Core::Vertex* vert
 		else TexCoords[i] = vertices[i].tex_coord;
 	};
 
+	unsigned short newIndicies[num_indices];
+    for (int i = 0; i < num_indices; i++)
+    {
+      newIndicies[i] = (unsigned short) indices[i];
+    }
+
 	render_data.glEnableClientState(GL_VERTEX_ARRAY);
 	render_data.glEnableClientState(GL_COLOR_ARRAY);
 	render_data.glVertexPointer(2, GL_FLOAT, 0, &Positions[0]);
@@ -61,7 +67,7 @@ void RocketSDLRenderInterfaceOpenGLES::RenderGeometry(Rocket::Core::Vertex* vert
 	render_data.glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	render_data.glEnable(GL_BLEND);
 	render_data.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	render_data.glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, indices);
+	render_data.glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, newIndicies);
 	render_data.glDisableClientState(GL_VERTEX_ARRAY);
 	render_data.glDisableClientState(GL_COLOR_ARRAY);
 	render_data.glDisableClientState(GL_TEXTURE_COORD_ARRAY);

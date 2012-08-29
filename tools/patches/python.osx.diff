@@ -1,0 +1,21 @@
+diff -r 668d9477f03f Include/pyport.h
+--- a/Include/pyport.h	Tue Aug 28 22:26:17 2012 -0300
++++ b/Include/pyport.h	Wed Aug 29 00:01:38 2012 -0300
+@@ -670,7 +670,7 @@
+ #endif
+ #endif
+
+-
++#if 0 // Causes problems with Boost::Python, see http://bugs.python.org/issue10910
+ #if defined(__APPLE__)
+ # define _PY_PORT_CTYPE_UTF8_ISSUE
+ #endif
+@@ -693,7 +693,7 @@
+ #undef toupper
+ #define toupper(c) towupper(btowc(c))
+ #endif
+-
++#endif
+
+ /* Declarations for symbol visibility.
+
