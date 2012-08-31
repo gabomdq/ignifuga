@@ -225,6 +225,10 @@ class Entity(object):
     # Component handling, tags, properties
     ###########################################################################
 
+    @property
+    def components(self):
+        return self._components
+
     def getComponent(self, id):
         """ Retrieve a component with a given id, return None if no component by that id is found"""
         if id in self._components:

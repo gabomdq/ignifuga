@@ -102,6 +102,7 @@ class Sprite(Viewable):
 
         if self._static:
             # This is a single image non animated sprite, we return with the STOP instruction so the update loop is not called
+            self._doCompositing()
             STOP()
             return
 
@@ -454,6 +455,7 @@ class Sprite(Viewable):
     def overlays(self, overlays):
         """ Overlays should have the format [(id, x, y, z, r, g, a, op), (id, x, y, z, r, g, a, op), ...]
         See addOverlay for the meaning of these parameters
+        ie: "overlays":[["ci_ovl", 0,0,0,null, null, null, null, 2]]
         """
         self._overlays = {}
 

@@ -160,7 +160,7 @@ class Gilbert:
         self.parser.add_option("--height", dest="height", default=None,help="Resolution Height")
         self.parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
         self.parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
-
+        self.parser.add_option("-c", "--capture", action="store_true", dest="capture", default=False,help="Start paused (useful for video capture)")
 
     
     def init(self, backend, firstScene, scenesFile=None):
@@ -229,6 +229,10 @@ class Gilbert:
         self.dataManager = DataManager()
         self.gameLoop = GameLoop()
 
+        if options.capture:
+            print "System paused, press Enter to continue"
+            ch = sys.stdin.read(1)
+
         if not self.loadState():
             debug('Failed loading previous state')
             if scenesFile is not None:
@@ -239,6 +243,7 @@ class Gilbert:
                 self._firstScene = firstScene.id
             else:
                 self._firstScene = firstScene
+
 ########################################################################################################################
 # SPLASH SCENE CODE
 # ANY MODIFICATION OF THE SCENE DEFINITION AND RELATED CODE AND ARTWORK RENDERS THE LICENSE TO USE THIS ENGINE VOID.
