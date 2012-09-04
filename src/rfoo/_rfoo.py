@@ -563,11 +563,13 @@ def connect(host=LOOPBACK, port=DEFAULT_PORT):
 
 
 class QueueInetServer(InetServer):
-    """ A queueing inet server, this one stores commands in a buffer for processing in the main thread"""
-    def __init__(self, handler_type, handler_context=None):
+    """ A queueing inet server for Ignifuga, this one stores commands in a buffer for processing in the main thread
+    and sets up the current scene namespace as if the commands where run from a component """
+    def __init__(self, handler_type, handler_context=None, staticglobals=False):
         super(QueueInetServer, self).__init__(handler_type, handler_context)
 
         self.inBuf = []
+        self.staticglobals = staticglobals
 
     def _on_accept(self, conn, addr):
         """Serve acceptted connection.
@@ -591,7 +593,6 @@ class QueueInetServer(InetServer):
                     data = c.read()
                     type, name, args, kwargs = loads(data)
                     # Buffer the call for later processing with self.process
-                    print "buffering", (handler, c, type, name, args, kwargs)
                     self.inBuf.append((handler, c, type, name, args, kwargs))
             except EofError:
                 logging.debug('Caught end of file, error=%r.', sys.exc_info()[1])
@@ -603,16 +604,35 @@ class QueueInetServer(InetServer):
 
     def process(self):
         """Process buffered incoming calls"""
+        if self.inBuf and not self.staticglobals:
+            # We change the namespace available on each call, kinda hacky and certainly slow...but hey, it works and the scene is dinamically available to you
+            from ignifuga.Gilbert import Gilbert
+            from ignifuga.rfoo.utils.rconsole import BufferedInterpreter
+            import rlcompleter
+
+            gilbert = Gilbert()
+
         while self.inBuf:
             handler, conn, type, name, args, kwargs = self.inBuf.pop(0)
 
             try:
+
+                if not self.staticglobals:
+                    if gilbert.scene != None:
+                        self._handler_context = gilbert.scene.runEnv
+                    else:
+                        self._handler_context = globals()
+
+                    handler._namespace = self._handler_context
+                    handler._interpreter = BufferedInterpreter(handler._namespace)
+                    handler._completer = rlcompleter.Completer(handler._namespace)
+
                 foo = handler._methods.get(name, None) or handler._get_method(name)
                 result = foo(*args, **kwargs)
                 error = None
 
             except Exception:
-                logging.debug('Caught exception raised by callable.', exc_info=True)
+                print 'Caught exception raised by callable.'
                 # Use exc_info for py2.x py3.x compatibility.
                 t, v, tb = sys.exc_info()
                 if t in BUILTIN_EXCEPTIONS:

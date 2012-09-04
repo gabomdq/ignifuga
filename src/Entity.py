@@ -77,6 +77,13 @@ class Entity(object):
         else:
             self.scene = None
 
+        # persist attribute, when components are removed/restored, their "properties" persist in the entity
+        if 'persist' in kwargs:
+            self.persist = kwargs['persist']
+            del kwargs['persist']
+        else:
+            self.persist = True
+
         # Process the data, load the components from it
         self.setup(**data)
         self.load()
@@ -309,6 +316,10 @@ class Entity(object):
         for property in component.properties:
             if property in self._properties and self._properties[property] == component:
                 del self._properties[property]
+                if self.persist and property in component.persist:
+                    # Persist the value entity
+                    value = getattr(component, property)
+                    setattr(self, property, value)
 
     def addTags(self, tags):
         """ Add one tag or a list of tags to the entity"""

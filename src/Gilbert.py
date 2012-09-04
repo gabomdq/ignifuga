@@ -166,7 +166,9 @@ class Gilbert:
         self.parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
         self.parser.add_option("-c", "--capture", action="store_true", dest="capture", default=False,help="Start paused (useful for video capture)")
         self.parser.add_option("-r", "--remote", action="store_true", dest="remote", default=False,help="Enable Remote Console (http://code.google.com/p/rfoo/)")
+        self.parser.add_option("--staticglobals", action="store_true", dest="staticglobals", default=False,help="Dont update the remote console globals to match the current scene")
         self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port (default: 54321)")
+        self.parser.add_option("--ip", dest="ip", default='127.0.0.1',help="Remote Console IP to bind to (default: 127.0.0.1)")
 
     
     def init(self, backend, firstScene, scenesFile=None):
@@ -235,7 +237,7 @@ class Gilbert:
         self.dataManager = DataManager()
 
         if options.remote:
-            self.startRemoteConsole(options.port)
+            self.startRemoteConsole(options.ip, options.port, options.staticglobals)
         self.gameLoop = GameLoop(remoteConsole = self.remoteConsole)
 
         if options.capture:
@@ -485,13 +487,13 @@ class Gilbert:
     def unfreezeRenderer(self):
         self.gameLoop.freezeRenderer = False
 
-    def startRemoteConsole(self, port=54321):
+    def startRemoteConsole(self, ip='127.0.0.1', port=54321, staticglobals=False):
         debug("Enabling Remote Console on port %d" % port)
-        self.remoteConsole = QueueInetServer(ConsoleHandler, globals())
+        self.remoteConsole = QueueInetServer(ConsoleHandler, globals(), staticglobals)
 
         def _wrapper():
             try:
-                self.remoteConsole.start(LOOPBACK, port)
+                self.remoteConsole.start(ip, port)
             except socket.error:
                 error('Failed to bind rconsole to socket port, port=%r.', port)
 

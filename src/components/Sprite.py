@@ -33,6 +33,8 @@ class Sprite(Viewable):
     """ Sprite component class, viewable, potentially animated
     """
     PROPERTIES = Viewable.PROPERTIES + ['frame', 'frameCount', 'forward', 'blur', 'overlays', 'addOverlay', 'removeOverlay', 'clearOverlays', 'updateRenderer']
+    PROPERTIES_PERSIST = Viewable.PROPERTIES_PERSIST + ['forward', 'blur']
+
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, loop=-1, **data):
 
         # Default values
@@ -56,7 +58,7 @@ class Sprite(Viewable):
             '_rendererSpriteId': None,
             '_static': False,
             '_parent': None,
-            '_paused': False
+            '_paused': False,
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)

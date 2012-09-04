@@ -17,6 +17,7 @@ class Component(object):
     TAGS = []
     ENTITY_TAGS = []
     PROPERTIES = []
+    PROPERTIES_PERSIST = []
 
     class __metaclass__(type):
         # Metaclass builds a list of all the components in __inheritors__
@@ -45,6 +46,7 @@ class Component(object):
         self.tags = []
         self.entityTags = []
         self.properties = []
+        self.persist = self.PROPERTIES_PERSIST
 
         self.load(data)
 

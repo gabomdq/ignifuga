@@ -35,6 +35,7 @@ class Viewable(Component):
     TAGS = ['viewable',]
     ENTITY_TAGS = ['viewable',]
     PROPERTIES = ['canvas', 'position', 'x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax', 'getRect', 'getRenderArea']
+    PROPERTIES_PERSIST = ['x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
         # We have to do this here otherwise the z ordering thingy breaks
         self._entity = entity
@@ -63,7 +64,7 @@ class Viewable(Component):
             'parallax_y': 0.0,
             '_scrollx': 0,      # Keep track of the renderer scroll for parallax functionality
             '_scrolly': 0,
-            'interactive': False
+            'interactive': False,
         })
 
         super(Viewable, self).__init__(id, entity, active, frequency, **data)
@@ -136,7 +137,7 @@ class Viewable(Component):
 
     @property
     def z(self):
-        return self._z if self._visible and self._active else None
+        return self._z
 
     @z.setter
     def z(self, new_z):
@@ -148,9 +149,6 @@ class Viewable(Component):
 
         if new_z != self._z:
             self._z = new_z
-#            if self.entity != None and self.active: # If active==false, it's probable that the .z property for the entity is not set!
-#                Gilbert().refreshEntityZ(self.entity)
-
 
     @property
     def angle(self):
