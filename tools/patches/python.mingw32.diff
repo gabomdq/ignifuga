@@ -2928,11 +2928,11 @@ Index: Modules/socketmodule.c
  {
 Index: Modules/socketmodule.h
 ===================================================================
---- Modules/socketmodule.h	(revisión: 29)
-+++ Modules/socketmodule.h	(copia de trabajo)
+--- Modules/socketmodule.h      2012-09-04 17:16:58.641682805 -0300
++++ Modules/socketmodule.h      2012-09-04 17:17:24.000000000 -0300
 @@ -13,6 +13,13 @@
  # endif
- 
+
  #else /* MS_WINDOWS */
 +#ifdef socklen_t
 +/* Configure script define to int on windows for GCC compiler.
@@ -2944,6 +2944,16 @@ Index: Modules/socketmodule.h
  # include <winsock2.h>
  # include <ws2tcpip.h>
  /* VC6 is shipped with old platform headers, and does not have MSTcpIP.h
+@@ -21,7 +28,7 @@
+  * I use SIO_GET_MULTICAST_FILTER to detect a decent SDK.
+  */
+ # ifdef SIO_GET_MULTICAST_FILTER
+-#  include <MSTcpIP.h> /* for SIO_RCVALL */
++#  include <mstcpip.h> /* for SIO_RCVALL */
+ #  define HAVE_ADDRINFO
+ #  define HAVE_SOCKADDR_STORAGE
+ #  define HAVE_GETADDRINFO
+
 Index: Modules/_multiprocessing/multiprocessing.c
 ===================================================================
 --- Modules/_multiprocessing/multiprocessing.c	(revisión: 29)

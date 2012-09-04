@@ -19,8 +19,8 @@ def make(options, env, target, sources, cython_src, cfiles):
     freetypeflags = get_freetype_flags(target)
     pngflags = get_png_flags(target)
 
-    extralibs = "-lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
-    cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz -lstdc++ %s %s %s -o %s' % \
+    extralibs = "-lodbc32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid -lgdi32 -limm32 -lversion"
+    cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw32 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz -lws2_32 -lwsock32 -lstdc++ %s %s %s -o %s' % \
     (env['CC'],
     sources,
     join(target.dist, 'include'),

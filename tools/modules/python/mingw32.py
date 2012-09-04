@@ -32,7 +32,7 @@ def prepare(env, target, ignifuga_src, python_build):
     shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
     shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
 
-    ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lstdc++ -lgcc\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
+    ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
 
     return ignifuga_module
 
@@ -44,7 +44,7 @@ def make(env, target, options, freeze_modules, frozen_file):
         sdlldflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
         cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
         sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
-        extralibs = "-lodbc32 -lwsock32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
+        extralibs = "-lodbc32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
         cmd = 'rm -f configure'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = 'autoconf'
