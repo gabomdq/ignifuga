@@ -269,6 +269,11 @@ class Entity(object):
                     self._componentsByTag[tag] = []
                 self._componentsByTag[tag].append(component)
 
+        if self.scene is not None:
+            scene = self.scene()
+            if not scene.isolateEntities and not str(component.id).isdigit():
+                scene.runEnv[component.id] = component
+
 
 
     def remove(self, component):
@@ -282,6 +287,11 @@ class Entity(object):
         if component in self._components:
             del self._components[component]
             self.removeProperties(component)
+
+        if self.scene is not None:
+            scene = self.scene()
+            if not scene.isolateEntities and component.id in scene.runEnv and scene.runEnv[component.id] == component:
+                del scene.runEnv[component.id]
 
         self.refreshTags()
 

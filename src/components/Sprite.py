@@ -55,12 +55,13 @@ class Sprite(Viewable):
             '_overlays': {},
             '_rendererSpriteId': None,
             '_static': False,
-            '_parent': None
+            '_parent': None,
+            '_paused': False
             })
 
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
 
-        self._started = True
+        self._started = False
         self._dirty = True
 
     def init(self, **data):
@@ -112,7 +113,7 @@ class Sprite(Viewable):
             if not sprite.active:
                 sprite.update(now, **data)
 
-        if self.sprite != None:
+        if self.sprite != None and not self._paused:
             if self.sprite.frame == 0 and self.loop == 0 and not self._started:
                 self._started = True
                 self.run(self.onStart)
@@ -243,8 +244,24 @@ class Sprite(Viewable):
     def frame(self, frame):
         if self.sprite != None:
             self.sprite.frame = frame
-            if frame == 0:
-                self._started = False
+
+        if frame == 0:
+            self._started = False
+
+        for overlay in self._overlays.itervalues():
+            (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
+            sprite.frame = frame
+
+    def reset(self):
+        # Reset sprite
+        self.frame = 0
+        self._started = False
+        self.loop = 0
+
+        for overlay in self._overlays.itervalues():
+            (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
+            sprite.reset()
+
     @property
     def blur(self):
         return self._blur
@@ -516,6 +533,17 @@ class Sprite(Viewable):
     def parent(self, value):
         self._parent = value
 
+    @property
+    def paused(self):
+        return self._paused
+
+    @paused.setter
+    def paused(self, value):
+        # Pause/unpause the overlays
+        for overlay in self._overlays.itervalues():
+            (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
+            sprite.paused = value
+        self._paused = value
 
     def reload(self, url):
         # The Canvas was reloaded before we get here

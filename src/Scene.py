@@ -30,7 +30,9 @@ class Scene(Entity):
             '_scrollY': None,
             '_ready': False,
             'reloadPreserveCamera': True,
-            'data_url': None
+            'data_url': None,
+            'isolateEntities': False,
+            'runEnv': {}
         })
         # Add the Scene entity
         super(Scene, self).__init__(**data)
@@ -51,6 +53,7 @@ class Scene(Entity):
         # Remove existing entities
         if self._ready:
             self._ready = False
+            self.runEnv = {}
             super(Scene, self).reset()
 
             for entity in self.entities.itervalues():
@@ -88,12 +91,21 @@ class Scene(Entity):
 
     def init(self,**data):
         """ Initialize the required external data """
+
+        # Prepare a basic run environment for components to execute commands
+        self.runEnv['scene'] = self
+        self.runEnv['Gilbert'] = Gilbert()
+        self.runEnv['DataManager'] = Gilbert().dataManager
+        self.runEnv['Renderer'] = Gilbert().renderer
+
         # Build entities
         if 'entities' in self._data:
             for entity_id, entity_data in self._data['entities'].iteritems():
                 entity = Entity.create(id=entity_id, scene=self, **entity_data)
                 if entity != None:
                     self.entities[entity_id] = entity
+                    if not self.isolateEntities and not str(entity.id).isdigit():
+                        self.runEnv[entity.id] = entity
 
         for entity in self.entities.itervalues():
             Gilbert().startEntity(entity)

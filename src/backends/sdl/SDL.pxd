@@ -378,7 +378,7 @@ cdef extern from "SDL.h":
     cdef void SDL_Quit()
     cdef int SDL_EnableUNICODE(int enable)
     cdef Uint32 SDL_GetTicks()
-    cdef void SDL_Delay(Uint32 ms)
+    cdef void SDL_Delay(Uint32 ms) nogil
     cdef int SDL_PollEvent(SDL_Event * event)
     cdef SDL_RWops * SDL_RWFromFile(char *file, char *mode)
     cdef SDL_RWops * SDL_RWFromMem(void *mem, int size)

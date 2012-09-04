@@ -1,0 +1,60 @@
+
+rfoo - Fast RPC client/server module.
+
+Contact: Nir Aides
+Email:   nir@winpdb.org
+Website: http://www.winpdb.org/
+Version: 1.3.0
+
+rfoo (remote foo) is a fast Python RPC package which can do 160,000 RPC 
+calls per second on a regular PC. It includes a fast serialization module 
+called rfoo.marsh which extends the Python built in marshal module by 
+eliminating serialization of code objects and protecting against bad input. 
+The result is a safe to use ultra fast serializer.
+
+Example server code:
+> class MyHandler(rfoo.BaseHandler):
+>     def echo(self, str):
+>         return str
+>
+> rfoo.InetServer(MyHandler).start()
+
+Example client code:
+> c = rfoo.InetConnection().connect()
+> Proxy(c).echo('Hello World!')
+
+
+rconsole - included with rfoo package is a remote Python console with
+auto completion, which can be used to inspect and modify namespace of a
+running script.
+
+To activate in a script do:
+> from rfoo.utils import rconsole
+> rconsole.spawn_server()
+
+To attach from a shell do:
+$ rconsole
+
+SECURITY NOTE:
+The rconsole listener started with spawn_server() will accept any local 
+connection and may therefore be insecure to use in shared hosting
+or similar environments!
+
+
+Requirements
+
+    Depends on Cython - http://cython.org/
+    To install Cython follow the simple instructions at
+    http://docs.cython.org/src/quickstart/install.html
+
+    Tested on GNU/Linux:
+     Ubuntu 8.10 64bit, Python 2.5, Python 3.2
+     CentOS 64bit, Python 2.4
+
+	
+Installation
+
+    sudo python setup.py install
+
+
+

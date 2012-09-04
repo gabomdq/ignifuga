@@ -46,7 +46,7 @@ cdef bint isdead(PyGreenlet* greenlet):
 
 
 cdef class GameLoopBase(object):
-    def __init__(self, fps = 30.0):
+    def __init__(self, fps = 30.0, remoteConsole = None):
         # SDL should be initialized at this point when Renderer was instantiated
         self.quit = False
         self.fps = fps
@@ -61,6 +61,13 @@ cdef class GameLoopBase(object):
 
         PyGreenlet_Import()
         self.main_greenlet = PyGreenlet_GetCurrent()
+
+        if remoteConsole is None:
+            self.remoteConsole = None
+            self.updateRemoteConsole = False
+        else:
+            self.remoteConsole = remoteConsole
+            self.updateRemoteConsole = True
 
     def __dealloc__(self):
         self.free()
@@ -249,6 +256,10 @@ cdef class GameLoopBase(object):
                 if iter == self.running.end():
                     break
                 inc(iter)
+
+        # Process remote console
+        if self.updateRemoteConsole:
+            self.remoteConsole.process()
 
     cdef bint _doSwitch(self, _Task *task, PyObject *args, PyObject *kwargs):
         cdef PyObject *retp = NULL

@@ -18,8 +18,8 @@ import time, sys
 DEF NUM_STREAMS = 20
 
 cdef class GameLoop(GameLoopBase):
-    def __init__(self, fps = 30.0):
-        super(GameLoop, self).__init__(fps)
+    def __init__(self, fps = 30.0, remoteConsole=None):
+        super(GameLoop, self).__init__(fps, remoteConsole)
         self.renderer = <Renderer>Gilbert().renderer
         self._screen_w, self._screen_h = self.renderer.screenSize
         self.paused = False
@@ -93,7 +93,8 @@ cdef class GameLoop(GameLoopBase):
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 self.fw.update()
 #endif
-                SDL_Delay( remainingTime)
+                with nogil: # No gil in case there's other threads waiting for us (for example rconsole)
+                    SDL_Delay( remainingTime)
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev

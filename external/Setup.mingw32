@@ -212,7 +212,7 @@ _locale _localemodule.c  # -lintl
 #_csv _csv.c
 
 # Socket module helper for socket(2)
-#_socket socketmodule.c
+_socket socketmodule.c
 
 # Socket module helper for SSL support; you must comment out the other
 # socket line above, and possibly edit the SSL variable:
@@ -441,8 +441,8 @@ binascii binascii.c
 #parser parsermodule.c
 
 # cStringIO and cPickle
-#cStringIO cStringIO.c
-#cPickle cPickle.c
+cStringIO cStringIO.c
+cPickle cPickle.c
 
 
 # Lee Busby's SIGFPE modules.

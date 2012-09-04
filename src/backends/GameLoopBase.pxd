@@ -79,6 +79,8 @@ cdef class GameLoopBase(object):
     cdef deque[_Task] *loading, *loading_tmp, *running, *running_tmp
     cdef readonly unsigned long frame_time, _interval, ticks_second
     cdef PyGreenlet *main_greenlet
+    cdef bint updateRemoteConsole
+    cdef object remoteConsole
 
 
     cpdef startEntity(self, entity, bint load_phase=*)

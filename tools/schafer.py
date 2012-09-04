@@ -139,6 +139,8 @@ def make_python(platform, ignifuga_src, options, env=os.environ):
     freeze_modules += ['threading','collections', 'keyword', 'heapq']
     # For profiling
     freeze_modules += ['cProfile', 'runpy', 'pkgutil', 'pstats', 'functools', 'bisect']
+    # For rfoo: cStringIO
+    freeze_modules += ['logging', 'atexit', 'inspect', 'dis', 'opcode', 'tokenize', 'token', 'socket', 'rlcompleter', 'pprint', 'codeop', 'code', '__future__']
 
     target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])

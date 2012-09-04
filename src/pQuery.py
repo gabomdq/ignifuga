@@ -9,6 +9,7 @@
 from ignifuga.Entity import Entity
 from ignifuga.Scene import Scene
 from ignifuga.components.Component import Component
+from ignifuga.Gilbert import Gilbert
 import re
 #if ROCKET
 import _rocketcore as rocket
@@ -37,102 +38,78 @@ class pQueryWrapper(object):
         return pQuery(selector, pQuery(context, self))
 
 
-def _pQueryIgnifuga(filter, targets):
-    """ Filter targets according to the filter provided. See pQuery for a resume of filter options"""
+def _splitSelector(selector):
 
-    if filter == '':
-        return targets
-
-    # Split the filter
-    filter_parts = []
+    # Process the selectors
+    selector_parts = []
     r_nonalphanum = re.compile('[^A-z0-9]')
     r_bracket = re.compile('\[[^\]]*\]')
-    r_parenthesis = re.compile('\(([^\)]*)\)')
-    while filter != '':
-        if filter[0] == ':':
-            filter = filter[1:]
-            # Split the filter on the next non alphanumeric character
-            rr = r_nonalphanum.search(filter)
+    while selector != '':
+        if selector[0] == ':':
+            selector = selector[1:]
+            # Split the selector on the next non alphanumeric character
+            rr = r_nonalphanum.search(selector)
             if rr is not None:
-                part = filter[rr.span()[0]]
-                filter_parts.append(':'+part)
-                filter = filter[len(part):]
+                part = selector[rr.span()[0]]
+                selector_parts.append(':'+part)
+                selector = selector[len(part):]
             else:
-                filter_parts.append(':'+filter)
-                filter = ''
-        elif filter[0] == '[':
+                selector_parts.append(':'+selector)
+                selector = ''
+        elif selector[0] == '[':
             # Pick up everything from [ to the next ]
-            rr = r_bracket.match(filter)
+            rr = r_bracket.match(selector)
             if rr is not None:
                 part = rr.group(0)
             else:
-                part = filter
-            filter_parts.append(part)
-            filter = filter[len(part):]
+                part = selector
+            selector_parts.append(part)
+            selector = selector[len(part):]
         else:
-            # Split the filter on the next space
-            part = filter.split(' ')[0]
-            filter_parts.append(part)
-            filter = filter[len(part):]
+            # Split the selector on the next space
+            part = selector.split(' ')[0]
+            selector_parts.append(part)
+            selector = selector[len(part):]
 
+    return selector_parts
+
+def _pQueryIgnifuga(selector, targets):
+    """ Filter targets according to the selector provided. See pQuery for a resume of selector options
+        No "or" operations are supported here, that's handled by the pQuery function
+    """
+
+    if selector == '':
+        return targets
 
     # Make a copy of the incoming targets
     targets = targets[:]
 
-    # Scan the filter for commas which act as the or operator
-    new_filter = ''
-    new_filters = []
-    for filter in filter_parts:
-        if filter == ',':
-            if new_filter != '':
-                new_filters.append(new_filter)
-                new_filter = ''
-        elif filter.startswith(','):
-            new_filter += filter[1:]
-            if new_filter != '':
-                new_filters.append(new_filter)
-                new_filter = ''
-        elif filter.endswith(','):
-            new_filter += filter[:-1]
-            if new_filter != '':
-                new_filters.append(new_filter)
-                new_filter = ''
-        else:
-            new_filter += filter + ' '
-
-    if new_filter != '':
-        new_filters.append(new_filter)
-
-    if len(new_filters) > 1:
-        # Or together more than one filter
-        _targets = []
-        for filter in new_filters:
-            for target in _pQueryIgnifuga(filter, targets):
-                if target not in _targets:
-                    _targets.append(target)
-        return _targets
+    r_parenthesis = re.compile('\(([^\)]*)\)')
 
     _targets = []
-    for filter in filter_parts:
-        filter = filter.strip()
 
-        # Apply filtering
+    selector_parts = _splitSelector(selector)
+
+    for selector in selector_parts:
+        selector = selector.strip()
+
+        # Apply selectoring
         if len(targets) > 0:
-            if filter == '':
-                # No filter
+            if selector == '':
+                # No selector
                 _targets = targets
 
-            elif filter.startswith('~'):
+            elif selector.startswith('~'):
                 # Special case, the scene selector (~) ignores everything that came before it
-                if filter == '~':
+                if selector == '~':
                     _targets = [Gilbert().scene,]
                 else:
-                    filter = filter[1:]
-                    if filter in Gilbert().scenes:
-                        _targets = [Gilbert().scenes[filter]]
+                    selector = selector[1:]
+                    if selector in Gilbert().scenes:
+                        _targets = [Gilbert().scenes[selector]]
                     else:
                         _targets = []
-            elif filter == '*':
+            elif selector == '*':
                 # Select everything
                 if isinstance(target, Scene):
                     # Select all entities and components in the scene
@@ -144,12 +121,12 @@ def _pQueryIgnifuga(filter, targets):
                     # Select all components in the entity
                     for component in target.components:
                         _targets.append(component)
-            elif filter.startswith('#'):
-                # Filter targets by id
-                id = filter[1:]
+            elif selector.startswith('#'):
+                # selector targets by id
+                id = selector[1:]
                 for target in targets:
                     if isinstance(target, Scene):
-                        # Filter the scene and find entities and components matching the id
+                        # selector the scene and find entities and components matching the id
                         for entity in target.entities:
                             if entity.id == id:
                                 _targets.append(entity)
@@ -157,57 +134,57 @@ def _pQueryIgnifuga(filter, targets):
                             if component is not None:
                                 _targets.append(component)
                     elif isinstance(target, Entity):
-                        # Filter the entity and find a component matching the id
+                        # selector the entity and find a component matching the id
                         component = target.getComponent(id)
                         if component is not None:
                             _targets.append(component)
-            elif filter.startswith('.'):
-                # Filter targets by tag
-                tag = filter[1:]
+            elif selector.startswith('.'):
+                # selector targets by tag
+                tag = selector[1:]
                 for target in targets:
                     if isinstance(target, Scene):
-                        # Filter the scene and find entities and components matching the tag
+                        # selector the scene and find entities and components matching the tag
                         for entity in target.entities:
                             if tag in entity.tags:
                                 _targets.append(entity)
                             for component in entity.getComponentsByTag(tag):
                                 _targets.append(component)
                     elif isinstance(target, Entity):
-                        # Filter the entity and find components matching the tag
+                        # selector the entity and find components matching the tag
                         for component in target.getComponentsByTag(tag):
                             _targets.append(component)
-            elif filter.startswith('['):
-                # Filter by attribute
-                filter = filter[1:-1] # remove [ and ]
+            elif selector.startswith('['):
+                # selector by attribute
+                selector = selector[1:-1] # remove [ and ]
 
                 op = None
-                if '|=' in filter:
+                if '|=' in selector:
                     # Attribute Contains Prefix Selector [name|="value"] - Selects elements that have the specified attribute with a value either equal to a given string or starting with that string followed by a hyphen (-).
-                    name, value = filter.split('|=')
+                    name, value = selector.split('|=')
                     op = '|'
-                elif '*=' in filter:
+                elif '*=' in selector:
                     # Attribute Contains Selector [name*="value"] - Selects elements that have the specified attribute with a value containing the a given substring.
-                    name, value = filter.split('*=')
+                    name, value = selector.split('*=')
                     op = '*'
-                elif '~=' in filter:
+                elif '~=' in selector:
                     # Attribute Contains Word Selector [name~="value"] - Selects elements that have the specified attribute with a value containing a given word, delimited by spaces.
-                    name, value = filter.split('~=')
+                    name, value = selector.split('~=')
                     op = '~'
-                elif '$=' in filter:
+                elif '$=' in selector:
                     # Attribute Ends With Selector [name$="value"] - Selects elements that have the specified attribute with a value ending exactly with a given string. The comparison is case sensitive.
-                    name, value = filter.split('$=')
+                    name, value = selector.split('$=')
                     op = '$'
-                elif '!=' in filter:
+                elif '!=' in selector:
                     # Attribute Not Equal Selector [name!="value"] - Select elements that either don't have the specified attribute, or do have the specified attribute but not with a certain value.
-                    name, value = filter.split('!=')
+                    name, value = selector.split('!=')
                     op = '!'
-                elif '^=' in filter:
+                elif '^=' in selector:
                     # Attribute Starts With Selector [name^="value"] - Selects elements that have the specified attribute with a value beginning exactly with a given string.
-                    name, value = filter.split('^=')
+                    name, value = selector.split('^=')
                     op = '^'
-                elif '=' in filter:
+                elif '=' in selector:
                     # Attribute Equals Selector [name="value"] - Selects elements that have the specified attribute with a value exactly equal to a certain value.
-                    name, value = filter.split('=')
+                    name, value = selector.split('=')
                     op = '='
 
                 if op != None:
@@ -236,8 +213,8 @@ def _pQueryIgnifuga(filter, targets):
                                 if tvalue == value:
                                     _targets.append(target)
 
-            elif filter == ':active' or filter==':enabled':
-                # Filter by the active attribute
+            elif selector == ':active' or selector==':enabled':
+                # selector by the active attribute
                 for target in targets:
                     if isinstance(target, Scene):
                         # Scene is active if it's the current scene
@@ -252,8 +229,8 @@ def _pQueryIgnifuga(filter, targets):
                         if target.active:
                             _targets.append(target)
 
-            elif filter == ':inactive' or filter==':disabled':
-                # Filter by the active attribute
+            elif selector == ':inactive' or selector==':disabled':
+                # selector by the active attribute
                 for target in targets:
                     if isinstance(target, Scene):
                         # Scene is active if it's the current scene
@@ -268,14 +245,14 @@ def _pQueryIgnifuga(filter, targets):
                         if not target.active:
                             _targets.append(target)
 
-            elif filter == ':even':
+            elif selector == ':even':
                 for t in range(0, len(targets), 2):
                     _targets.append(targets[t])
-            elif filter == ':odd':
+            elif selector == ':odd':
                 if len(targets) > 1:
                     for t in range(1, len(targets), 2):
                         _targets.append(targets[t])
-            elif filter == ':empty':
+            elif selector == ':empty':
                 for target in targets:
                     if isinstance(target, Scene) and not target.entities:
                         # Empty scenes are scenes without entities
@@ -284,7 +261,7 @@ def _pQueryIgnifuga(filter, targets):
                         # Empty entities are entities without components
                         if Gilbert().scene != target.scene():
                             _targets.append(target)
-            elif filter == ':parent':
+            elif selector == ':parent':
                 # Select targets that have children (opposite of :empty)
                 for target in targets:
                     if isinstance(target, Scene) and target.entities:
@@ -292,11 +269,11 @@ def _pQueryIgnifuga(filter, targets):
                     elif isinstance(target, Entity) and target.components:
                         if Gilbert().scene != target.scene():
                             _targets.append(target)
-            elif filter == ':first':
+            elif selector == ':first':
                 _targets.append(targets[0])
-            elif filter == ':last':
+            elif selector == ':last':
                 _targets.append(targets[-1])
-            elif filter == ':first-child':
+            elif selector == ':first-child':
                 for target in targets:
                     if isinstance(target, Scene):
                         if target.entities:
@@ -304,7 +281,7 @@ def _pQueryIgnifuga(filter, targets):
                     elif isinstance(target, Entity):
                         if target.components:
                             _targets.append(target.components.items()[0])
-            elif filter == ':last-child':
+            elif selector == ':last-child':
                 for target in targets:
                     if isinstance(target, Scene):
                         if target.entities:
@@ -312,7 +289,7 @@ def _pQueryIgnifuga(filter, targets):
                     elif isinstance(target, Entity):
                         if target.components:
                             _targets.append(target.components.items()[-1])
-            elif filter == ':last-child':
+            elif selector == ':last-child':
                 for target in targets:
                     if isinstance(target, Scene):
                         if len(target.entities) == 1:
@@ -320,8 +297,16 @@ def _pQueryIgnifuga(filter, targets):
                     elif isinstance(target, Entity):
                         if len(target.components) == 1:
                             _targets.append(target.components.items()[0])
-            elif filter == ':visible':
-                # Filter by the visibility attribute
+            elif selector == ':children' or selector == '>':
+                for target in targets:
+                    if isinstance(target, Scene):
+                        for entity in target.entities:
+                            _targets.append(entity)
+                    elif isinstance(target, Entity):
+                        for component in target.components:
+                            _targets.append(component)
+            elif selector == ':visible':
+                # selector by the visibility attribute
                 for target in targets:
                     if isinstance(target, Scene):
                         # Scene is visible if it's the current scene
@@ -341,8 +326,8 @@ def _pQueryIgnifuga(filter, targets):
                                 _targets.append(target)
                         except:
                             pass
-            elif filter == ':hidden':
-                # Filter by the visibility attribute (hidden)
+            elif selector == ':hidden':
+                # selector by the visibility attribute (hidden)
                 for target in targets:
                     if isinstance(target, Scene):
                         # Scene is visible if it's the current scene
@@ -362,8 +347,8 @@ def _pQueryIgnifuga(filter, targets):
                                 _targets.append(target)
                         except:
                             pass
-            elif filter.startswith(':nth-child'):
-                rr = r_parenthesis.search(filter)
+            elif selector.startswith(':nth-child'):
+                rr = r_parenthesis.search(selector)
                 if rr is not None:
                     try:
                         value = int(rr.group(1))
@@ -376,8 +361,8 @@ def _pQueryIgnifuga(filter, targets):
                                     _targets.append(target.components.items()[value])
                     except:
                         pass
-            elif filter.startswith(':not'):
-                rr = r_parenthesis.search(filter)
+            elif selector.startswith(':not'):
+                rr = r_parenthesis.search(selector)
                 if rr is not None:
                     value = rr.group(1)
                     __targets = _pQueryIgnifuga(value, targets[:])
@@ -386,17 +371,17 @@ def _pQueryIgnifuga(filter, targets):
                             _targets.append(target)
 
             else:
-                # Finally, use filter as a python class specifier
+                # Finally, use selector as a python class specifier
                 for target in targets:
                     if isinstance(target, Scene):
-                         if filter in Entity.__inheritors__:
-                            _class = Entity.__inheritors__[filter]
+                         if selector in Entity.__inheritors__:
+                            _class = Entity.__inheritors__[selector]
                             for entity in target.entities:
                                 if isinstance(entity, _class):
                                     _targets.append(entity)
                     elif isinstance(target, Entity):
-                        if filter in Component.__inheritors__:
-                            _class = Component.__inheritors__[filter]
+                        if selector in Component.__inheritors__:
+                            _class = Component.__inheritors__[selector]
                             for component in target.components:
                                 if isinstance(component, _class):
                                     _targets.append(component)
@@ -477,6 +462,7 @@ def pQuery(selector, context = None):
     ":component" Select only components
     ":active" (or :enabled) Select active entities/components
     ":inactive" (or :disabled) Select inactive entities/components
+    ":children" (similar to jQuery's >) Select direct children of element
     "~" Selects the current Ignifuga Scene (ignores all other selectors)
     "~sceneid" Selects an Ignifuga Scene with a given id (ignores all other selectors)
     """
@@ -496,8 +482,8 @@ def pQuery(selector, context = None):
         selector = str(selector).strip()
     else:
         # Unknown selector, return an empty wrapper
-        if context is none:
-            return pQueryWrapper([], TYPE_UNKNOWN)
+        if context is None:
+            return pQueryWrapper([], pQueryWrapper.TYPE_UNKNOWN)
         else:
             return pQueryWrapper(context.targets, context.type)
 
@@ -512,20 +498,49 @@ def pQuery(selector, context = None):
 
     if type is None:
         # No context given or the context does not have a known type, so we default to an Ignifuga query
-        # because we can't operate on Rocket without knowing the desired document
+        # with the current scene as context because we can't operate on Rocket without knowing the desired document
         type = pQueryWrapper.TYPE_IGNIFUGA_STR
         context = pQuery(Gilbert().scene)
 
-    # Process the selectors
-    selector_parts = selector.split(' ')
-    targets = context.targets
-    for filter in selector_parts:
-        if type == pQueryWrapper.TYPE_IGNIFUGA_STR:
-            targets = _pQueryIgnifuga(filter, targets)
-        #if ROCKET
-        elif type == pQueryWrapper.TYPE_ROCKET_STR:
-            targets = _pQueryRocket(filter, targets)
-        #endif
+    selector_parts = _splitSelector(selector)
+
+    # Scan the selector for commas which act as the or operator
+    new_selector = ''
+    selectors = []
+    for selector in selector_parts:
+        if selector == ',':
+            if new_selector != '':
+                selectors.append(new_selector)
+                new_selector = ''
+        elif selector.startswith(','):
+            new_selector += selector[1:]
+            if new_selector != '':
+                selectors.append(new_selector)
+                new_selector = ''
+        elif selector.endswith(','):
+            new_selector += selector[:-1]
+            if new_selector != '':
+                selectors.append(new_selector)
+                new_selector = ''
+        else:
+            new_selector += selector + ' '
+
+    if new_selector != '':
+        selectors.append(new_selector)
+
+    targets = []
+    if type == pQueryWrapper.TYPE_IGNIFUGA_STR:
+        for selector in selectors:
+            for target in _pQueryIgnifuga(selector, context.targets):
+                if target not in targets:
+                    targets.append(target)
+    #if ROCKET
+    elif type == pQueryWrapper.TYPE_ROCKET_STR:
+            for selector in selectors:
+                for target in _pQueryRocket(selector, context.targets):
+                    if target not in targets:
+                        targets.append(target)
+    #endif
 
     return pQueryWrapper(targets, type)
 

@@ -12,6 +12,9 @@ from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
 import sys, pickle, os, weakref, gc, platform, copy, base64
 from optparse import OptionParser
+from ignifuga.rfoo import QueueInetServer, LOOPBACK
+from ignifuga.rfoo.utils.rconsole import ConsoleHandler
+import thread, socket
 
 class BACKENDS:
     sdl = 'sdl'
@@ -117,7 +120,7 @@ SPLASH_SCENE = {
                 "runNext": {
                     "duration":1.0,
                     "alpha":0.0,
-                    "onStop": "Gilbert().startFirstScene()"
+                    "onStop": "Gilbert.startFirstScene()"
                 }
             }]
         }
@@ -153,6 +156,7 @@ class Gilbert:
     __metaclass__ = Singleton
 
     def __init__(self):
+        self.remoteConsole = None
         usage = "game [options]"
         self.parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
         self.parser.add_option("-d", "--display", dest="display", default=0,help="Display (default: 0)")
@@ -161,6 +165,8 @@ class Gilbert:
         self.parser.add_option("-w", "--windowed", action="store_true", dest="windowed", default=False,help="Start in windowed mode (default: no)")
         self.parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
         self.parser.add_option("-c", "--capture", action="store_true", dest="capture", default=False,help="Start paused (useful for video capture)")
+        self.parser.add_option("-r", "--remote", action="store_true", dest="remote", default=False,help="Enable Remote Console (http://code.google.com/p/rfoo/)")
+        self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port (default: 54321)")
 
     
     def init(self, backend, firstScene, scenesFile=None):
@@ -227,7 +233,10 @@ class Gilbert:
 
         self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display)
         self.dataManager = DataManager()
-        self.gameLoop = GameLoop()
+
+        if options.remote:
+            self.startRemoteConsole(options.port)
+        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole)
 
         if options.capture:
             print "System paused, press Enter to continue"
@@ -475,6 +484,18 @@ class Gilbert:
 
     def unfreezeRenderer(self):
         self.gameLoop.freezeRenderer = False
+
+    def startRemoteConsole(self, port=54321):
+        debug("Enabling Remote Console on port %d" % port)
+        self.remoteConsole = QueueInetServer(ConsoleHandler, globals())
+
+        def _wrapper():
+            try:
+                self.remoteConsole.start(LOOPBACK, port)
+            except socket.error:
+                error('Failed to bind rconsole to socket port, port=%r.', port)
+
+        thread.start_new_thread(_wrapper, ())
 
 
 # Gilbert imports

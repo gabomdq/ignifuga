@@ -7,8 +7,10 @@
 # Base Component class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from ignifuga.Log import error
+from ignifuga.Log import error, debug
 from ignifuga.Gilbert import Gilbert
+import traceback
+from copy import copy
 
 class Component(object):
     TYPE = None
@@ -77,14 +79,11 @@ class Component(object):
             self._active = active
             if self._entity != None:
                 if self._active:
-                    #self.entity.addTags(self.entityTags)
-                    #self.entity.addProperties(self)
                     self.entity.add(self)
                     Gilbert().gameLoop.startComponent(self)
                 else:
-                    #self.entity.refreshTags()
-                    #self.entity.removeProperties(self)
-                    self.entity.remove(self)
+                    self.entity.refreshTags()
+                    self.entity.removeProperties(self)
                     Gilbert().gameLoop.stopComponent(self)
 
     @property
@@ -158,10 +157,36 @@ class Component(object):
             if hasattr(command, '__call__'):
                 command(self)
             else:
-                exec command
+                # Make a suitable environment for running commands
+                if self.entity is not None and self.entity.scene is not None:
+                    scene = self.entity.scene()
+                    lcls = copy(scene.runEnv)
+                else:
+                    lcls = {}
+
+                lcls['self'] = self
+                lcls['parent'] = self.entity
+
+                if self.entity is not None and (self.entity.scene is None or scene.isolateEntities):
+                    for c,o in self.entity._components.iteritems():
+                        c = str(c)
+                        if not c.isdigit():
+                            lcls[c] = o
+
+                try:
+                    exec command in lcls
+                except Exception, ex:
+                    error(traceback.format_exc())
 
     def reload(self, url):
         pass
 
     def event(self, action, sx, sy):
         return True, False
+
+    def getComponent(self, id):
+        """ Retrieve a component belonging to our entity with a given id, return None if no component by that id is found"""
+        if self._entity is not None:
+            return self._entity.getComponent(id)
+
+        return None

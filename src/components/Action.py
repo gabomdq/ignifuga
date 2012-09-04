@@ -223,6 +223,7 @@ class Action(Component):
     def active(self, active):
         if self._root:
             if active == self._active or self._entity == None:
+                self._active = active
                 return
             try:
                 self._active = active
@@ -231,16 +232,18 @@ class Action(Component):
                 elif not active and self._running:
                     self.stop()
                 if self._active:
+                    # Root action being activated, add component, tags and properties to entity
                     self.entity.add(self)
                 else:
-                    self.entity.remove(self)
+                    # Root action being deactivated, remove tags and properties from entity
+                    self.entity.refreshTags()
+                    self.entity.removeProperties(self)
             except Exception, ex:
                 self._active = False
                 raise ex
 
         elif self._active:
                 self._active = False
-                self.entity.remove(self)
 
     @Component.entity.setter
     def entity(self, entity):
@@ -404,6 +407,7 @@ class Action(Component):
             if self._root:
                 if self._freePending:
                     self.free()
+                self.active=False
                 return STOP()
 
     def _step(self, dt):
