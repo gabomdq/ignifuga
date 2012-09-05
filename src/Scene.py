@@ -97,6 +97,8 @@ class Scene(Entity):
         self.runEnv['Gilbert'] = Gilbert()
         self.runEnv['DataManager'] = Gilbert().dataManager
         self.runEnv['Renderer'] = Gilbert().renderer
+        from ignifuga.pQuery import pQuery
+        self.runEnv['_'] = pQuery
 
         # Build entities
         if 'entities' in self._data:

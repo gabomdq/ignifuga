@@ -10,21 +10,20 @@ from ignifuga.Entity import Entity
 from ignifuga.Scene import Scene
 from ignifuga.components.Component import Component
 from ignifuga.Gilbert import Gilbert
-import re
+import re, inspect
 #if ROCKET
 import _rocketcore as rocket
 #endif
 
 class pQueryWrapper(object):
     TYPE_UNKNOWN = 0
-    TYPE_IGNIFUGA_OBJ = 1
-    TYPE_IGNIFUGA_STR = 2
-    TYPE_ROCKET_OBJ = 3
-    TYPE_ROCKET_STR = 4
+    TYPE_IGNIFUGA = 1
+    TYPE_ROCKET = 2
 
     def __init__(self, targets, type):
-        self._targets = targets
-        self._type = type
+        # Do assignment like this to avoid endless loops due to __getattr__
+        self.__dict__['_targets'] = targets
+        self.__dict__['_type'] = type
 
     @property
     def type(self):
@@ -37,6 +36,46 @@ class pQueryWrapper(object):
     def pQuery(self, selector, context = None):
         return pQuery(selector, pQuery(context, self))
 
+    def __repr__(self):
+        if self.type == pQueryWrapper.TYPE_IGNIFUGA:
+            type = 'Ignifuga'
+        elif self.type == pQueryWrapper.TYPE_ROCKET:
+            type = 'Rocket'
+        else:
+            type = 'unknown'
+        return "pQuery Wrapper of type %s with %d targets: %s" % (type, len(self._targets), self._targets)
+
+    def __getattr__(self, name):
+
+        if name in self.__dict__:
+            return self.__dict__[name]
+
+        ret = []
+        for target in self._targets:
+            try:
+                getattr(target,name)
+            except:
+                pass
+
+        return ret
+
+    def __setattr__( self, name, value):
+        for target in self._targets:
+            try:
+                setattr(target,name, value)
+            except:
+                pass
+
+    def __getitem__(self, key):
+        try:
+            key = int(key)
+        except:
+            raise TypeError('pQueryWrapper only accepts integers as keys')
+        if key < len(self._targets):
+            return self._targets[key]
+
+        return None
+
 
 def _splitSelector(selector):
 
@@ -45,6 +84,7 @@ def _splitSelector(selector):
     r_nonalphanum = re.compile('[^A-z0-9]')
     r_bracket = re.compile('\[[^\]]*\]')
     while selector != '':
+        print selector, selector_parts
         if selector[0] == ':':
             selector = selector[1:]
             # Split the selector on the next non alphanumeric character
@@ -68,8 +108,11 @@ def _splitSelector(selector):
         else:
             # Split the selector on the next space
             part = selector.split(' ')[0]
-            selector_parts.append(part)
-            selector = selector[len(part):]
+            if part != '':
+                selector_parts.append(part)
+                selector = selector[len(part):]
+            else:
+                break
 
     return selector_parts
 
@@ -83,10 +126,27 @@ def _pQueryIgnifuga(selector, targets):
 
     # Make a copy of the incoming targets
     targets = targets[:]
-
-    r_parenthesis = re.compile('\(([^\)]*)\)')
-
     _targets = []
+
+    if inspect.isclass(selector):
+        # Selector is a python class
+        for target in targets:
+            if isinstance(target, Scene):
+                for entity in target.entities.itervalues():
+                    if isinstance(entity, selector):
+                        _targets.append(entity)
+                    for component in entity.components.itervalues():
+                        if isinstance(component, selector):
+                            _targets.append(component)
+            elif isinstance(target, Entity):
+                for component in target.components.itervalues():
+                    if isinstance(component, selector):
+                        _targets.append(component)
+
+        return _targets
+
+    # String selector
+    r_parenthesis = re.compile('\(([^\)]*)\)')
 
     selector_parts = _splitSelector(selector)
 
@@ -113,13 +173,13 @@ def _pQueryIgnifuga(selector, targets):
                 # Select everything
                 if isinstance(target, Scene):
                     # Select all entities and components in the scene
-                    for entity in target.entities:
+                    for entity in target.entities.itervalues():
                         _targets.append(entity)
-                        for component in entity.components:
+                        for component in entity.components.itervalues():
                             _targets.append(component)
                 elif isinstance(target, Entity):
                     # Select all components in the entity
-                    for component in target.components:
+                    for component in target.components.itervalues():
                         _targets.append(component)
             elif selector.startswith('#'):
                 # selector targets by id
@@ -127,7 +187,7 @@ def _pQueryIgnifuga(selector, targets):
                 for target in targets:
                     if isinstance(target, Scene):
                         # selector the scene and find entities and components matching the id
-                        for entity in target.entities:
+                        for entity in target.entities.itervalues():
                             if entity.id == id:
                                 _targets.append(entity)
                             component = target.getComponent(id)
@@ -144,7 +204,7 @@ def _pQueryIgnifuga(selector, targets):
                 for target in targets:
                     if isinstance(target, Scene):
                         # selector the scene and find entities and components matching the tag
-                        for entity in target.entities:
+                        for entity in target.entities.itervalues():
                             if tag in entity.tags:
                                 _targets.append(entity)
                             for component in entity.getComponentsByTag(tag):
@@ -303,7 +363,7 @@ def _pQueryIgnifuga(selector, targets):
                         for entity in target.entities:
                             _targets.append(entity)
                     elif isinstance(target, Entity):
-                        for component in target.components:
+                        for component in target.components.itervalues():
                             _targets.append(component)
             elif selector == ':visible':
                 # selector by the visibility attribute
@@ -355,10 +415,10 @@ def _pQueryIgnifuga(selector, targets):
                         for target in targets:
                             if isinstance(target, Scene):
                                 if len(target.entities) > value:
-                                    _targets.append(target.entities.items()[value])
+                                    _targets.append(target.entities.values()[value])
                             elif isinstance(target, Entity):
                                 if len(target.components) > value:
-                                    _targets.append(target.components.items()[value])
+                                    _targets.append(target.components.values()[value])
                     except:
                         pass
             elif selector.startswith(':not'):
@@ -369,20 +429,24 @@ def _pQueryIgnifuga(selector, targets):
                     for target in targets:
                         if target not in __targets:
                             _targets.append(target)
-
             else:
-                # Finally, use selector as a python class specifier
+                # Last chance, test if it is a class selector (a string that says "Entity" for example)
                 for target in targets:
                     if isinstance(target, Scene):
-                         if selector in Entity.__inheritors__:
-                            _class = Entity.__inheritors__[selector]
-                            for entity in target.entities:
+                        for entity in target.entities.itervalues():
+                            if selector in Entity.__inheritors__:
+                                _class = Entity.__inheritors__[selector]
                                 if isinstance(entity, _class):
                                     _targets.append(entity)
+                            elif selector in Component.__inheritors__:
+                                _class = Component.__inheritors__[selector]
+                                for component in entity.components.itervalues():
+                                    if isinstance(component, _class):
+                                        _targets.append(component)
                     elif isinstance(target, Entity):
                         if selector in Component.__inheritors__:
                             _class = Component.__inheritors__[selector]
-                            for component in target.components:
+                            for component in target.components.itervalues():
                                 if isinstance(component, _class):
                                     _targets.append(component)
 
@@ -472,11 +536,13 @@ def pQuery(selector, context = None):
         # A pQueryWrapper is not really a selector, return it as is
         return selector
     elif isinstance(selector,  Entity) or isinstance(selector, Component):
-        return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA_OBJ)
+        return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA)
     #if ROCKET
     elif isinstance(selector, rocket.Document) or isinstance(selector, rocket.Element):
-        return pQueryWrapper([selector,], pQueryWrapper.TYPE_ROCKET_OBJ)
+        return pQueryWrapper([selector,], pQueryWrapper.TYPE_ROCKET)
     #endif
+    elif inspect.isclass(selector):
+        pass
     elif isinstance(selector, basestring):
         # Cast out the unicode pariahs just in case
         selector = str(selector).strip()
@@ -499,8 +565,11 @@ def pQuery(selector, context = None):
     if type is None:
         # No context given or the context does not have a known type, so we default to an Ignifuga query
         # with the current scene as context because we can't operate on Rocket without knowing the desired document
-        type = pQueryWrapper.TYPE_IGNIFUGA_STR
+        type = pQueryWrapper.TYPE_IGNIFUGA
         context = pQuery(Gilbert().scene)
+
+    if inspect.isclass(selector):
+        return pQueryWrapper(_pQueryIgnifuga(selector, context.targets), pQueryWrapper.TYPE_IGNIFUGA)
 
     selector_parts = _splitSelector(selector)
 
@@ -529,13 +598,13 @@ def pQuery(selector, context = None):
         selectors.append(new_selector)
 
     targets = []
-    if type == pQueryWrapper.TYPE_IGNIFUGA_STR:
+    if type == pQueryWrapper.TYPE_IGNIFUGA:
         for selector in selectors:
             for target in _pQueryIgnifuga(selector, context.targets):
                 if target not in targets:
                     targets.append(target)
     #if ROCKET
-    elif type == pQueryWrapper.TYPE_ROCKET_STR:
+    elif type == pQueryWrapper.TYPE_ROCKET:
             for selector in selectors:
                 for target in _pQueryRocket(selector, context.targets):
                     if target not in targets:
