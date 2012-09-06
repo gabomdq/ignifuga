@@ -8,7 +8,12 @@
 # Purcell, the Ignifuga Game Engine Remote Console, based on RFoo's remote console
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-import getopt, sys, os, code, rfoo
+import getopt, sys, os, code
+try:
+    import rfoo
+except:
+    print "RFOO does not seem to be installed, try running schafer -D"
+    exit(1)
 
 PORT=54321
 

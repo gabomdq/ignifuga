@@ -6,7 +6,7 @@
 # Schafer Module: Misc utility functions
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-import os, shlex, shutil, re, platform, fnmatch
+import os, shlex, shutil, re, platform, fnmatch, sys
 from os.path import *
 from subprocess import Popen, PIPE
 from log import info, log, error
@@ -364,6 +364,21 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
         f.close()
     else:
         log('Android SDK is available at %s' % ANDROID_SDK)
+
+    # Rfoo
+    install_rfoo = True
+    try:
+        import rfoo
+        install_rfoo = False
+    except:
+        pass
+
+    if install_rfoo:
+        log('Installing RFOO')
+        rfoo_dir = join(ROOT_DIR, 'external', 'rfoo-1.3.0')
+        cmd = 'sudo ' + sys.executable + ' setup.py install'
+        Popen(shlex.split(cmd), cwd=rfoo_dir).communicate()
+
 
 def locate(pattern, root=os.curdir, skip = []):
     '''Locate all files matching supplied filename pattern in and below
