@@ -68,6 +68,7 @@ cdef class GameLoopBase(object):
         else:
             self.remoteConsole = remoteConsole
             self.updateRemoteConsole = True
+            self.startRunnable(self.remoteConsole, False, self.remoteConsole.process)
 
     def __dealloc__(self):
         self.free()
@@ -123,6 +124,13 @@ cdef class GameLoopBase(object):
             self._interval = 1000 / fps
 
     cpdef startEntity(self, entity, bint load_phase=True):
+        self.startRunnable(entity, load_phase)
+
+    cpdef startComponent(self, component):
+        """ Components hit the ground running, their initialization was handled by their entity"""
+        self.startRunnable(component, False)
+
+    cdef startRunnable(self, entity, bint load_phase=True, runnable=None):
         """ Put an entity in the loading or running queue"""
         cdef _Task new_task, *taskp
 
@@ -132,11 +140,11 @@ cdef class GameLoopBase(object):
         Py_XINCREF(new_task.entity)
 
         # Note: Got to do this assignment with an intermediary object, otherwise Cython just can't take it!
-        runnable = None
-        if load_phase:
-            runnable = entity.init
-        else:
-            runnable = entity.update
+        if runnable is None:
+            if load_phase:
+                runnable = entity.init
+            else:
+                runnable = entity.update
 
         new_task.runnable = <PyObject*>runnable
         new_task.data = NULL
@@ -151,10 +159,6 @@ cdef class GameLoopBase(object):
             self.running_tmp.push_back(new_task)
 
         del runnable
-
-    cpdef startComponent(self, component):
-        """ Components hit the ground running, their initialization was handled by their entity"""
-        self.startEntity(component, False)
 
     cpdef bint stopEntity(self, entity):
         cdef _Task *taskp
@@ -256,10 +260,6 @@ cdef class GameLoopBase(object):
                 if iter == self.running.end():
                     break
                 inc(iter)
-
-        # Process remote console
-        if self.updateRemoteConsole:
-            self.remoteConsole.process()
 
     cdef bint _doSwitch(self, _Task *task, PyObject *args, PyObject *kwargs):
         cdef PyObject *retp = NULL

@@ -602,8 +602,11 @@ class QueueInetServer(InetServer):
             if 'handler' in locals():
                 handler._close()
 
-    def process(self):
-        """Process buffered incoming calls"""
+    def process(self, data=None):
+        """Process buffered incoming calls
+        The data parameter is ignored, it's there for compatibility with init/update from the Entity/Components classes
+        as this function is going to be called within a greenlet
+        """
         if self.inBuf and not self.staticglobals:
             # We change the namespace available on each call, kinda hacky and certainly slow...but hey, it works and the scene is dinamically available to you
             from ignifuga.Gilbert import Gilbert

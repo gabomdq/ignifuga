@@ -168,7 +168,7 @@ class Gilbert:
         self.parser.add_option("-r", "--remote", action="store_true", dest="remote", default=False,help="Enable Remote Console (http://code.google.com/p/rfoo/)")
         self.parser.add_option("--staticglobals", action="store_true", dest="staticglobals", default=False,help="Dont update the remote console globals to match the current scene")
         self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port (default: 54321)")
-        self.parser.add_option("--ip", dest="ip", default='127.0.0.1',help="Remote Console IP to bind to (default: 127.0.0.1)")
+        self.parser.add_option("--ip", dest="ip", default='0.0.0.0',help="Remote Console IP to bind to (default: 0.0.0.0)")
 
     
     def init(self, backend, firstScene, scenesFile=None):

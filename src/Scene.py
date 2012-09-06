@@ -97,6 +97,11 @@ class Scene(Entity):
         self.runEnv['Gilbert'] = Gilbert()
         self.runEnv['DataManager'] = Gilbert().dataManager
         self.runEnv['Renderer'] = Gilbert().renderer
+        # Some task helper functions
+        self.runEnv['SKIP'] = SKIP
+        self.runEnv['DONE'] = DONE
+        self.runEnv['ERROR'] = ERROR
+
         from ignifuga.pQuery import pQuery
         self.runEnv['_'] = pQuery
 

@@ -15,6 +15,242 @@ import re, inspect
 import _rocketcore as rocket
 #endif
 
+class pQueryResult(list):
+    """ A pQuery results holder, returned when you request an attribute from a pQuery wrapper
+    It's essentially a list of tuples containing (target, property_name) with a few convenience operations
+    """
+    def __iter__(self):
+        for target,name in super(pQueryResult, self).__iter__():
+            try:
+                value = getattr(target, name)
+            except:
+                value = None
+            yield value
+
+    def __getitem__(self, key):
+        try:
+            key = int(key)
+        except:
+            raise TypeError('pQueryResult only accepts integers as keys')
+        if key < len(self):
+            target,name = super(pQueryResult, self).__getitem__(key)
+            return getattr(target,name)
+
+        return None
+
+    def __add__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(getattr(target, name) + v)
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(getattr(target, name) + value)
+
+        return ret
+
+    def __radd__(self, value):
+        return self.__add__(value)
+
+    def __sub__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(getattr(target, name) - v)
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(getattr(target, name) - value)
+
+        return ret
+
+    def __rsub__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(v - getattr(target, name))
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(value - getattr(target, name))
+
+        return ret
+
+    def __mul__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(getattr(target, name) * v)
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(getattr(target, name) * value)
+
+        return ret
+
+    def __rmul__(self, value):
+        return self.__mul__(value)
+
+    def __div__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(getattr(target, name) / v)
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(getattr(target, name) / value)
+
+        return ret
+
+    def __rdiv__(self, value):
+        ret = []
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    ret.append(v/getattr(target, name))
+                else:
+                    break
+                ndx+=1
+            return ret
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            ret.append(value / getattr(target, name))
+
+        return ret
+
+    def __iadd__(self, value):
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    setattr(target, name, getattr(target,name) + v)
+                else:
+                    break
+                ndx+=1
+            return self
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            setattr(target, name, getattr(target, name) + value)
+
+        return self
+
+    def __isub__(self, value):
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    setattr(target, name, getattr(target,name)-v)
+                else:
+                    break
+                ndx+=1
+            return self
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            setattr(target, name, getattr(target, name) - value)
+
+        return self
+
+    def __imul__(self, value):
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    setattr(target, name, getattr(target,name)*v)
+                else:
+                    break
+                ndx+=1
+            return self
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            setattr(target, name, getattr(target, name) * value)
+
+        return self
+
+    def __idiv__(self, value):
+        if hasattr(value, '__iter__'):
+            # Add a list of values in order to each of the targets
+            ndx = 0
+            target_len = len(self)
+            for v in value:
+                if ndx < target_len:
+                    target, name = self[ndx]
+                    setattr(target, name, getattr(target,name)/v)
+                else:
+                    break
+                ndx+=1
+            return self
+
+        # A scalar value
+        for target,name in super(pQueryResult, self).__iter__():
+            setattr(target, name, getattr(target, name) / value)
+
+        return self
+
+
 class pQueryWrapper(object):
     TYPE_UNKNOWN = 0
     TYPE_IGNIFUGA = 1
@@ -46,20 +282,30 @@ class pQueryWrapper(object):
         return "pQuery Wrapper of type %s with %d targets: %s" % (type, len(self._targets), self._targets)
 
     def __getattr__(self, name):
-
         if name in self.__dict__:
             return self.__dict__[name]
 
-        ret = []
+        ret = pQueryResult()
         for target in self._targets:
-            try:
-                getattr(target,name)
-            except:
-                pass
+            ret.append((target,name))
 
         return ret
 
     def __setattr__( self, name, value):
+        if hasattr(value, '__iter__'):
+            # Assign a list of values in order to each of the targets
+            ndx = 0
+            targets = self._targets
+            target_len = len(targets)
+            for v in value:
+                if ndx < target_len:
+                    setattr(targets[ndx], name, v)
+                else:
+                    break
+                ndx+=1
+            return
+
+        # Assign a scalar value (int, float, string, etc) to every target
         for target in self._targets:
             try:
                 setattr(target,name, value)
@@ -84,7 +330,6 @@ def _splitSelector(selector):
     r_nonalphanum = re.compile('[^A-z0-9]')
     r_bracket = re.compile('\[[^\]]*\]')
     while selector != '':
-        print selector, selector_parts
         if selector[0] == ':':
             selector = selector[1:]
             # Split the selector on the next non alphanumeric character

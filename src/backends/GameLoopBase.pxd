@@ -85,6 +85,7 @@ cdef class GameLoopBase(object):
 
     cpdef startEntity(self, entity, bint load_phase=*)
     cpdef startComponent(self, component)
+    cdef startRunnable(self, entity, bint load_phase=*, runnable=*)
     cpdef bint stopEntity(self, entity)
     cpdef bint stopComponent(self, component)
     cpdef update(self, int now=*, bint wrapup=*)
