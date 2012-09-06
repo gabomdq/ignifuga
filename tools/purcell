@@ -1,0 +1,113 @@
+#! /usr/bin/env python
+#Copyright (c) 2010-2012, Gabriel Jacobo
+#All rights reserved.
+#Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
+#whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
+
+
+# Purcell, the Ignifuga Game Engine Remote Console, based on RFoo's remote console
+# Author: Gabriel Jacobo <gabriel@mdqinc.com>
+
+import getopt, sys, os, code, rfoo
+
+PORT=54321
+
+
+
+def print_usage():
+    scriptName = os.path.basename(sys.argv[0])
+    sys.stdout.write("""
+Start remote console:
+%(name)s [-h] [-pPORT]
+
+--help  Print this help.
+-pPORT      Set PORT.
+-hHOST      Set HOST.
+""" % {'name': scriptName})
+
+
+class ProxyConsole(code.InteractiveConsole):
+    """Proxy interactive console to remote interpreter."""
+
+    def __init__(self, host=rfoo.LOOPBACK, port=PORT):
+        code.InteractiveConsole.__init__(self)
+        self.host = host
+        self.port = port
+        self.conn = None
+
+    def interact(self, banner=None):
+        self.conn = rfoo.InetConnection().connect(host=self.host, port=self.port)
+        return code.InteractiveConsole.interact(self, banner)
+
+    def complete(self, phrase, state):
+        """Auto complete support for interactive console."""
+        # Allow tab key to simply insert spaces when proper.
+        if phrase == '':
+            if state == 0:
+                return '    '
+            return None
+
+        return rfoo.Proxy(self.conn).complete(phrase, state)
+
+    def runsource(self, source, filename="<input>", symbol="single"):
+        more, output = rfoo.Proxy(self.conn).runsource(source, filename)
+        if output:
+            self.write(output)
+
+        return more
+
+def interact(banner=None, readfunc=None, host=rfoo.LOOPBACK, port=PORT):
+    """Start console and connect to remote console server."""
+
+    console = ProxyConsole(host=host, port=port)
+
+    if readfunc is not None:
+        console.raw_input = readfunc
+    else:
+        try:
+            import readline
+            readline.set_completer(console.complete)
+            readline.parse_and_bind('tab: complete')
+        except ImportError:
+            pass
+
+    console.interact(banner)
+
+
+
+def main():
+    """Parse options and run script."""
+
+    try:
+        options, args = getopt.getopt(
+            sys.argv[1:], 
+            'h:p:',
+            ['help']
+            )
+        options = dict(options)
+
+    except getopt.GetoptError:
+        print_usage()
+        return 2
+
+    if '--help' in options:
+        print_usage()
+        return
+
+    if '-p' in options:
+        port = int(options.get('-p'))
+    else:
+        port = PORT
+
+    if '-h' in options:
+        host = options.get('-h')
+    else:
+        host = '127.0.0.1'
+
+    print "Connecting to %s:%s" % (host, port)
+    interact(host=host, port=port)
+
+if __name__ == '__main__':
+    main()
+
+    

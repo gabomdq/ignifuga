@@ -62,13 +62,13 @@ class ConsoleHandler(rfoo.BaseHandler):
         self._interpreter = BufferedInterpreter(self._namespace)
         self._completer = rlcompleter.Completer(self._namespace)
 
-    @rfoo.restrict_local
+    #@rfoo.restrict_local
     def complete(self, phrase, state):
         """Auto complete for remote console."""
         logging.debug('Enter, phrase=%r, state=%d.', phrase, state)
         return self._completer.complete(phrase, state)
 
-    @rfoo.restrict_local
+    #@rfoo.restrict_local
     def runsource(self, source, filename="<input>"):
         """Variation of InteractiveConsole which returns expression
         result as second element of returned tuple.
@@ -106,14 +106,15 @@ class ConsoleHandler(rfoo.BaseHandler):
 class ProxyConsole(code.InteractiveConsole):
     """Proxy interactive console to remote interpreter."""
 
-    def __init__(self, port=PORT):
+    def __init__(self, host=rfoo.LOOPBACK, port=PORT):
         code.InteractiveConsole.__init__(self)
+        self.host = host
         self.port = port
         self.conn = None
 
     def interact(self, banner=None):
         logging.info('Enter.')
-        self.conn = rfoo.InetConnection().connect(port=self.port)
+        self.conn = rfoo.InetConnection().connect(host=self.host, port=self.port)
         return code.InteractiveConsole.interact(self, banner)
 
     def complete(self, phrase, state):
@@ -161,12 +162,12 @@ def spawn_server(namespace=None, port=PORT):
     thread.start_new_thread(_wrapper, ())
 
 
-def interact(banner=None, readfunc=None, port=PORT):
+def interact(banner=None, readfunc=None, host=rfoo.LOOPBACK, port=PORT):
     """Start console and connect to remote console server."""
 
-    logging.info('Enter, port=%d.', port)
+    logging.info('Enter, host=%s, port=%d.', host, port)
 
-    console = ProxyConsole(port)
+    console = ProxyConsole(host=host, port=port)
 
     if readfunc is not None:
         console.raw_input = readfunc
