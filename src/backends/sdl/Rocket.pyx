@@ -12,6 +12,7 @@ from ignifuga.Log import debug, error
 from ignifuga.components.Viewable import Viewable
 from ignifuga.backends.sdl.Renderer cimport Renderer
 from ignifuga.Gilbert import Gilbert
+from ignifuga.pQuery import pQuery
 
 cdef class Rocket:
     cdef init(self, SDL_Renderer *renderer, SDL_Window *window):
@@ -72,7 +73,7 @@ cdef class _RocketComponent:
         cdef Renderer renderer = <Renderer>Gilbert().renderer
         self.rocket = renderer.rocket
 
-    cpdef loadDocument(self, filename):
+    cpdef _loadDocument(self, filename):
         cdef bytes bFilename = bytes(filename)
         # TODO: Load this through the DataManager and use Rocket's LoadDocumentFromMemory
         self.doc = self.rocket.loadDocument(bFilename)
@@ -81,7 +82,7 @@ cdef class _RocketComponent:
         cdef bytes bFilename = bytes(filename)
         self.rocket.loadFont(bFilename)
 
-    cpdef unloadDocument(self):
+    cpdef _unloadDocument(self):
         if self.doc != NULL:
             self.doc.Close()
             self.doc = NULL
@@ -111,7 +112,8 @@ class RocketComponent(Viewable, _RocketComponent):
         self._loadDefaults({
             'file': None,
             'docCtx': None,
-            'fonts': []
+            'fonts': [],
+            'pQuery': None
         })
 
         super(RocketComponent, self).__init__(id, entity, active, frequency, **data)
@@ -125,21 +127,48 @@ class RocketComponent(Viewable, _RocketComponent):
 
         self.unloadDocument()
         self.loadDocument(self.file)
-        Gilbert().dataManager.addListener(self.file, self)
-        self.docCtx = self.getContext()
-        self.docCtx['parent'] = self
-        self.docCtx['gilbert'] = Gilbert()
+
+
         self.show()
         super(RocketComponent, self).init(**data)
 
     def free(self, **kwargs):
         self.hide()
-        del self.docCtx['gilbert']
-        del self.docCtx['parent']
-        self.docCtx = None
         self.unloadDocument()
         Gilbert().dataManager.removeListener(self.file, self)
         super(RocketComponent, self).free(**kwargs)
+
+    def loadDocument(self, filename):
+        self._loadDocument(filename)
+        Gilbert().dataManager.addListener(self.file, self)
+        self.docCtx = self.getContext()
+        self.docCtx['parent'] = self
+        self.docCtx['gilbert'] = Gilbert()
+
+        def _pQuery(selector, context=None):
+            if context is None:
+                context = pQuery(self.docCtx['document'])
+
+            return pQuery(selector, context)
+
+        self.docCtx['pQuery'] = _pQuery
+        self.docCtx['_'] = _pQuery
+
+        if 'onLoad' in self.docCtx:
+            self.docCtx['onLoad']()
+
+    def unloadDocument(self):
+
+        if self.docCtx is not None and 'onUnload' in self.docCtx:
+            self.docCtx['onUnload']()
+        self._unloadDocument()
+        if self.docCtx is not None:
+            del self.docCtx['gilbert']
+            del self.docCtx['parent']
+            del self.docCtx['pQuery']
+            del self.docCtx['_']
+            self.docCtx = None
+
 
     def reload(self, url):
         self.unloadDocument()

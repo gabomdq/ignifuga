@@ -250,6 +250,18 @@ class pQueryResult(list):
 
         return self
 
+    def __call__(self, *args, **kwargs):
+        ret = []
+        for target,name in super(pQueryResult, self).__iter__():
+            try:
+                f = getattr(target, name)
+                ret.append(f(*args, **kwargs))
+            except:
+                pass
+
+        return ret
+
+
 
 class pQueryWrapper(object):
     TYPE_UNKNOWN = 0
@@ -321,6 +333,185 @@ class pQueryWrapper(object):
             return self._targets[key]
 
         return None
+
+class pQueryWrapperRocket(pQueryWrapper):
+    """ Adds some jQuery inspired methods to the standard wrapper for use with Rocket elements
+    Most of this stuff returns a single value, but when used for setting it sets the value for all targeted items
+    """
+
+    # CSS stuff: http://api.jquery.com/category/css/
+
+    def addClass(self, name):
+        """Adds the specified class(es) to each of the set of matched elements."""
+        for target in self._targets:
+            for classname in name.split(' '):
+                if not target.IsClassSet(classname):
+                    target.SetClass(classname, True)
+
+    def css(self, name, value=None):
+        """ Get/set the value of a style property for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].GetProperty(name)
+            else:
+                for target in self._targets:
+                    target.SetProperty(name, value)
+
+        return None
+
+    def hasClass(self, name):
+        """Determine whether any of the matched elements are assigned the given class."""
+        for target in self._targets:
+            if target.IsClassSet(name):
+                return True
+
+        return False
+
+    def height(self, value=None):
+        """Get/set the current computed height for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].offset_height
+            else:
+                for target in self._targets:
+                    target.SetProperty('height', value)
+
+        return None
+
+    def innerHeight(self):
+        """Get the current computed height for the first element in the set of matched elements, including padding but not border."""
+        if self._targets:
+            return self._targets[0].client_height
+        return None
+
+    def innerWidth(self):
+        """Get the current computed width for the first element in the set of matched elements, including padding but not border."""
+        if self._targets:
+            return self._targets[0].client_width
+        return None
+
+    def offset(self, value=None):
+        """Get/set the current coordinates of the first element in the set of matched elements, relative to the document."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].absolute_left, self._targets[0].absolute_top
+            else:
+                for target in self._targets:
+                    try:
+                        target.SetProperty('left', value[0])
+                        target.SetProperty('top', value[1])
+                    except:
+                        pass
+
+        return None
+
+    def position(self):
+        """Get the current coordinates of the first element in the set of matched elements, relative to the offset parent."""
+        if self._targets:
+            return self._targets[0].offset_left, self._targets[0].offset_top
+
+        return None
+
+    def removeClass(self, name):
+        """Remove a single class from each element in the set of matched elements."""
+        for target in self._targets:
+            for classname in name.split(' '):
+                if target.IsClassSet(classname):
+                    target.SetClass(classname, False)
+
+    def scrollLeft(self, value=None):
+        """Get/set the current horizontal position of the scroll bar for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].scroll_left
+            else:
+                for target in self._targets:
+                    target.scroll_left = value
+
+        return None
+
+    def scrollTop(self, value=None):
+        """Get/set the current vertical position of the scroll bar for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].scroll_top
+            else:
+                for target in self._targets:
+                    target.scroll_top = value
+
+        return None
+
+    def toggleClass(self, name):
+        """Remove a single class, multiple classes, or all classes from each element in the set of matched elements."""
+        for target in self._targets:
+            for classname in name.split(' '):
+                if not target.IsClassSet(classname):
+                    target.SetClass(classname, True)
+                else:
+                    target.SetClass(classname, False)
+
+    def width(self, value=None):
+        """Get/set the current computed width for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].offset_width
+            else:
+                for target in self._targets:
+                    target.SetProperty('width', value)
+
+        return None
+
+    # Attributes: http://api.jquery.com/category/attributes/
+
+    def attr(self, name, value=None):
+        """Get/set the value of an attribute for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].GetAttribute(name)
+            else:
+                for target in self._targets:
+                    target.SetAttribute(name, value)
+
+        return None
+
+    def html(self, value=None):
+        """Get/set the value of an attribute for the first element in the set of matched elements."""
+        if self._targets:
+            if value is None:
+                return self._targets[0].inner_rml
+            else:
+                for target in self._targets:
+                    target.inner_rml = value
+
+        return None
+
+    def rml(self, value=None):
+        return self.html(value)
+
+    def val(self, value=None):
+        if self._targets:
+            try:
+                if value is None:
+                    return self._targets[0].text
+                else:
+                    for target in self._targets:
+                        target.text = value
+            except:
+                pass
+
+        return None
+
+    # Events: http://api.jquery.com/category/events/
+
+    def bind(self, eventType, handler, capture_phase=False):
+        """Attach a handler to an event for the elements."""
+        for target in self._targets:
+            target.AddEventListener(eventType, handler, capture_phase)
+
+    def unbind(self, eventType, handler, capture_phase=False):
+        """Attach a handler to an event for the elements."""
+        for target in self._targets:
+            target.RemoveEventListener(eventType, handler, capture_phase)
 
 
 def _splitSelector(selector):
@@ -398,7 +589,7 @@ def _pQueryIgnifuga(selector, targets):
     for selector in selector_parts:
         selector = selector.strip()
 
-        # Apply selectoring
+        # Apply selectors
         if len(targets) > 0:
             if selector == '':
                 # No selector
@@ -704,8 +895,283 @@ def _pQueryIgnifuga(selector, targets):
 
 
 #if ROCKET
-def _pQueryRocket(filter, targets):
-    pass
+def _pQueryRocket(selector, targets):
+    """ Filter targets according to the selector provided. See pQuery for a resume of selector options
+        No "or" operations are supported here, that's handled by the pQuery function
+    """
+
+    if selector == '':
+        return targets
+
+    # Make a copy of the incoming targets
+    targets = targets[:]
+    _targets = []
+
+    # String selector
+    r_parenthesis = re.compile('\(([^\)]*)\)')
+
+    selector_parts = _splitSelector(selector)
+
+    for selector in selector_parts:
+        selector = selector.strip()
+
+        # Apply selectors
+        if len(targets) > 0:
+            if selector == '':
+                # No selector
+                _targets = targets
+            elif selector == '*':
+                # Select every children down to the last level
+                while targets:
+                    target = targets.pop()
+                    for child in target.child_nodes:
+                        targets.append(child)
+                        if child not in _targets:
+                            _targets.append(child)
+
+            elif selector.startswith('#'):
+                # selector targets by id
+                id = selector[1:]
+                for target in targets:
+                    element = target.GetElementById(id)
+                    if element is not None:
+                        _targets.append(element)
+            elif selector.startswith('.'):
+                # selector targets by class
+                classname = selector[1:]
+                for target in targets:
+                    elements = target.GetElementsByClassName(classname)
+                    for element in elements:
+                        if element not in _targets:
+                            _targets.append(element)
+            elif selector.startswith('['):
+                # selector by attribute
+                selector = selector[1:-1] # remove [ and ]
+
+                op = None
+                if '|=' in selector:
+                    # Attribute Contains Prefix Selector [name|="value"] - Selects elements that have the specified attribute with a value either equal to a given string or starting with that string followed by a hyphen (-).
+                    name, value = selector.split('|=')
+                    op = '|'
+                elif '*=' in selector:
+                    # Attribute Contains Selector [name*="value"] - Selects elements that have the specified attribute with a value containing the a given substring.
+                    name, value = selector.split('*=')
+                    op = '*'
+                elif '~=' in selector:
+                    # Attribute Contains Word Selector [name~="value"] - Selects elements that have the specified attribute with a value containing a given word, delimited by spaces.
+                    name, value = selector.split('~=')
+                    op = '~'
+                elif '$=' in selector:
+                    # Attribute Ends With Selector [name$="value"] - Selects elements that have the specified attribute with a value ending exactly with a given string. The comparison is case sensitive.
+                    name, value = selector.split('$=')
+                    op = '$'
+                elif '!=' in selector:
+                    # Attribute Not Equal Selector [name!="value"] - Select elements that either don't have the specified attribute, or do have the specified attribute but not with a certain value.
+                    name, value = selector.split('!=')
+                    op = '!'
+                elif '^=' in selector:
+                    # Attribute Starts With Selector [name^="value"] - Selects elements that have the specified attribute with a value beginning exactly with a given string.
+                    name, value = selector.split('^=')
+                    op = '^'
+                elif '=' in selector:
+                    # Attribute Equals Selector [name="value"] - Selects elements that have the specified attribute with a value exactly equal to a certain value.
+                    name, value = selector.split('=')
+                    op = '='
+
+                if op != None:
+                    for target in targets:
+                        if hasattr(target, name):
+                            tvalue = str(getattr(target, name))
+                            if op == '|':
+                                if tvalue == value or tvalue.startswith(value+'-'):
+                                    _targets.append(target)
+                            elif op == '*':
+                                if value in tvalue:
+                                    _targets.append(target)
+                            elif op == '~':
+                                if " %s " % value in tvalue:
+                                    _targets.append(target)
+                            elif op == '$':
+                                if tvalue.endswith(value):
+                                    _targets.append(target)
+                            elif op == '!':
+                                if tvalue != value:
+                                    _targets.append(target)
+                            elif op == '^':
+                                if tvalue.startswith(value):
+                                    _targets.append(target)
+                            elif op == '=':
+                                if tvalue == value:
+                                    _targets.append(target)
+
+            elif selector == ':active' or selector==':enabled':
+                # selector by the active attribute
+                for target in targets:
+                    if isinstance(target, Scene):
+                        # Scene is active if it's the current scene
+                        if Gilbert().scene == target:
+                            _targets.append(target)
+                    elif isinstance(target, Entity):
+                        # Entity is active if it belongs to the active scene
+                        if Gilbert().scene == target.scene():
+                            _targets.append(target)
+                    elif isinstance(target, Component):
+                        # Component is active if it's marked as active
+                        if target.active:
+                            _targets.append(target)
+
+            elif selector == ':inactive' or selector==':disabled':
+                # selector by the active attribute
+                for target in targets:
+                    if isinstance(target, Scene):
+                        # Scene is active if it's the current scene
+                        if Gilbert().scene != target:
+                            _targets.append(target)
+                    elif isinstance(target, Entity):
+                        # Entity is active if it belongs to the active scene
+                        if Gilbert().scene != target.scene():
+                            _targets.append(target)
+                    elif isinstance(target, Component):
+                        # Component is active if it's marked as active
+                        if not target.active:
+                            _targets.append(target)
+
+            elif selector == ':even':
+                for t in range(0, len(targets), 2):
+                    _targets.append(targets[t])
+            elif selector == ':odd':
+                if len(targets) > 1:
+                    for t in range(1, len(targets), 2):
+                        _targets.append(targets[t])
+            elif selector == ':empty':
+                for target in targets:
+                    if isinstance(target, Scene) and not target.entities:
+                        # Empty scenes are scenes without entities
+                        _targets.append(target)
+                    elif isinstance(target, Entity) and not target.components:
+                        # Empty entities are entities without components
+                        if Gilbert().scene != target.scene():
+                            _targets.append(target)
+            elif selector == ':parent':
+                # Select targets that have children (opposite of :empty)
+                for target in targets:
+                    if isinstance(target, Scene) and target.entities:
+                        _targets.append(target)
+                    elif isinstance(target, Entity) and target.components:
+                        if Gilbert().scene != target.scene():
+                            _targets.append(target)
+            elif selector == ':first':
+                _targets.append(targets[0])
+            elif selector == ':last':
+                _targets.append(targets[-1])
+            elif selector == ':first-child':
+                for target in targets:
+                    if isinstance(target, Scene):
+                        if target.entities:
+                            _targets.append(target.entities.items()[0])
+                    elif isinstance(target, Entity):
+                        if target.components:
+                            _targets.append(target.components.items()[0])
+            elif selector == ':last-child':
+                for target in targets:
+                    if isinstance(target, Scene):
+                        if target.entities:
+                            _targets.append(target.entities.items()[-1])
+                    elif isinstance(target, Entity):
+                        if target.components:
+                            _targets.append(target.components.items()[-1])
+            elif selector == ':last-child':
+                for target in targets:
+                    if isinstance(target, Scene):
+                        if len(target.entities) == 1:
+                            _targets.append(target.entities.items()[0])
+                    elif isinstance(target, Entity):
+                        if len(target.components) == 1:
+                            _targets.append(target.components.items()[0])
+            elif selector == ':children' or selector == '>':
+                for target in targets:
+                    if isinstance(target, Scene):
+                        for entity in target.entities:
+                            _targets.append(entity)
+                    elif isinstance(target, Entity):
+                        for component in target.components.itervalues():
+                            _targets.append(component)
+            elif selector == ':visible':
+                # selector by the visibility attribute
+                for target in targets:
+                    if isinstance(target, Scene):
+                        # Scene is visible if it's the current scene
+                        if Gilbert().scene == target:
+                            _targets.append(target)
+                    elif isinstance(target, Entity):
+                        # Entity is visible if it has a visible property and belongs to the current scene
+                        try:
+                            if Gilbert().scene == target.scene() and target.visible:
+                                _targets.append(target)
+                        except:
+                            pass
+                    elif isinstance(target, Component):
+                        # Component is visible if it has the visible attribute and is marked as such
+                        try:
+                            if target.visible:
+                                _targets.append(target)
+                        except:
+                            pass
+            elif selector == ':hidden':
+                # selector by the visibility attribute (hidden)
+                for target in targets:
+                    if isinstance(target, Scene):
+                        # Scene is visible if it's the current scene
+                        if Gilbert().scene != target:
+                            _targets.append(target)
+                    elif isinstance(target, Entity):
+                        # Entity is visible if it has a visible property and belongs to the current scene
+                        try:
+                            if Gilbert().scene != target.scene() or not target.visible:
+                                _targets.append(target)
+                        except:
+                            pass
+                    elif isinstance(target, Component):
+                        # Component is visible if it has the visible attribute and is marked as such
+                        try:
+                            if not target.visible:
+                                _targets.append(target)
+                        except:
+                            pass
+            elif selector.startswith(':nth-child'):
+                rr = r_parenthesis.search(selector)
+                if rr is not None:
+                    try:
+                        value = int(rr.group(1))
+                        for target in targets:
+                            if isinstance(target, Scene):
+                                if len(target.entities) > value:
+                                    _targets.append(target.entities.values()[value])
+                            elif isinstance(target, Entity):
+                                if len(target.components) > value:
+                                    _targets.append(target.components.values()[value])
+                    except:
+                        pass
+            elif selector.startswith(':not'):
+                rr = r_parenthesis.search(selector)
+                if rr is not None:
+                    value = rr.group(1)
+                    __targets = _pQueryIgnifuga(value, targets[:])
+                    for target in targets:
+                        if target not in __targets:
+                            _targets.append(target)
+            else:
+                # Last chance, test if it is a tag selector (ie body, document, etc)
+                for target in targets:
+                    elements = target.GetElementsByTagName(selector)
+                    for element in elements:
+                        if element not in _targets:
+                            _targets.append(element)
+
+            targets = _targets[:]
+
+    return targets
+
 #endif
 
 def pQuery(selector, context = None):
@@ -784,7 +1250,7 @@ def pQuery(selector, context = None):
         return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA)
     #if ROCKET
     elif isinstance(selector, rocket.Document) or isinstance(selector, rocket.Element):
-        return pQueryWrapper([selector,], pQueryWrapper.TYPE_ROCKET)
+        return pQueryWrapperRocket([selector,], pQueryWrapper.TYPE_ROCKET)
     #endif
     elif inspect.isclass(selector):
         pass
@@ -848,13 +1314,16 @@ def pQuery(selector, context = None):
             for target in _pQueryIgnifuga(selector, context.targets):
                 if target not in targets:
                     targets.append(target)
+        return pQueryWrapper(targets, type)
+
     #if ROCKET
     elif type == pQueryWrapper.TYPE_ROCKET:
             for selector in selectors:
                 for target in _pQueryRocket(selector, context.targets):
                     if target not in targets:
                         targets.append(target)
+            return pQueryWrapperRocket(targets, type)
     #endif
 
-    return pQueryWrapper(targets, type)
+
 

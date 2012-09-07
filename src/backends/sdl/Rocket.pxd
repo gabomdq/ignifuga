@@ -92,8 +92,8 @@ cdef class _RocketComponent:
     cdef ElementDocument *doc
     cdef Rocket rocket
 
-    cpdef loadDocument(self, filename)
-    cpdef unloadDocument(self)
+    cpdef _loadDocument(self, filename)
+    cpdef _unloadDocument(self)
     cpdef loadFont(self, filename)
     cpdef getContext(self)
     cpdef show(self)
