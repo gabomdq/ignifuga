@@ -502,16 +502,18 @@ class pQueryWrapperRocket(pQueryWrapper):
         return None
 
     # Events: http://api.jquery.com/category/events/
-
     def bind(self, eventType, handler, capture_phase=False):
         """Attach a handler to an event for the elements."""
         for target in self._targets:
             target.AddEventListener(eventType, handler, capture_phase)
 
-    def unbind(self, eventType, handler, capture_phase=False):
+    def unbind(self, eventType, handler=None, capture_phase=False):
         """Attach a handler to an event for the elements."""
         for target in self._targets:
-            target.RemoveEventListener(eventType, handler, capture_phase)
+            if handler is not None:
+                target.RemoveEventListener(eventType, handler, capture_phase)
+            else:
+                target.RemoveEventListener(eventType)
 
 
 def _splitSelector(selector):
