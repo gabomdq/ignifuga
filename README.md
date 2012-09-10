@@ -1,4 +1,4 @@
-About the [Ignifuga Game Engine](www.ignifuga.org)
+About the [Ignifuga Game Engine](http://ignifuga.org)
 ==============================
 
 Ignifuga is a multi platform (Windows/Linux/OS X/iOS/Android) 2D hardware accelerated engine based on Python and Cython,
