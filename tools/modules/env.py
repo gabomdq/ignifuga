@@ -36,6 +36,7 @@ def get_target(platform, project_root = '.', dist=None, tmp=None):
     target.builds.JPG = join(tmp_dir, 'jpg')
     target.builds.ZLIB = join(tmp_dir, 'zlib')
     target.builds.IGNIFUGA = join(tmp_dir, 'ignifuga')
+    target.builds.GC = join(tmp_dir, 'gc')
 
     target.python_headers = join(target.builds.PYTHON, 'Include')
     target.sdl_headers = join(dist_dir, 'include', 'SDL')
@@ -47,8 +48,8 @@ def get_target(platform, project_root = '.', dist=None, tmp=None):
 
 
 
-def prepare_linux64_env(pp=None, openmp=False):
-    """ Set up the environment variables for Linux64 compilation"""
+def prepare_intel_linux64_env(pp=None, openmp=False):
+    """ Set up the environment variables for x86_64 Linux64 native compilation from a x86_64 Linux system"""
     if pp is None:
         pp = preprocessor()
 
@@ -58,9 +59,9 @@ def prepare_linux64_env(pp=None, openmp=False):
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
-    env['CFLAGS'] = "" if not 'CFLAGS' in env else env['CFLAGS']
-    env['CPPFLAGS'] = "" if not 'CPPFLAGS' in env else env['CPPFLAGS']
-    env['LDFLAGS'] = "" if not 'LDFLAGS' in env else env['LDFLAGS']
+    env['CFLAGS'] = " -m64" if not 'CFLAGS' in env else env['CFLAGS'] + ' -m64'
+    env['CPPFLAGS'] = " -m64" if not 'CPPFLAGS' in env else env['CPPFLAGS'] + ' -m64'
+    env['LDFLAGS'] = " -m64" if not 'LDFLAGS' in env else env['LDFLAGS'] + ' -m64'
     if openmp:
         env['CFLAGS'] += "-fopenmp"
         env['CPPFLAGS'] += "-fopenmp"
@@ -68,8 +69,30 @@ def prepare_linux64_env(pp=None, openmp=False):
     return env, pp
 
 
+def prepare_intel_linux32_env(pp=None, openmp=False):
+    """ Set up the environment variables for i386 Linux32 compilation from i386 or cross compilation from a x86_64 Linux system"""
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__LINUX__')
+    pp.defines.append('__LINUX32__')
+
+    env = deepcopy(os.environ)
+    env['CC'] = 'gcc'
+    env['STRIP'] = 'strip'
+    env['CFLAGS'] = " -m32" if not 'CFLAGS' in env else env['CFLAGS'] + ' -m32'
+    env['CPPFLAGS'] = " -m32" if not 'CPPFLAGS' in env else env['CPPFLAGS'] + ' -m32'
+    env['LDFLAGS'] = " -m32" if not 'LDFLAGS' in env else env['LDFLAGS'] + ' -m32'
+    if openmp:
+        env['CFLAGS'] += "-fopenmp"
+        env['CPPFLAGS'] += "-fopenmp"
+        env['LDFLAGS'] += '-lgomp'
+    return env, pp
+
+
+
 def prepare_osx_env(pp=None, openmp=False):
-    """ Set up the environment variables for OS X compilation"""
+    """ Set up the environment variables for OS X native compilation from a OS X environment, fat builds for i386 and x86_64"""
     global XCODE_ROOT, OSX_SDK
 
     if pp is None:
@@ -93,7 +116,7 @@ def prepare_osx_env(pp=None, openmp=False):
     return env, pp
 
 def prepare_ios_env(pp=None, openmp=False, sdk=None, target='3.0'):
-    """ Set up the environment variables for iOS compilation"""
+    """ Set up the environment variables for iOS cross compilation from a OS X environment, fat builds for armv6 and armv7"""
     if pp is None:
         pp = preprocessor()
 
@@ -128,7 +151,11 @@ def prepare_ios_env(pp=None, openmp=False, sdk=None, target='3.0'):
 
 ANDROID_VALID_GCC = ['4.4.3', '4.6']
 def prepare_android_env(pp=None, openmp=False, api_level=10, gcc='4.4.3'):
-    """ Set up the environment variables for Android compilation"""
+    """ Default to an ARM build """
+    return prepare_arm_android_env(pp, openmp, api_level, gcc)
+
+def prepare_arm_android_env(pp=None, openmp=False, api_level=10, gcc='4.4.3'):
+    """ Set up the environment variables for ARM Android cross compilation from a OS X or Linux environment"""
     from schafer import ANDROID_NDK, ANDROID_SDK, HOSTPYTHON, HOSTPGEN
     if pp is None:
         pp = preprocessor()
@@ -222,8 +249,8 @@ def prepare_android_env(pp=None, openmp=False, api_level=10, gcc='4.4.3'):
     return env, pp
 
 
-def prepare_mingw32_env(pp=None, openmp=False):
-    """ Set up the environment variables for Mingw32 compilation"""
+def prepare_intel_mingw32_env(pp=None, openmp=False):
+    """ Set up the environment variables for i386 Mingw32 cross compilation from OS X or Linux"""
     from schafer import HOSTPYTHON, HOSTPGEN
     if pp is None:
         pp = preprocessor()
@@ -252,4 +279,37 @@ def prepare_mingw32_env(pp=None, openmp=False):
     env['OBJDUMP'] = "i686-w64-mingw32-objdump"
     env['RESCOMP'] = "i686-w64-mingw32-windres"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
+    return env, pp
+
+
+def prepare_intel_mingw64_env(pp=None, openmp=False):
+    """ Set up the environment variables for x86_64 Mingw64 cross compilation from OS X x86_64 or Linux x86_64"""
+    from schafer import HOSTPYTHON, HOSTPGEN
+    if pp is None:
+        pp = preprocessor()
+
+    pp.defines.append('__MINGW__')
+    pp.defines.append('__MINGW64__')
+
+
+    env = deepcopy(os.environ)
+    env['ARCH'] = "win64"
+    # Force LIBC functions (otherwise you get undefined SDL_sqrt, SDL_cos, etc
+    # Force a dummy haptic and mm joystick (otherwise there a bunch of undefined symbols from SDL_haptic.c and SDL_joystick.c).
+    # The cross platform configuration of SDL doesnt work fine at this moment and it doesn't define these variables as it should
+    #env['CFLAGS'] = "-DHAVE_LIBC=1 -DSDL_HAPTIC_DUMMY=1 -DSDL_JOYSTICK_WINMM=1"
+    env['CFLAGS'] = ""
+    env['CXXFLAGS'] = env['CFLAGS']
+    env['CC'] = 'x86_64-w64-mingw32-gcc %s' % (env['CFLAGS'],)
+    env['CXX'] = 'x86_64-w64-mingw32-g++ %s' % (env['CXXFLAGS'],)
+    env['AR'] = "x86_64-w64-mingw32-ar"
+    env['RANLIB'] = "x86_64-w64-mingw32-ranlib"
+    env['STRIP'] = "x86_64-w64-mingw32-strip --strip-unneeded"
+    env['LD'] = "x86_64-w64-mingw32-ld"
+    env['AS'] = "x86_64-w64-mingw32-as"
+    env['NM'] = "x86_64-w64-mingw32-nm"
+    env['DLLTOOL'] = "x86_64-w64-mingw32-dlltool"
+    env['OBJDUMP'] = "x86_64-w64-mingw32-objdump"
+    env['RESCOMP'] = "x86_64-w64-mingw32-windres"
+    env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw64msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
     return env, pp

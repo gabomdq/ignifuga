@@ -163,6 +163,11 @@ def make(env, target):
     if not isfile(join(target.builds.SDL_TTF, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --with-sdl-prefix="%s" --with-freetype-prefix="%s" --prefix="%s"'% (target.dist, target.dist, target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
+        # Disable showfont/glfont to avoid the dependencies they carry
+        cmd = 'sed -e "s|.*showfont.*||g" -i "" %s' % (join(target.builds.SDL_TTF, 'Makefile'),)
+        Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
+        cmd = 'sed -e "s|.*glfont.*||g" -i "" %s' % (join(target.builds.SDL_TTF, 'Makefile'),)
+        Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL_TTF, env=env).communicate()
     cmd = 'make V=0 install'

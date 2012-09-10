@@ -70,7 +70,7 @@ def make(env, target, options, freeze_modules, frozen_file):
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
 
     freeze_modules += ['ntpath', 'locale']
-    make_python_freeze('mingw32', freeze_modules, frozen_file)
+    make_python_freeze(options.platform, freeze_modules, frozen_file)
     if isfile(join(target.dist, 'lib', 'libpython2.7.a')):
         os.remove(join(target.dist, 'lib', 'libpython2.7.a'))
 

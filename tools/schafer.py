@@ -6,7 +6,7 @@
 
 # Schafer: The Ignifuga Builder utility
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
-# Requires: RSync, Cython, GNU Tools, MINGW32, Android SDK, etc
+# Requires: RSync, Cython, GNU Tools, MINGW, Android SDK, etc
 
 import os, sys, shutil, shlex, imp, marshal, fnmatch
 from subprocess import Popen, PIPE
@@ -24,6 +24,7 @@ from modules.util import *
 from modules.pypreprocessor import preprocessor
 
 AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
+PLATFORM_ALIASES = get_platform_aliases()
 
 ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
 ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
@@ -47,6 +48,7 @@ SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
 SOURCES['IGNIFUGA'] = join(ROOT_DIR, 'src')
 SOURCES['ROCKET'] = join(ROOT_DIR, 'external', 'Rocket')
 SOURCES['BOOST'] = join(ROOT_DIR, 'external', 'boost')
+SOURCES['GC'] = join(ROOT_DIR, 'external', 'gc')
 
 ########################################################################################################################
 
@@ -75,13 +77,13 @@ def clean_modules(platforms, modules, everything=False):
 
 def check_ignifuga_libraries(platform):
     target = get_target(platform)
-    if platform in ['linux64', 'mingw32', 'osx', 'ios']:
+    if platform in ['intel_linux64', 'intel_linux32', 'mingw64', 'intel_mingw32', 'osx', 'ios']:
         if isfile(join(target.dist, 'lib', 'libpython2.7.a')) and \
            isfile(join(target.dist, 'lib', 'libSDL2.a')) and \
            isfile(join(target.dist, 'lib', 'libSDL2_image.a')) and \
            isfile(join(target.dist, 'lib', 'libSDL2_ttf.a')):
             return True
-    elif platform == 'android':
+    elif platform == 'arm_android':
         if isfile(join(target.dist, 'jni', 'python', 'libpython2.7.so')) and \
         isfile(join(target.dist, 'jni', 'SDL', 'libSDL2.so')) and \
         isfile(join(target.dist, 'jni', 'SDL_image', 'libSDL2_image.so')) and \
@@ -482,10 +484,10 @@ def spawn_shell(platform):
     target = get_target(platform)
     cmd = 'bash'
     env = os.environ
-    if platform == 'android':
-        env, pp = prepare_android_env()
-    elif platform == 'mingw32':
-        env, pp = prepare_mingw32_env()
+    if platform == 'arm_android':
+        env, pp = prepare_arm_android_env()
+    elif platform == 'intel_mingw32':
+        env, pp = prepare_intel_mingw32_env()
 
     info('Entering %s shell environment' % (platform,))
 
@@ -507,7 +509,7 @@ def build_generic(options, platform, pp, env=None):
     else:
         pp.undefines.append('ROCKET')
 
-    if platform in ['linux64', 'mingw32', 'osx']:
+    if platform in ['intel_linux64', 'intel_linux32', 'mingw64', 'intel_mingw32', 'osx']:
         # Android/iOS has its own skeleton set up
         cmd = 'mkdir -p "%s"' % target.dist
         Popen(shlex.split(cmd), env=env).communicate()
@@ -600,8 +602,8 @@ def build_project_generic(options, platform, target, pp, env=None):
 # ===============================================================================================================
 # LINUX 64
 # ===============================================================================================================
-def build_linux64 (options):
-    platform = 'linux64'
+def build_intel_linux64 (options):
+    platform = 'intel_linux64'
     target = get_target(platform)
 
     if options.main and check_ignifuga_libraries(platform):
@@ -609,14 +611,36 @@ def build_linux64 (options):
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_linux64_env(openmp=options.openmp)
+    env, pp = prepare_intel_linux64_env(openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
-def build_project_linux64(options, project_root):
-    platform = 'linux64'
-    env, pp = prepare_linux64_env(openmp=options.openmp)
+def build_project_intel_linux64(options, project_root):
+    platform = 'intel_linux64'
+    env, pp = prepare_intel_linux64_env(openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
+
+# ===============================================================================================================
+# LINUX 32
+# ===============================================================================================================
+def build_intel_linux32 (options):
+    platform = 'intel_linux32'
+    target = get_target(platform)
+
+    if options.main and check_ignifuga_libraries(platform):
+        return
+    info('Building Ignifuga For Linux 32 bits')
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
+    env, pp = prepare_intel_linux32_env(openmp=options.openmp)
+    build_generic(options, platform, pp, env)
+
+def build_project_intel_linux32(options, project_root):
+    platform = 'intel_linux32'
+    env, pp = prepare_intel_linux32_env(openmp=options.openmp)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, pp, env)
+
 
 
 # ===============================================================================================================
@@ -672,50 +696,71 @@ def build_project_ios(options, project_root):
 # ===============================================================================================================
 # ANDROID
 # ===============================================================================================================
-def prepare_android_skeleton():
+def prepare_arm_android_skeleton():
     """ Copy a skeleton of the final project to the dist directory """
-    target = get_target ('android')
+    target = get_target ('arm_android')
     if not isdir(target.dist):
         shutil.copytree(join(ROOT_DIR, 'tools', 'android_skeleton'), target.dist)
         cmd = 'find %s -name ".svn" -type d -exec rm -rf {} \;' % (target.dist,)
         Popen(shlex.split(cmd), cwd = target.dist).communicate()
     
-def build_android (options):
-    platform = 'android'
+def build_arm_android (options):
+    platform = 'arm_android'
     target = get_target(platform)
     if options.main != None and check_ignifuga_libraries(platform):
         return
     validate_android_api_level(options.androidtarget, ANDROID_SDK)
     info('Building Ignifuga For Android')
-    env, pp = prepare_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
-    prepare_android_skeleton()
+    env, pp = prepare_arm_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
+    prepare_arm_android_skeleton()
     build_generic(options, platform, pp, env)
 
-def build_project_android(options, project_root):
-    platform = 'android'
+def build_project_arm_android(options, project_root):
+    platform = 'arm_android'
     validate_android_api_level(options.androidtarget, ANDROID_SDK)
-    env, pp = prepare_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
+    env, pp = prepare_arm_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
 # ===============================================================================================================
 # Windows - Mingw32
 # ===============================================================================================================
-def build_mingw32 (options):
-    platform = 'mingw32'
+def build_intel_mingw32 (options):
+    platform = 'intel_mingw32'
     target = get_target(platform)
-    check_mingw32tools()
+    check_intel_mingw32_tools()
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For Windows 32 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_mingw32_env(openmp=options.openmp)
+    env, pp = prepare_intel_mingw32_env(openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
-def build_project_mingw32(options, project_root):
-    platform = 'mingw32'
-    env, pp = prepare_mingw32_env(openmp=options.openmp)
+def build_project_intel_mingw32(options, project_root):
+    platform = 'intel_mingw32'
+    env, pp = prepare_intel_mingw32_env(openmp=options.openmp)
+    target = get_target(platform, project_root)
+    build_project_generic(options, platform, target, pp, env)
+
+# ===============================================================================================================
+# Windows - Mingw64
+# ===============================================================================================================
+def build_intel_mingw64 (options):
+    platform = 'intel_mingw64'
+    target = get_target(platform)
+    check_intel_mingw64_tools()
+    if options.main and check_ignifuga_libraries(platform):
+        return
+    info('Building Ignifuga For Windows 64 bits')
+    if not isdir(target.dist):
+        os.makedirs(target.dist)
+    env, pp = prepare_intel_mingw64_env(openmp=options.openmp)
+    build_generic(options, platform, pp, env)
+
+def build_project_intel_mingw64(options, project_root):
+    platform = 'intel_mingw64'
+    env, pp = prepare_intel_mingw64_env(openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -727,8 +772,11 @@ if __name__ == '__main__':
     info('Schafer - The Ignifuga Builder Utility')
     usage = "schafer.py -p platform [options]"
     parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
+    parser.add_option("-A","--available-platforms",
+        action="store_true", dest="available_platforms", default=False,
+        help="List the available target platforms on the system")
     parser.add_option("-P", "--platform", dest="platform", default=None,
-                  help="Platform (iphone, android, linux, windows, osx, all)")
+                  help="Platform, see -A option for available platform names")
     parser.add_option("-M", "--module", dest="module", default="all",
                   help="Ignifuga module to build (all, ignifuga, sdl) Default: all")
     parser.add_option("-c", "--clean",
@@ -798,15 +846,32 @@ if __name__ == '__main__':
         install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK)
         exit()
 
+    if options.available_platforms:
+        print "Available Platforms: 'all',", str(AVAILABLE_PLATFORMS)[1:-1]
+        print "Platform Aliases:"
+        for platform, alias in PLATFORM_ALIASES.iteritems():
+            print platform, " -> ", alias
+        exit()
+
     options.platform = str(options.platform).lower()
+
+    if options.platform in PLATFORM_ALIASES:
+        options.platform = PLATFORM_ALIASES[options.platform]
+
+    # Temporarily disable intel_mingw64
+    if options.platform == 'intel_mingw64':
+        print "MingW64 support is temporarily disabled until this is solved: https://github.com/python-greenlet/greenlet/issues/20"
+        exit(1)
 
     if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
         error('Invalid target platform. Valid platforms: %s' % AVAILABLE_PLATFORMS)
         parser.print_help()
-        exit()
+        exit(1)
 
     if options.platform == 'all':
         platforms = AVAILABLE_PLATFORMS
+        # Temporarily disable intel_mingw64
+        platforms.remove('intel_mingw64')
     else:
         platforms = [options.platform,]
 
@@ -817,7 +882,7 @@ if __name__ == '__main__':
 
     if options.shell and options.platform != 'all':
         spawn_shell(options.platform)
-        exit()
+        exit(1)
 
     if options.module == 'all' or options.main != None:
         options.modules = [ 'sdl', 'ignifuga']

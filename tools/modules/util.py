@@ -72,9 +72,18 @@ def check_gnutools():
         check_tool(tool)
     return True
 
-def check_mingw32tools():
+def check_intel_mingw32_tools():
     tools = ['i686-w64-mingw32-gcc', 'i686-w64-mingw32-g++', 'i686-w64-mingw32-ar', 'i686-w64-mingw32-ranlib', 'i686-w64-mingw32-strip', 'i686-w64-mingw32-ld', 'i686-w64-mingw32-as',
              'i686-w64-mingw32-nm', 'i686-w64-mingw32-dlltool', 'i686-w64-mingw32-objdump', 'i686-w64-mingw32-windres']
+
+    for tool in tools:
+        check_tool(tool)
+
+    return True
+
+def check_intel_mingw64_tools():
+    tools = ['x86_64-w64-mingw32-gcc', 'x86_64-w64-mingw32-g++', 'x86_64-w64-mingw32-ar', 'x86_64-w64-mingw32-ranlib', 'x86_64-w64-mingw32-strip', 'x86_64-w64-mingw32-ld', 'x86_64-w64-mingw32-as',
+             'x86_64-w64-mingw32-nm', 'x86_64-w64-mingw32-dlltool', 'x86_64-w64-mingw32-objdump', 'x86_64-w64-mingw32-windres']
 
     for tool in tools:
         check_tool(tool)
@@ -175,10 +184,10 @@ def validate_android_api_level(level, ANDROID_SDK):
 def check_host_tools():
     """ Check if the required host tools are present """
     from schafer import HOSTPYTHON, HOSTPGEN, ROOT_DIR, HOST_DIST_DIR, prepare_python
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
+    processor, system, arch, distro_name, distro_version, distro_id = get_build_platform()
     supported_platform = False
     if system == 'Linux':
-        if arch == '64bit':
+        if processor == 'x86_64':
             if distro_name == 'Ubuntu':
                 if distro_id in ['natty', 'oneiric', 'precise']:
                     supported_platform = True
@@ -210,11 +219,16 @@ def check_host_tools():
         # First let's make the host version of Python, statically linked
         info('Building Python for the host')
         python_build = join(ROOT_DIR, 'tmp', 'python_host')
-        if system == 'Linux' and arch == '64bit':
-            prepare_python('linux64', None, python_build, os.environ)
-            cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
-            Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
-        elif system == 'Darwin' and arch == '64bit':
+        if system == 'Linux':
+            if arch == '64bit':
+                prepare_python('intel_linux64', None, python_build, os.environ)
+                cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
+                Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
+            else:
+                prepare_python('intel_linux32', None, python_build, os.environ)
+                cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
+                Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
+        elif system == 'Darwin':
             prepare_python('osx', None, python_build, os.environ)
             cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
@@ -261,15 +275,24 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
     Platforms supported:
     * Ubuntu 64 Natty 11.04
     * Ubuntu 64 Oneiric 11.10
-    * Ubuntu 64 Precise 11.10
+    * Ubuntu 32 Precise 12.04
+    * Ubuntu 64 Precise 12.04
     * OS X Lion 64
     """
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
+    processor, system, arch, distro_name, distro_version, distro_id = get_build_platform()
 
     log ('Installing development packages')
     if system == 'Linux':
-        cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib libgc1c2'
-        Popen(shlex.split(cmd)).communicate()
+        if processor == 'x86_64':
+            cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib libX11-dev'
+            Popen(shlex.split(cmd)).communicate()
+            # 32 bit versions
+            cmd = 'sudo apt-get -y install libX11-dev:i386'
+            Popen(shlex.split(cmd)).communicate()
+        elif processor in ['i386', 'i486', 'i586', 'i686']:
+            cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk gcc-multilib libX11-dev'
+            Popen(shlex.split(cmd)).communicate()
+
     elif system == 'Darwin':
         check_xcode()
         install_mac_ports()
@@ -422,23 +445,46 @@ def get_build_platform():
         distro_name, distro_version, distro_id = platform.linux_distribution()
     elif system == 'Darwin':
         distro_name, distro_version, distro_id = platform.mac_ver()
-    return system, arch, distro_name, distro_version, distro_id
+    return platform.processor(), system, arch, distro_name, distro_version, distro_id
 
 def get_available_platforms():
     """ Determine which build platforms are available depending on which platform we are building """
-    system, arch, distro_name, distro_version, distro_id = get_build_platform()
-
+    processor, system, arch, distro_name, distro_version, distro_id = get_build_platform()
+    AVAILABLE_PLATFORMS = []
     if system == 'Linux':
         SED_CMD = 'sed -i '
-        if arch == '64bit':
-            AVAILABLE_PLATFORMS = ['linux64', 'mingw32', 'android']
-        else:
-            AVAILABLE_PLATFORMS = ['mingw32', 'android']
+        if processor == 'x86_64':
+            AVAILABLE_PLATFORMS = ['intel_linux64', 'intel_linux32', 'intel_mingw32', 'intel_mingw64',  'arm_android', 'intel_android']
+        elif processor in ['i386', 'i486', 'i586', 'i686']:
+            AVAILABLE_PLATFORMS = ['intel_linux32', 'intel_mingw32', 'arm_android', 'intel_android']
     elif system == 'Darwin':
         SED_CMD = 'sed -i "" '
-        AVAILABLE_PLATFORMS = ['osx', 'android', 'ios']
+        AVAILABLE_PLATFORMS = ['osx', 'ios', 'arm_android', 'intel_android' ]
 
     return AVAILABLE_PLATFORMS, SED_CMD
+
+def get_platform_aliases():
+    """ Prepare a few platform dependent target system aliases """
+    processor, system, arch, distro_name, distro_version, distro_id = get_build_platform()
+    ALIASES = {}
+    ALIASES['android'] = 'arm_android'
+    ALIASES['mingw32'] = 'intel_mingw32'
+    ALIASES['win32'] = 'intel_mingw32'
+    ALIASES['mingw64'] = 'intel_mingw64'
+    ALIASES['win64'] = 'intel_mingw64'
+
+    if system == 'Linux':
+        if processor == 'x86_64':
+            ALIASES['linux'] = 'intel_linux64'
+            ALIASES['linux64'] = 'intel_linux64'
+            ALIASES['linux32'] = 'intel_linux32'
+        elif processor in ['i386', 'i486', 'i586', 'i686']:
+            ALIASES['linux'] = 'intel_linux32'
+            ALIASES['linux32'] = 'intel_linux32'
+    elif system == 'Darwin':
+        pass
+
+    return ALIASES
 
 def prepare_source(name, src, dst):
     if not isdir(src):

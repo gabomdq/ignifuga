@@ -52,6 +52,10 @@ cdef class Renderer:
             display = int(kwargs['display'])
 
         ndisplays = SDL_GetNumVideoDisplays()
+        debug ("System has %d displays" % ndisplays)
+        if ndisplays == 0:
+            error("Can not detect a valid display, exiting")
+            exit(1)
         if display > ndisplays-1:
             display = 0
         x = SDL_WINDOWPOS_UNDEFINED_MASK | display
@@ -102,7 +106,7 @@ cdef class Renderer:
         if self.window == NULL:
             error("COULD NOT CREATE SDL WINDOW")
             error(SDL_GetError())
-            sys.exit(1)
+            exit(1)
             return
 
         # Find the GL renderer (useful for windows)
@@ -120,7 +124,7 @@ cdef class Renderer:
         if self.renderer == NULL:
             error("COULD NOT CREATE RENDERER")
             error(SDL_GetError())
-            sys.exit(1)
+            exit(1)
             return
 
         SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "1")

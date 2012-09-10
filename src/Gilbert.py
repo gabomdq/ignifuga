@@ -318,7 +318,7 @@ class Gilbert:
                         elif callable(ref):
                             debug("    INSTANCEMETHOD: %s %s" % (hash(ref), str(ref)))
                             referrers1 = gc.get_referrers(ref)
-                            debug("NUMBER OF REFERRERS", len(referrers1))
+                            debug("NUMBER OF REFERRERS %d" % len(referrers1))
                             for ref1 in referrers1:
                                 if ref1 != referrers and ref1 != objs:
                                     debug(ref1)

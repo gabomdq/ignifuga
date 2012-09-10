@@ -69,7 +69,7 @@ def make(env, target, options, freeze_modules, frozen_file):
         cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
 
-    make_python_freeze('android', freeze_modules, frozen_file)
+    make_python_freeze(options.platform, freeze_modules, frozen_file)
     if isfile(join(target.builds.PYTHON, 'libpython2.7.so')):
         os.remove(join(target.builds.PYTHON, 'libpython2.7.so'))
 

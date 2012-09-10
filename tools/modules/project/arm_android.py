@@ -16,7 +16,7 @@ def make(options, env, target, sources, cython_src, cfiles):
     from schafer import SED_CMD, ANDROID_SDK, ANDROID_NDK
 
     # Copy/update the skeleton
-    platform_build = join(target.project, 'android')
+    platform_build = join(target.project, options.platform)
     android_project = join(platform_build, 'android_project')
     jni_src = join(android_project, 'jni', 'src')
     local_cfiles = []
