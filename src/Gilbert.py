@@ -12,7 +12,7 @@ from ignifuga.Singleton import Singleton
 from ignifuga.Log import *
 import sys, pickle, os, weakref, gc, platform, copy, base64
 from optparse import OptionParser
-from ignifuga.rfoo import QueueInetServer, LOOPBACK
+from ignifuga.rfoo import QueueInetServer, LOOPBACK, QueueWebsocketServer
 from ignifuga.rfoo.utils.rconsole import ConsoleHandler
 import thread, socket
 
@@ -166,6 +166,8 @@ class Gilbert:
         self.parser.add_option("-p", "--profile", action="store_true", dest="profile", default=False,help="Do a profile (ignored by the engine, useful for apps)")
         self.parser.add_option("-c", "--capture", action="store_true", dest="capture", default=False,help="Start paused (useful for video capture)")
         self.parser.add_option("-r", "--remote", action="store_true", dest="remote", default=False,help="Enable Remote Console (http://code.google.com/p/rfoo/)")
+        self.parser.add_option("-t", "--telnetremote", action="store_true", dest="telnetremote", default=False,help="Enable A Telnet Remote Console")
+        self.parser.add_option("-j", "--jsremote", action="store_true", dest="jsremote", default=False,help="Enable A Websockets Remote Console")
         self.parser.add_option("--staticglobals", action="store_true", dest="staticglobals", default=False,help="Dont update the remote console globals to match the current scene")
         self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port (default: 54321)")
         self.parser.add_option("--ip", dest="ip", default='0.0.0.0',help="Remote Console IP to bind to (default: 0.0.0.0)")
@@ -238,6 +240,10 @@ class Gilbert:
 
         if options.remote:
             self.startRemoteConsole(options.ip, options.port, options.staticglobals)
+        elif options.jsremote:
+            self.startWebsocketRemoteConsole(options.ip, options.port, options.staticglobals)
+        elif options.telnetremote:
+            self.startSocketRemoteConsole(options.ip, options.port, options.staticglobals)
         self.gameLoop = GameLoop(remoteConsole = self.remoteConsole)
 
         if options.capture:
@@ -490,12 +496,24 @@ class Gilbert:
     def startRemoteConsole(self, ip='127.0.0.1', port=54321, staticglobals=False):
         debug("Enabling Remote Console on port %d" % port)
         self.remoteConsole = QueueInetServer(ConsoleHandler, globals(), staticglobals)
+        self._startRemoteConsoleThread(ip, port)
 
+    def startWebsocketRemoteConsole(self, ip='127.0.0.1', port=54321, staticglobals=False):
+        debug("Enabling Websocket Remote Console on port %d" % port)
+        self.remoteConsole = QueueWebsocketServer(ConsoleHandler, globals(), staticglobals)
+        self._startRemoteConsoleThread(ip, port)
+
+    def startSocketRemoteConsole(self, ip='127.0.0.1', port=54321, staticglobals=False):
+        debug("Enabling Socket Remote Console on port %d" % port)
+        self.remoteConsole = QueueWebsocketServer(ConsoleHandler, globals(), staticglobals, websocket=False)
+        self._startRemoteConsoleThread(ip, port)
+
+    def _startRemoteConsoleThread(self, ip, port ):
         def _wrapper():
             try:
                 self.remoteConsole.start(ip, port)
             except socket.error:
-                error('Failed to bind rconsole to socket port, port=%r.', port)
+                error('Failed to bind rconsole to socket port, port=%r.' % port)
 
         thread.start_new_thread(_wrapper, ())
 

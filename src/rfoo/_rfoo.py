@@ -55,6 +55,11 @@ import inspect
 import socket
 import sys
 import os
+import re
+from hashlib import sha1, md5
+import struct
+from base64 import b64encode
+import traceback
 
 import marshal as _marshal
 
@@ -594,7 +599,7 @@ class QueueInetServer(InetServer):
                     type, name, args, kwargs = loads(data)
                     # Buffer the call for later processing with self.process
                     self.inBuf.append((handler, c, type, name, args, kwargs))
-            except EofError:
+            except:
                 logging.debug('Caught end of file, error=%r.', sys.exc_info()[1])
 
         finally:
@@ -621,7 +626,7 @@ class QueueInetServer(InetServer):
             try:
 
                 if not self.staticglobals:
-                    if gilbert.scene != None:
+                    if gilbert.scene is not None:
                         self._handler_context = gilbert.scene.runEnv
                     else:
                         self._handler_context = globals()
@@ -647,4 +652,249 @@ class QueueInetServer(InetServer):
             if type == CALL:
                 response = dumps((result, error))
                 conn.write(response)
+
+class STDProxy:
+    def __init__(self, conn, rfc6455=False):
+        self.conn = conn
+        self.rfc6455 = rfc6455
+
+    def write(self, message):
+        if self.rfc6455:
+            self.conn.sendall(chr(129))
+            length = len(message)
+            if length <= 125:
+                self.conn.sendall(chr(length))
+            elif length >= 126 and length <= 65535:
+                self.conn.sendall(chr(126))
+                self.conn.sendall(struct.pack(">H", length))
+            else:
+                self.conn.sendall(chr(127))
+                self.conn.sendall(struct.pack(">Q", length))
+            self.conn.sendall(message)
+        else:
+            self.conn.sendall(message)
+
+    def read(self, l):
+        r = self.conn.recv(l)
+        return r or ' '
+
+    def readline(self):
+        data = []
+        while 1:
+            c = self.read(1)
+            if c == '\n':
+                return ''.join(data) + '\n'
+            data.append(c)
+
+class QueueWebsocketServer(QueueInetServer):
+    """ A queueing websocket server for Ignifuga, this one processes strings received by socket, stores them in a buffer for processing in the main thread
+    and sets up the current scene namespace as if the commands where run from a component
+    Websocket encoding/decoding/handshake stuff inspired by: https://gist.github.com/3136208
+    For RFC 6455 reference see http://tools.ietf.org/html/rfc6455
+    """
+    handshake = (
+        "HTTP/1.1 101 Web Socket Protocol Handshake\r\n"
+        "Upgrade: WebSocket\r\n"
+        "Connection: Upgrade\r\n"
+        "WebSocket-Origin: %(origin)s\r\n"
+        "WebSocket-Location: ws://%(bind)s:%(port)s/\r\n"
+        "Sec-Websocket-Origin: %(origin)s\r\n"
+        "Sec-Websocket-Location: ws://%(bind)s:%(port)s/\r\n"
+        )
+
+    def __init__(self, handler_type, handler_context=None, staticglobals=False, websocket=True):
+        super(QueueWebsocketServer, self).__init__(handler_type, handler_context)
+        self.websocket = websocket
+        self.rfc6455 = False
+
+    def dohandshake(self, conn, header, key=None):
+        print "Begin handshake: %s" % header
+        rfc6455_magic = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+        digitRe = re.compile(r'[^0-9]')
+        spacesRe = re.compile(r'\s')
+        part_1 = part_2 = origin = digest = None
+        for line in header.split('\r\n')[1:]:
+            name, value = line.split(': ', 1)
+            if name.lower() == "sec-websocket-key1":
+                key_number_1 = int(digitRe.sub('', value))
+                spaces_1 = len(spacesRe.findall(value))
+                if spaces_1 == 0:
+                    return False
+                if key_number_1 % spaces_1 != 0:
+                    return False
+                part_1 = key_number_1 / spaces_1
+            elif name.lower() == "sec-websocket-key2":
+                key_number_2 = int(digitRe.sub('', value))
+                spaces_2 = len(spacesRe.findall(value))
+                if spaces_2 == 0:
+                    return False
+                if key_number_2 % spaces_2 != 0:
+                    return False
+                part_2 = key_number_2 / spaces_2
+            elif name.lower() == "origin":
+                origin = value
+            elif name.lower() == 'sec-websocket-key':
+                digest = b64encode(sha1(value + rfc6455_magic).hexdigest().decode('hex'))
+                self.rfc6455 = True
+            elif name.lower() == 'upgrade':
+                if value.lower() != "websocket":
+                    print "Unsupported Websocket Upgrade: ", value
+                    raise Exception("Unsupported Websocket Upgrade: %s" % value)
+
+        handshake = QueueWebsocketServer.handshake % {
+            'origin': origin,
+            'port': conn.getsockname()[1],
+            'bind': conn.getsockname()[0]
+        }
+
+        if part_1 and part_2:
+            print "Using challenge + response"
+            challenge = struct.pack('!I', part_1) + struct.pack('!I', part_2) + key
+            response = md5(challenge).digest()
+            handshake += '\r\n' + response
+        elif digest != None:
+            print "Using digest response"
+            handshake += 'Sec-WebSocket-Accept: %s\r\n\r\n' % digest
+        else:
+            print "Not using challenge + response"
+            handshake += '\r\n\r\n'
+
+        print "Sending handshake %s" % handshake
+        conn.send(handshake)
+        return True
+
+    def _on_accept(self, conn, addr):
+        """Serve acceptted connection.
+        Should be used in the context of a threaded server, see
+        threaded_connection(), or fork server (not implemented here).
+        """
+
+        logging.info('Enter, addr=%s.', addr)
+
+        try:
+            #
+            # Instantiate handler for the lifetime of the connection,
+            # making it possible to manage a state between calls.
+            #
+            handler = self._handler_type(addr, self._handler_context)
+
+            header = ''
+            if self.websocket:
+                while True:
+                    header += conn.recv(1024)
+                    if header.find('\r\n\r\n') != -1:
+                        parts = header.split('\r\n\r\n', 1)
+                        if self.dohandshake(conn, parts[0], parts[1]):
+                            break
+
+            proxy = STDProxy(conn, self.rfc6455)
+            data = ''
+            try:
+                while True:
+
+                    if self.websocket and self.rfc6455:
+                        tmp = ''
+                        while len(tmp) < 2:
+                            tmp += conn.recv(1)
+                        length = ord(tmp[1]) & 127
+                        tmp = ''
+                        if length == 126:
+                            while len(tmp) < 2:
+                                tmp += conn.recv(1)
+                            length = struct.unpack(">H", tmp)[0]
+                        elif length == 127:
+                            while len(tmp) < 8:
+                                tmp += conn.recv(1)
+                            length = struct.unpack(">Q", tmp)[0]
+                        tmp = ''
+                        while len(tmp) < 4:
+                            tmp += conn.recv(1)
+
+                        masks = [ord(byte) for byte in tmp]
+                        decoded = ""
+                        tmp = ''
+
+                        while len(tmp) < length:
+                            tmp += conn.recv(1)
+
+                        for char in tmp:
+                            decoded += chr(ord(char) ^ masks[len(decoded) % 4])
+                        data += decoded
+                    else:
+                        data += conn.recv(1024)
+
+                    try:
+                        if data != '':
+                            #compile(data, '<string>', 'exec')
+                            # The data received is a valid Python instruction, buffer the call for later processing with self.process
+                            self.inBuf.append((handler, proxy, data))
+                            data = ''
+                    except:
+                        pass
+            except:
+                print "Socket error", traceback.format_exc()
+
+        finally:
+            try:
+                conn.shutdown(socket.SHUT_RDWR)
+            except socket.error:
+                pass
+            conn.close()
+            if 'handler' in locals():
+                handler._close()
+
+    def process(self, data=None):
+        """Process buffered incoming calls
+        The data parameter is ignored, it's there for compatibility with init/update from the Entity/Components classes
+        as this function is going to be called within a greenlet
+        """
+        if self.inBuf and not self.staticglobals:
+            # We change the namespace available on each call, kinda hacky and certainly slow...but hey, it works and the scene is dinamically available to you
+            from ignifuga.Gilbert import Gilbert
+            from ignifuga.rfoo.utils.rconsole import BufferedInterpreter
+            import rlcompleter
+
+            gilbert = Gilbert()
+
+        while self.inBuf:
+            handler, proxy, data = self.inBuf.pop(0)
+
+            sys.stdin = proxy
+            sys.stdout = proxy
+            sys.stderr = proxy
+            try:
+
+                if not self.staticglobals:
+                    if gilbert.scene is not None:
+                        self._handler_context = gilbert.scene.runEnv
+                    else:
+                        self._handler_context = globals()
+
+                    handler._namespace = self._handler_context
+                    handler._interpreter = BufferedInterpreter(handler._namespace)
+                    handler._completer = rlcompleter.Completer(handler._namespace)
+
+                handler._interpreter.runsource(data)
+                error = None
+
+            except:
+                print traceback.format_exc()
+                # Use exc_info for py2.x py3.x compatibility.
+                t, v, tb = sys.exc_info()
+                if t in BUILTIN_EXCEPTIONS:
+                    error = (t.__name__, v.args)
+                else:
+                    error = (repr(t), v.args)
+                result = None
+
+#            if handler._interpreter.buffout != '':
+#                conn.sendall(handler._interpreter.buffout)
+#                handler._interpreter.buffout = ''
+#
+#            if error is not None:
+#                conn.sendall(str(error))
+
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        sys.stdin = sys.__stdin__
 
