@@ -354,14 +354,14 @@ cdef extern from "SDL.h":
     cdef void SDL_DestroyRenderer (SDL_Renderer * renderer)
     cdef SDL_Texture * SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
     cdef SDL_Texture * SDL_CreateTextureFromSurface(SDL_Renderer * renderer, SDL_Surface * surface)
-    cdef SDL_Surface * SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask)
+    cdef SDL_Surface * SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask) nogil
     cdef int SDL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect * srcrect, SDL_Rect * dstrect)
     cdef int SDL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture, SDL_Rect * srcrect, SDL_Rect * dstrect, double angle, SDL_Point *center, SDL_RendererFlip flip)
     cdef void SDL_RenderPresent(SDL_Renderer * renderer)
     cdef SDL_bool SDL_RenderTargetSupported(SDL_Renderer *renderer)
     cdef int SDL_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture)
     cdef void SDL_DestroyTexture(SDL_Texture * texture)
-    cdef void SDL_FreeSurface(SDL_Surface * surface)
+    cdef void SDL_FreeSurface(SDL_Surface * surface) nogil
     cdef int SDL_UpperBlit (SDL_Surface * src, SDL_Rect * srcrect, SDL_Surface * dst, SDL_Rect * dstrect)
     cdef int SDL_LockTexture(SDL_Texture * texture, SDL_Rect * rect, void **pixels, int *pitch)
     cdef void SDL_UnlockTexture(SDL_Texture * texture)
@@ -407,7 +407,7 @@ cdef extern from "SDL.h":
     cdef int SDL_GetRenderDriverInfo(int index, SDL_RendererInfo* info)
     cdef int SDL_GL_BindTexture(SDL_Texture *texture, float *texw, float *texh)
     cdef int SDL_GL_UnbindTexture(SDL_Texture *texture)
-
+    cdef int SDL_RenderReadPixels(SDL_Renderer * renderer, SDL_Rect * rect, Uint32 format, void *pixels, int pitch) nogil
 
 cdef extern from "SDL_image.h":
     cdef SDL_Surface *IMG_Load(char *file)
@@ -562,12 +562,116 @@ cdef extern from "SDL_ttf.h":
 
 cpdef str readFile(str name)
 
-cdef extern from "stdlib.h":
-    ctypedef int size_t
-    void* malloc(size_t)
-    void free(void*)
-    void *memcpy(void *dst, void *src, long n)
+#cdef extern from "stdlib.h":
+#    ctypedef int size_t
+#    void* malloc(size_t)
+#    void free(void*)
+#    void *memcpy(void *dst, void *src, long n)
 
 #cdef extern from "SDL_ignifuga.h":
 #    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)
 
+cdef extern from "turbojpeg.h":
+    ctypedef void* tjhandle
+    cdef enum TJPF:
+        # RGB pixel format.  The red, green, and blue components in the image are stored in 3-byte pixels in the order R, G, B from lowest to highest byte address within each pixel.
+        TJPF_RGB=0,
+        # BGR pixel format.  The red, green, and blue components in the image are stored in 3-byte pixels in the order B, G, R from lowest to highest byte address within each pixel.
+        TJPF_BGR,
+        # RGBX pixel format.  The red, green, and blue components in the image are stored in 4-byte pixels in the order R, G, B from lowest to highest byte address within each pixel.  The X component is ignored when compressing and undefined when decompressing.
+        TJPF_RGBX,
+        # BGRX pixel format.  The red, green, and blue components in the image are stored in 4-byte pixels in the order B, G, R from lowest to highest byte address within each pixel.  The X component is ignored when compressing and undefined when decompressing.
+        TJPF_BGRX,
+        # XBGR pixel format.  The red, green, and blue components in the image are stored in 4-byte pixels in the order R, G, B from highest to lowest byte address within each pixel.  The X component is ignored when compressing and undefined when decompressing.
+        TJPF_XBGR,
+        # XRGB pixel format.  The red, green, and blue components in the image are stored in 4-byte pixels in the order B, G, R from highest to lowest byte address within each pixel.  The X component is ignored when compressing and undefined when decompressing.
+        TJPF_XRGB,
+        # Grayscale pixel format.  Each 1-byte pixel represents a luminance (brightness) level from 0 to 255.
+        TJPF_GRAY,
+        #* RGBA pixel format.  This is the same as @ref TJPF_RGBX, except that when
+        #* decompressing, the X component is guaranteed to be 0xFF, which can be
+        #* interpreted as an opaque alpha channel.
+        TJPF_RGBA,
+        #* BGRA pixel format.  This is the same as @ref TJPF_BGRX, except that when
+        #* decompressing, the X component is guaranteed to be 0xFF, which can be
+        #* interpreted as an opaque alpha channel.
+        TJPF_BGRA,
+        #* ABGR pixel format.  This is the same as @ref TJPF_XBGR, except that when
+        #* decompressing, the X component is guaranteed to be 0xFF, which can be
+        #* interpreted as an opaque alpha channel.
+        TJPF_ABGR,
+        #* ARGB pixel format.  This is the same as @ref TJPF_XRGB, except that when
+        #* decompressing, the X component is guaranteed to be 0xFF, which can be
+        #* interpreted as an opaque alpha channel.
+        TJPF_ARGB
+
+    cdef enum TJSAMP:
+        #* 4:4:4 chrominance subsampling (no chrominance subsampling).  The JPEG or
+        #* YUV image will contain one chrominance component for every pixel in the
+        #* source image.
+        TJSAMP_444=0,
+        #* 4:2:2 chrominance subsampling.  The JPEG or YUV image will contain one
+        #* chrominance component for every 2x1 block of pixels in the source image.
+        TJSAMP_422,
+        #* 4:2:0 chrominance subsampling.  The JPEG or YUV image will contain one
+        #* chrominance component for every 2x2 block of pixels in the source image.
+        TJSAMP_420,
+        #* Grayscale.  The JPEG or YUV image will contain no chrominance components.
+        TJSAMP_GRAY,
+        #* 4:4:0 chrominance subsampling.  The JPEG or YUV image will contain one
+        #* chrominance component for every 1x2 block of pixels in the source image.
+        TJSAMP_440
+
+
+
+    cdef tjhandle tjInitCompress() nogil
+
+    #/**
+    #* Compress an RGB or grayscale image into a JPEG image.
+    #*
+    #* @param handle a handle to a TurboJPEG compressor or transformer instance
+    #* @param srcBuf pointer to an image buffer containing RGB or grayscale pixels
+    #*        to be compressed
+    #* @param width width (in pixels) of the source image
+    #* @param pitch bytes per line of the source image.  Normally, this should be
+    #*        <tt>width * #tjPixelSize[pixelFormat]</tt> if the image is unpadded,
+    #*        or <tt>#TJPAD(width * #tjPixelSize[pixelFormat])</tt> if each line of
+    #*        the image is padded to the nearest 32-bit boundary, as is the case
+    #*        for Windows bitmaps.  You can also be clever and use this parameter
+    #*        to skip lines, etc.  Setting this parameter to 0 is the equivalent of
+    #*        setting it to <tt>width * #tjPixelSize[pixelFormat]</tt>.
+    #* @param height height (in pixels) of the source image
+    #* @param pixelFormat pixel format of the source image (see @ref TJPF
+    #                                                                *        "Pixel formats".)
+    #* @param jpegBuf address of a pointer to an image buffer that will receive the
+    #*        JPEG image.  TurboJPEG has the ability to reallocate the JPEG buffer
+    #*        to accommodate the size of the JPEG image.  Thus, you can choose to:
+    #*        -# pre-allocate the JPEG buffer with an arbitrary size using
+    #*        #tjAlloc() and let TurboJPEG grow the buffer as needed,
+    #*        -# set <tt>*jpegBuf</tt> to NULL to tell TurboJPEG to allocate the
+    #*        buffer for you, or
+    #*        -# pre-allocate the buffer to a "worst case" size determined by
+    #*        calling #tjBufSize().  This should ensure that the buffer never has
+    #*        to be re-allocated (setting #TJFLAG_NOREALLOC guarantees this.)
+    #                             *        .
+    #               *        If you choose option 1, <tt>*jpegSize</tt> should be set to the
+    #                                                                                    *        size of your pre-allocated buffer.  In any case, unless you have
+    #                                                                                                                                                         *        set #TJFLAG_NOREALLOC, you should always check <tt>*jpegBuf</tt> upon
+    #                                                                                                                                                         *        return from this function, as it may have changed.
+    #* @param jpegSize pointer to an unsigned long variable that holds the size of
+    #*        the JPEG image buffer.  If <tt>*jpegBuf</tt> points to a
+    #*        pre-allocated buffer, then <tt>*jpegSize</tt> should be set to the
+    #*        size of the buffer.  Upon return, <tt>*jpegSize</tt> will contain the
+    #*        size of the JPEG image (in bytes.)
+    #* @param jpegSubsamp the level of chrominance subsampling to be used when
+    #*        generating the JPEG image (see @ref TJSAMP
+    #                                             *        "Chrominance subsampling options".)
+    #* @param jpegQual the image quality of the generated JPEG image (1 = worst,
+    #                                                                     100 = best)
+    #* @param flags the bitwise OR of one or more of the @ref TJFLAG_BOTTOMUP
+    #*        "flags".
+    #*
+    #* @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
+
+    cdef int tjCompress2(tjhandle handle, unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf, unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags) nogil
+    cdef void tjFree(unsigned char *buffer) nogil

@@ -18,8 +18,8 @@ import time, sys
 DEF NUM_STREAMS = 20
 
 cdef class GameLoop(GameLoopBase):
-    def __init__(self, fps = 30.0, remoteConsole=None):
-        super(GameLoop, self).__init__(fps, remoteConsole)
+    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322):
+        super(GameLoop, self).__init__(fps, remoteConsole, remoteScreen, ip, port)
         self.renderer = <Renderer>Gilbert().renderer
         self._screen_w, self._screen_h = self.renderer.screenSize
         self.paused = False
@@ -46,6 +46,9 @@ cdef class GameLoop(GameLoopBase):
         cdef Uint32 now
         cdef Sint64 remainingTime
         cdef Uint64 nowx, freqx = self.ticks_second / 1000
+        cdef char *jpegBuf
+        cdef unsigned long jpegBufSize
+        cdef bytes screenCap
 
         overlord = Gilbert()
 #        if overlord.platform in ['iphone',]:
@@ -93,8 +96,30 @@ cdef class GameLoop(GameLoopBase):
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 self.fw.update()
 #endif
+                if self.enableRemoteScreen:
+                    if self.remoteScreenHandlers:
+                        print len(self.remoteScreenHandlers)
+                        jpegBuf = NULL
+                        jpegBufSize = 0
+                        if self.renderer.captureScreenJPEG(<unsigned char**>&jpegBuf, &jpegBufSize):
+                            screenCap = jpegBuf[:jpegBufSize]
+                            self.renderer.releaseCapturedScreenBufferJPEG(<unsigned char*>jpegBuf)
+                            jpegBuf = NULL
+
+                            for handler in self.remoteScreenHandlers:
+                                handler.screen = screenCap
+                                handler.screenSize = jpegBufSize
+                                handler.sem.release()
+                    # If remote screen is enabled, the renderer won't flip automatically because its waiting for us to order the screenshot
+                    self.renderer.flip()
+
                 with nogil: # No gil in case there's other threads waiting for us (for example rconsole)
                     SDL_Delay( remainingTime)
+            elif self.enableRemoteScreen:
+                # If remote screen is enabled, the renderer won't flip automatically because its waiting for us to order the screenshot
+                # in this case, there's not enough time
+                self.renderer.flip()
+
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev

@@ -13,7 +13,7 @@ from ..log import log, error
 from schafer import prepare_source, ROOT_DIR, SOURCES, SED_CMD
 import multiprocessing
 
-def prepare(env, target):
+def prepare(env, target, options):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL)
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE)
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
@@ -22,6 +22,8 @@ def prepare(env, target):
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE)
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE, 'Makefile') )
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
+    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
 
     shutil.copy(join(ROOT_DIR, 'external', 'Makefile.in.zlib'), join(target.builds.ZLIB, 'Makefile.in'))
     shutil.copy(join(ROOT_DIR, 'external', 'Makefile.libpng.mingw64'), join(target.builds.PNG, 'Makefile'))

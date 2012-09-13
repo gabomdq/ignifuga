@@ -99,7 +99,11 @@ cdef class Canvas (CanvasBase):
                 else:
                     self._surfacehw = SDL_CreateTexture(self._sdlRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, self._width, self._height)
             else:
-                self._surfacesw = SDL_CreateRGBSurface(0, self._width, self._height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+                #if BIG_ENDIAN
+                self._surfacesw = SDL_CreateRGBSurface(0, self._width, self._height, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF)
+                #else
+                self._surfacesw = SDL_CreateRGBSurface(0, self._width, self._height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 )
+                #endif
                 
         
         if (self._hw and self._surfacehw == NULL) or ( not self._hw and self._surfacesw == NULL):
@@ -172,14 +176,22 @@ cdef class Canvas (CanvasBase):
         
         if self._hw:
             # Convert our surface to software surface
-            dst = SDL_CreateRGBSurfaceFrom(NULL, dw, dh, 32, 0, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+            #if BIG_ENDIAN
+            dst = SDL_CreateRGBSurface(0, dw, dh, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF)
+            #else
+            dst = SDL_CreateRGBSurface(0, dw, dh, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 )
+            #endif
             SDL_LockTexture(self._surfacehw, &dstRect, &dst.pixels, &dst.pitch)
         else:
             dst = self._surfacesw
             
         if canvas._hw:
             # Convert the other surface to software surface
-            src = SDL_CreateRGBSurfaceFrom(NULL, sw, sh, 32, 0, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+            #if BIG_ENDIAN
+            src = SDL_CreateRGBSurface(0, sw, sh, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF)
+            #else
+            src = SDL_CreateRGBSurface(0, sw, sh, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 )
+            #endif
             SDL_LockTexture(canvas._surfacehw, &srcRect, &src.pixels, &src.pitch)
         else:
             src = canvas._surfacesw

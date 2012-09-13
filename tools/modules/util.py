@@ -499,3 +499,18 @@ def prepare_source(name, src, dst):
     Popen(shlex.split(cmd), cwd = src).communicate()
 
     return retval
+
+def validate_ogg_implementation(platform, libogg=None):
+    """ Validate the desired ogg implementation
+    Valid libogg values are None, vorbis, tremor, tremorlm
+    """
+    libogg = libogg.upper() if libogg is not None else None
+    if platform in ['intel_linux64', 'intel_linux32', 'intel_mingw32', 'intel_mingw64', 'osx']:
+        if libogg in ['VORBIS', 'TREMOR', 'TREMORLM']:
+            return libogg
+        return 'VORBIS'
+
+    if platform in ['arm_android', 'intel_android', 'ios']:
+        if libogg in ['TREMOR', 'TREMORLM']:
+            return libogg
+        return 'TREMORLM'

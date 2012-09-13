@@ -203,7 +203,7 @@ _locale _localemodule.c  # -lintl
 #fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
 #spwd spwdmodule.c		# spwd(3) 
 #grp grpmodule.c		# grp(3)
-#select selectmodule.c	# select(2); not on ancient System V
+select selectmodule.c	# select(2); not on ancient System V
 
 # Memory-mapped files (also works on Win32).
 #mmap mmapmodule.c

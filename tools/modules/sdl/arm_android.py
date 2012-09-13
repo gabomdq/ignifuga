@@ -14,7 +14,7 @@ from schafer import SED_CMD, ROOT_DIR, SOURCES, ANDROID_NDK, ANDROID_SDK
 from ..util import prepare_source
 import multiprocessing
 
-def prepare(env, target):
+def prepare(env, target, options):
     patch_target = not isdir(target.builds.SDL) # Keep count if we are starting from scratch to avoid rebuilding excessively too many files
     prepare_source('SDL Android Skeleton', join(SOURCES['SDL'], 'android-project'), target.builds.SDL)
     if patch_target:
@@ -50,6 +50,10 @@ def prepare(env, target):
         os.unlink(join(target.builds.SDL, 'build.xml'))
     cmd = 'android update project -t %s -p %s' % (env['TARGET'], target.builds.SDL)
     Popen(shlex.split(cmd)).communicate()
+
+    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
+
 
 
 def make(env, target):

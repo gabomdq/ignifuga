@@ -39,9 +39,11 @@ SOURCES['PYTHON'] = join(ROOT_DIR, 'external', 'Python')
 SOURCES['SDL'] = join(ROOT_DIR, 'external', 'SDL')
 SOURCES['SDL_IMAGE'] = join(ROOT_DIR, 'external', 'SDL_image')
 SOURCES['SDL_TTF'] = join(ROOT_DIR, 'external', 'SDL_ttf')
+SOURCES['SDL_MIXER'] = join(ROOT_DIR, 'external', 'SDL_mixer')
 SOURCES['FREETYPE'] = join(ROOT_DIR, 'external', 'freetype')
 SOURCES['PNG'] = join(ROOT_DIR, 'external', 'png')
-SOURCES['JPG'] = join(ROOT_DIR, 'external', 'jpeg')
+#SOURCES['JPG'] = join(ROOT_DIR, 'external', 'jpeg')
+SOURCES['JPGTURBO'] = join(ROOT_DIR, 'external', 'libjpeg-turbo')
 SOURCES['ZLIB'] = join(ROOT_DIR, 'external', 'zlib')
 SOURCES['GREENLET'] = join(ROOT_DIR, 'external', 'greenlet')
 SOURCES['BITARRAY'] = join(ROOT_DIR, 'external', 'bitarray', 'bitarray')
@@ -49,6 +51,9 @@ SOURCES['IGNIFUGA'] = join(ROOT_DIR, 'src')
 SOURCES['ROCKET'] = join(ROOT_DIR, 'external', 'Rocket')
 SOURCES['BOOST'] = join(ROOT_DIR, 'external', 'boost')
 SOURCES['GC'] = join(ROOT_DIR, 'external', 'gc')
+SOURCES['VORBIS'] = join(ROOT_DIR, 'external', 'libvorbis')
+SOURCES['TREMOR'] = join(ROOT_DIR, 'external', 'Tremor')
+SOURCES['TREMORLM'] = join(ROOT_DIR, 'external', 'Tremor-LM')
 
 ########################################################################################################################
 
@@ -141,8 +146,10 @@ def make_python(platform, ignifuga_src, options, env=os.environ):
     freeze_modules += ['threading','collections', 'keyword', 'heapq']
     # For profiling
     freeze_modules += ['cProfile', 'runpy', 'pkgutil', 'pstats', 'functools', 'bisect']
-    # For rfoo: cStringIO
-    freeze_modules += ['logging', 'atexit', 'inspect', 'dis', 'opcode', 'tokenize', 'token', 'socket', 'rlcompleter', 'pprint', 'codeop', 'code', '__future__']
+    # For rfoo: cStringIO, md5, sha*
+    freeze_modules += ['logging', 'atexit', 'inspect', 'dis', 'opcode', 'tokenize', 'token', 'socket', 'rlcompleter', 'pprint', 'codeop', 'code', '__future__', 'hashlib']
+    # For remote screen
+    freeze_modules += ['BaseHTTPServer', 'mimetools', 'SocketServer', 'tempfile', 'random', 'rfc822']
 
     target = get_target(platform)
     mod = __import__('modules.python.'+platform, fromlist=['make'])
@@ -467,15 +474,15 @@ def cythonize(build_dir, package_name, options, skip=[]):
 # ===============================================================================================================
 # SDL BUILDING
 # ===============================================================================================================
-def prepare_sdl(platform, env=None):
+def prepare_sdl(platform, options, env):
     target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['prepare'])
-    mod.prepare(env, target)
+    mod.prepare(env, target, options)
 
-def make_sdl(platform, env=None):
+def make_sdl(platform, options, env):
     target = get_target(platform)
     mod = __import__('modules.sdl.'+platform, fromlist=['make'])
-    mod.make(env, target)
+    mod.make(env, target, options)
 
 # ===============================================================================================================
 # PLATFORM BUILDS
@@ -485,9 +492,9 @@ def spawn_shell(platform):
     cmd = 'bash'
     env = os.environ
     if platform == 'arm_android':
-        env, pp = prepare_arm_android_env()
+        env, pp = prepare_arm_android_env(target)
     elif platform == 'intel_mingw32':
-        env, pp = prepare_intel_mingw32_env()
+        env, pp = prepare_intel_mingw32_env(target)
 
     info('Entering %s shell environment' % (platform,))
 
@@ -526,8 +533,8 @@ def build_generic(options, platform, pp, env=None):
     # Compile SDL statically
     if 'sdl' in options.modules:
         info('Building SDL')
-        prepare_sdl(platform, env)
-        make_sdl(platform, env)
+        prepare_sdl(platform, options, env)
+        make_sdl(platform, options, env)
 
     # Compile Ignifuga then Python statically
     if 'ignifuga' in options.modules:
@@ -611,12 +618,13 @@ def build_intel_linux64 (options):
     info('Building Ignifuga For Linux 64 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_intel_linux64_env(openmp=options.openmp)
+    env, pp = prepare_intel_linux64_env(target, openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
 def build_project_intel_linux64(options, project_root):
     platform = 'intel_linux64'
-    env, pp = prepare_intel_linux64_env(openmp=options.openmp)
+    target = get_target(platform)
+    env, pp = prepare_intel_linux64_env(target, openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -632,12 +640,13 @@ def build_intel_linux32 (options):
     info('Building Ignifuga For Linux 32 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_intel_linux32_env(openmp=options.openmp)
+    env, pp = prepare_intel_linux32_env(target, openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
 def build_project_intel_linux32(options, project_root):
     platform = 'intel_linux32'
-    env, pp = prepare_intel_linux32_env(openmp=options.openmp)
+    target = get_target(platform)
+    env, pp = prepare_intel_linux32_env(target, openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -655,12 +664,13 @@ def build_osx (options):
     info('Building Ignifuga For OS X')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_osx_env(openmp=options.openmp)
+    env, pp = prepare_osx_env(target, openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
 def build_project_osx(options, project_root):
     platform = 'osx'
-    env, pp = prepare_osx_env(openmp=options.openmp)
+    target = get_target(platform)
+    env, pp = prepare_osx_env(target, openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -682,13 +692,14 @@ def build_ios (options):
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For iOS')
-    env, pp = prepare_ios_env(None, options.openmp, options.iossdk, options.iostarget)
+    env, pp = prepare_ios_env(target, None, options.openmp, options.iossdk, options.iostarget)
     prepare_ios_skeleton()
     build_generic(options, platform, pp, env)
 
 def build_project_ios(options, project_root):
     platform = 'ios'
-    env, pp = prepare_ios_env(None, options.openmp, options.iossdk, options.iostarget)
+    target = get_target(platform)
+    env, pp = prepare_ios_env(target, None, options.openmp, options.iossdk, options.iostarget)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -711,14 +722,15 @@ def build_arm_android (options):
         return
     validate_android_api_level(options.androidtarget, ANDROID_SDK)
     info('Building Ignifuga For Android')
-    env, pp = prepare_arm_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
+    env, pp = prepare_arm_android_env(target, openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
     prepare_arm_android_skeleton()
     build_generic(options, platform, pp, env)
 
 def build_project_arm_android(options, project_root):
     platform = 'arm_android'
     validate_android_api_level(options.androidtarget, ANDROID_SDK)
-    env, pp = prepare_arm_android_env(openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
+    target = get_target(platform)
+    env, pp = prepare_arm_android_env(target, openmp=options.openmp, api_level=options.androidtarget, gcc=options.androidgcc)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -734,12 +746,13 @@ def build_intel_mingw32 (options):
     info('Building Ignifuga For Windows 32 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_intel_mingw32_env(openmp=options.openmp)
+    env, pp = prepare_intel_mingw32_env(target, openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
 def build_project_intel_mingw32(options, project_root):
     platform = 'intel_mingw32'
-    env, pp = prepare_intel_mingw32_env(openmp=options.openmp)
+    target = get_target(platform)
+    env, pp = prepare_intel_mingw32_env(target, openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -755,12 +768,13 @@ def build_intel_mingw64 (options):
     info('Building Ignifuga For Windows 64 bits')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_intel_mingw64_env(openmp=options.openmp)
+    env, pp = prepare_intel_mingw64_env(target, openmp=options.openmp)
     build_generic(options, platform, pp, env)
 
 def build_project_intel_mingw64(options, project_root):
     platform = 'intel_mingw64'
-    env, pp = prepare_intel_mingw64_env(openmp=options.openmp)
+    target = get_target(platform)
+    env, pp = prepare_intel_mingw64_env(target, openmp=options.openmp)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -838,6 +852,9 @@ if __name__ == '__main__':
     parser.add_option("--enable-valgrind",
         action="store_true", dest="valgrind", default=False,
         help="Create a Valgrind friendly build (although much slower)")
+    parser.add_option("--ogg",
+        default=None, dest="libogg",
+        help="Ogg decoder implementation, valid values are: vorbis (uses libvorbis), tremor, tremorlm (uses the low mem branch of Tremor)")
 
     (options, args) = parser.parse_args()
 
@@ -896,7 +913,10 @@ if __name__ == '__main__':
     # Check the availability of host tools, build host Python if required.
     check_host_tools()
 
+    libogg = options.libogg
+
     for platform in platforms:
+        options.libogg = validate_ogg_implementation(platform, libogg)
         locals()["build_"+platform](options)
 
     info ('Ignifuga engine files are ready.')

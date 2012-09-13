@@ -13,7 +13,7 @@ from ..log import log, error
 from schafer import prepare_source, SED_CMD, SOURCES
 import multiprocessing
 
-def prepare(env, target):
+def prepare(env, target, options):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_armv6')
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_armv7')
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+'_armv6')
@@ -31,6 +31,12 @@ def prepare(env, target):
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+'_armv6', 'Makefile') )
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE+'_armv7')
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+'_armv7', 'Makefile') )
+
+    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG+'_armv6')
+    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG+'_armv7')
+    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER+'_armv6')
+    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER+'_armv7')
+
 
 def make(env, target):
     ncpu = multiprocessing.cpu_count()

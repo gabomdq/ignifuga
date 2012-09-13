@@ -60,12 +60,16 @@ cdef class Renderer:
     cdef bint _keep_aspect
     # Scroll displacement in screen coordinates
     cdef int _scroll_x, _scroll_y
+    cdef bint autoflip
 
     # Sprites
     cdef map[int,deque[Sprite_p]] *zmap
     cdef deque[_Sprite] *active_sprites
     cdef deque[Sprite_p] *free_sprites
     cdef bint dirty, _userCanScroll, _userCanZoom
+
+    # JPEG compressor
+    cdef tjhandle tjh
 
 #if ROCKET
     # Rocket wrapper
@@ -114,6 +118,8 @@ cdef class Renderer:
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil
     cdef bint _spriteInteractive(self, _Sprite *sprite, bint interactive) nogil
     cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil
+    cdef bint captureScreenJPEG(self, unsigned char **jpegBuffer, unsigned long *jpegSize) nogil
+    cdef bint releaseCapturedScreenBufferJPEG(self, unsigned char *jpegBuffer) nogil
 
 
     cpdef cleanup(self)

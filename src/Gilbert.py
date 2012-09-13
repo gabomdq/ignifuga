@@ -168,8 +168,9 @@ class Gilbert:
         self.parser.add_option("-r", "--remote", action="store_true", dest="remote", default=False,help="Enable Remote Console (http://code.google.com/p/rfoo/)")
         self.parser.add_option("-t", "--telnetremote", action="store_true", dest="telnetremote", default=False,help="Enable A Telnet Remote Console")
         self.parser.add_option("-j", "--jsremote", action="store_true", dest="jsremote", default=False,help="Enable A Websockets Remote Console")
+        self.parser.add_option("-s", "--remotescreen", action="store_true", dest="remotescreen", default=False,help="Create a MJPEG stream of the screen at port+1")
         self.parser.add_option("--staticglobals", action="store_true", dest="staticglobals", default=False,help="Dont update the remote console globals to match the current scene")
-        self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port (default: 54321)")
+        self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port base (default: 54321)")
         self.parser.add_option("--ip", dest="ip", default='0.0.0.0',help="Remote Console IP to bind to (default: 0.0.0.0)")
 
     
@@ -235,7 +236,7 @@ class Gilbert:
         self._touchCaptor = None
         self._lastEvent = None
 
-        self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display)
+        self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display, autoflip=not options.remotescreen)
         self.dataManager = DataManager()
 
         if options.remote:
@@ -244,7 +245,7 @@ class Gilbert:
             self.startWebsocketRemoteConsole(options.ip, options.port, options.staticglobals)
         elif options.telnetremote:
             self.startSocketRemoteConsole(options.ip, options.port, options.staticglobals)
-        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole)
+        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole, remoteScreen = options.remotescreen, ip=options.ip, port=int(options.port)+1)
 
         if options.capture:
             print "System paused, press Enter to continue"

@@ -81,6 +81,8 @@ cdef class GameLoopBase(object):
     cdef PyGreenlet *main_greenlet
     cdef bint updateRemoteConsole
     cdef object remoteConsole
+    cdef bint enableRemoteScreen
+    cdef object remoteScreenServer, remoteScreenHandlers
 
 
     cpdef startEntity(self, entity, bint load_phase=*)
@@ -95,4 +97,6 @@ cdef class GameLoopBase(object):
     cpdef removeWatch(self, filename)
     cdef taskDecRef (self, _Task* taskp)
     cpdef free(self)
+    cpdef addRemoteScreenHandler(self, handler)
+    cpdef removeRemoteScreenHandler(self, handler)
     #cpdef checkStatus(self)

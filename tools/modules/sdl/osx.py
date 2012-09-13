@@ -13,7 +13,7 @@ from ..log import log, error
 from schafer import prepare_source, SED_CMD, SOURCES
 import multiprocessing
 
-def prepare(env, target):
+def prepare(env, target, options):
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_i386')
     prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_x86_64')
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+'_i386')
@@ -37,6 +37,8 @@ def prepare(env, target):
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE)
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE, 'Makefile') )
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
+    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
 
 def make(env, target):
     ncpu = multiprocessing.cpu_count()

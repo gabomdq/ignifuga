@@ -12,6 +12,13 @@
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Log import debug, error
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from SocketServer import ThreadingMixIn
+
+class MultiThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
+
+import thread, threading
 #import traceback
 
 # Python enum exports
@@ -44,15 +51,40 @@ cdef bint isdead(PyGreenlet* greenlet):
 
     return True
 
+class HTTPRemoteScreenHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.screen = None
+        self.screenSize = 0
+        self.sem = threading.Semaphore(0)
+        Gilbert().gameLoop.addRemoteScreenHandler(self)
+        BOUNDARY = 'IGNIFUGA-FRAME'
+        try:
+            self.send_response(200, 'OK')
+            self.send_header('Server', 'Ignifuga Game Engine')
+            self.send_header('Content-type', 'multipart/x-mixed-replace;boundary=%s' % BOUNDARY)
+            self.end_headers()
+
+            while True:
+                self.sem.acquire()
+                if self.screen is not None:
+                    self.wfile.write('--%s\r\n' % BOUNDARY)
+                    self.wfile.write('Content-Type: image/jpeg\r\n')
+                    self.wfile.write('Content-Length: %d\r\n\r\n' % self.screenSize)
+                    self.wfile.write(self.screen)
+                    self.screen = None
+        except:
+            pass
+        Gilbert().gameLoop.removeRemoteScreenHandler(self)
 
 cdef class GameLoopBase(object):
-    def __init__(self, fps = 30.0, remoteConsole = None):
+    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322):
         # SDL should be initialized at this point when Renderer was instantiated
         self.quit = False
         self.fps = fps
         self.frame_time = 0
         self.freezeRenderer = True
         self.released = False
+        self.enableRemoteScreen = remoteScreen
 
         self.loading = new deque[_Task]()
         self.loading_tmp = new deque[_Task]()
@@ -69,6 +101,18 @@ cdef class GameLoopBase(object):
             self.remoteConsole = remoteConsole
             self.updateRemoteConsole = True
             self.startRunnable(self.remoteConsole, False, self.remoteConsole.process)
+
+        if self.enableRemoteScreen:
+            self.remoteScreenServer = MultiThreadedHTTPServer((ip, port), HTTPRemoteScreenHandler)
+            self.remoteScreenHandlers = []
+            def _wrapper():
+                try:
+                    self.remoteScreenServer.serve_forever()
+                except :
+                    print "Halting remote screen server"
+                    self.remoteScreenServer.socket.close()
+
+            thread.start_new_thread(_wrapper, ())
 
     def __dealloc__(self):
         self.free()
@@ -377,6 +421,14 @@ cdef class GameLoopBase(object):
 
     cpdef removeWatch(self, filename):
         raise Exception('not implemented')
+
+    cpdef addRemoteScreenHandler(self, handler):
+        self.remoteScreenHandlers.append(handler)
+
+    cpdef removeRemoteScreenHandler(self, handler):
+        if handler in self.remoteScreenHandlers:
+            self.remoteScreenHandlers.remove(handler)
+
 
 #    cpdef checkStatus(self):
 #        cdef _Task *task

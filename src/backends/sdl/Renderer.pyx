@@ -32,7 +32,7 @@ SDL_WINDOWPOS_CENTERED_MASK = 0x2FFF0000
 SDL_WINDOWPOS_UNDEFINED_MASK = 0x1FFF0000
 
 cdef class Renderer:
-    def __init__(self, width=None, height=None, fullscreen = True, **kwargs):
+    def __init__(self, width=None, height=None, fullscreen = True, autoflip=True, **kwargs):
         cdef SDL_DisplayMode dm
         cdef int display = 0, x, y
         cdef char *metamode
@@ -44,6 +44,7 @@ cdef class Renderer:
         self._scale_y = 1.0
         self._scroll_x = 0
         self._scroll_y = 0
+        self.autoflip = autoflip
 
         # Create target window and renderer
         self._fullscreen = fullscreen
@@ -161,6 +162,9 @@ cdef class Renderer:
         self.rocket = Rocket()
         self.rocket.init(self.renderer, self.window)
         #endif
+
+        # JPEG Turbo
+        self.tjh = tjInitCompress()
 
         debug('Renderer initialized')
 
@@ -317,8 +321,9 @@ cdef class Renderer:
         self.rocket.update()
         self.rocket.render()
 #endif
-
-        self.flip()
+        # If remote screen is enabled, don't flip automatically, the gameloop will flip for us after it's taken the screenshot
+        if self.autoflip:
+            self.flip()
 
     cdef bint _indexSprite(self, _Sprite* sprite):
         cdef zmap_iterator ziter
@@ -803,6 +808,29 @@ cdef class Renderer:
             inc (ziter)
 
         return continuePropagation or ethereal, captureEvent and not ethereal, captor
+
+    cdef bint captureScreenJPEG(self, unsigned char **jpegBuffer, unsigned long *jpegSize) nogil:
+        """ Capture the screen and compress it with jpeg """
+        #if BIG_ENDIAN
+        cdef SDL_Surface *surface = SDL_CreateRGBSurface(0, self._width, self._height, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF)
+        #else
+        cdef SDL_Surface *surface = SDL_CreateRGBSurface(0, self._width, self._height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 )
+        #endif
+
+        if surface:
+            if SDL_RenderReadPixels(self.renderer, NULL, surface.format.format, surface.pixels, surface.pitch) == 0:
+                if tjCompress2(self.tjh, <unsigned char *>surface.pixels, self._width, surface.pitch, self._height, TJPF_RGBA, jpegBuffer, jpegSize, TJSAMP_444, 100, 0) == 0:
+                    SDL_FreeSurface(surface)
+                    return True
+            SDL_FreeSurface(surface)
+
+        return False
+
+    cdef bint releaseCapturedScreenBufferJPEG(self, unsigned char *jpegBuffer) nogil:
+        tjFree(jpegBuffer)
+        return True
+
+
 
 #OLD UPDATE ROUTINE THAT's DIRTY RECT BASED. KEPT HERE FOR FUTURE GENERATIONS ENJOYMENT ¿?
 #    cpdef update(self):
