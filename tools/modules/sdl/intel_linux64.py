@@ -20,25 +20,24 @@ def prepare(env, target, options):
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE)
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
     prepare_source('libpng', SOURCES['PNG'], target.builds.PNG)
-    shutil.copy(join(target.builds.PNG, 'scripts', 'makefile.linux'), join(target.builds.PNG, 'Makefile'))
-    #prepare_source('libjpeg', SOURCES['JPG'], target.builds.JPG)
     prepare_source('libjpeg-turbo', SOURCES['JPGTURBO'], target.builds.JPGTURBO)
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE)
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE, 'Makefile') )
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
 
-    if options.libogg == 'VORBIS' and isfile(join(target.builds.OGG, 'vorbisidec.pc.in')):
-        cmd = 'rm -rf %s' % target.builds.OGG
+    if options.oggdecoder == 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisidec.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
         Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'rm -rf %s' % target.builds.SDL_MIXER
         Popen(shlex.split(cmd), env=env).communicate()
-    elif options.libogg != 'VORBIS' and isfile(join(target.builds.OGG, 'vorbisenc.pc.in')):
-        cmd = 'rm -rf %s' % target.builds.OGG
+    elif options.oggdecoder != 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisenc.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
         Popen(shlex.split(cmd), env=env).communicate()
         cmd = 'rm -rf %s' % target.builds.SDL_MIXER
         Popen(shlex.split(cmd), env=env).communicate()
 
-    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    prepare_source('OGG', SOURCES['LIBOGG'], target.builds.LIBOGG)
+    prepare_source('VORBIS', SOURCES[options.oggdecoder], target.builds.OGGDECODER)
     prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
 
 
@@ -51,9 +50,7 @@ def make(env, target, options):
     if not isfile(join(target.builds.ZLIB, 'Makefile')):
         cmd = './configure --static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make -j%d' % ncpu
-    Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make install'
+    cmd = 'make -j%d install' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     if isfile(join(target.dist, 'lib', 'libz.a')):
         log('zlib built successfully')
@@ -65,13 +62,12 @@ def make(env, target, options):
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         os.remove(join(target.dist, 'lib', 'libpng.a'))
 
-    cmd = 'make -j%d V=0 prefix="%s"' % (ncpu, target.dist,)
+    if not isfile(join(target.builds.PNG, 'Makefile')):
+        cmd = './configure --enable-static --disable-shared --prefix="%s" --with-zlib-prefix="%s"'% (target.dist,target.builds.ZLIB)
+        Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
+
+    cmd = 'make -j%d install ' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
-    cmd = 'make V=0 install prefix="%s"' % (target.dist,)
-    Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
-    # Remove dynamic libraries to avoid confusions with the linker
-    cmd = 'find %s -name "*.so*" -delete' % join(target.dist, 'lib')
-    Popen(shlex.split(cmd), cwd = join(target.dist, 'lib'), env=env).communicate()
 
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         log('libpng built successfully')
@@ -182,26 +178,43 @@ def make(env, target, options):
         exit()
 
     # Build OGG
+    if isfile(join(target.dist, 'lib', 'libogg.a')):
+        os.remove(join(target.dist, 'lib', 'libogg.a'))
+
+    if not isfile(join(target.builds.LIBOGG, 'Makefile')):
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-oggtest --prefix="%s"'% (target.dist)
+        Popen(shlex.split(cmd), cwd = target.builds.LIBOGG, env=env).communicate()
+
+    cmd = 'make -j%d install V=0' % ncpu
+    Popen(shlex.split(cmd), cwd = target.builds.LIBOGG, env=env).communicate()
+
+    if isfile(join(target.dist, 'lib', 'libogg.a')):
+        log('Libogg built successfully')
+    else:
+        error('Problem building Libogg')
+        exit()
+
+    # Build OGG Decoder
     if isfile(join(target.dist, 'lib', 'libvorbis.a')):
         os.remove(join(target.dist, 'lib', 'libvorbis.a'))
 
     if isfile(join(target.dist, 'lib', 'libvorbisidec.a')):
         os.remove(join(target.dist, 'lib', 'libvorbisidec.a'))
 
-    if not isfile(join(target.builds.OGG, 'configure')):
+    if not isfile(join(target.builds.OGGDECODER, 'configure')):
         cmd = './autogen.sh'
-        Popen(shlex.split(cmd), cwd = target.builds.OGG, env=env).communicate()
-        if isfile(join(target.builds.OGG, 'Makefile')):
-            os.remove(join(target.builds.OGG, 'Makefile'))
+        Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
+        if isfile(join(target.builds.OGGDECODER, 'Makefile')):
+            os.remove(join(target.builds.OGGDECODER, 'Makefile'))
 
-    if not isfile(join(target.builds.OGG, 'Makefile')):
+    if not isfile(join(target.builds.OGGDECODER, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-oggtest --prefix="%s"'% (target.dist)
-        Popen(shlex.split(cmd), cwd = target.builds.OGG, env=env).communicate()
+        Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
 
     cmd = 'make -j%d install V=0' % ncpu
-    Popen(shlex.split(cmd), cwd = target.builds.OGG, env=env).communicate()
+    Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
 
-    if options.libogg == 'VORBIS':
+    if options.oggdecoder == 'VORBIS':
         sdl_mixer_ogg = '--enable-music-ogg --disable-music-ogg-tremor'
         # Libvorbis
         if isfile(join(target.dist, 'lib', 'libvorbis.a')):

@@ -500,17 +500,17 @@ def prepare_source(name, src, dst):
 
     return retval
 
-def validate_ogg_implementation(platform, libogg=None):
-    """ Validate the desired ogg implementation
-    Valid libogg values are None, vorbis, tremor, tremorlm
+def validate_ogg_decoder(platform, oggdecoder=None):
+    """ Validate the desired ogg decoder
+    Valid oggdecoder values are None, vorbis, tremor, tremorlm
     """
-    libogg = libogg.upper() if libogg is not None else None
+    oggdecoder = oggdecoder.upper() if oggdecoder is not None else None
     if platform in ['intel_linux64', 'intel_linux32', 'intel_mingw32', 'intel_mingw64', 'osx']:
-        if libogg in ['VORBIS', 'TREMOR', 'TREMORLM']:
-            return libogg
+        if oggdecoder in ['VORBIS', 'TREMOR', 'TREMORLM']:
+            return oggdecoder
         return 'VORBIS'
 
     if platform in ['arm_android', 'intel_android', 'ios']:
-        if libogg in ['TREMOR', 'TREMORLM']:
-            return libogg
+        if oggdecoder in ['TREMOR', 'TREMORLM']:
+            return oggdecoder
         return 'TREMORLM'

@@ -18,17 +18,27 @@ def prepare(env, target, options):
     prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE)
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
     prepare_source('libpng', SOURCES['PNG'], target.builds.PNG)
-    prepare_source('libjpeg', SOURCES['JPG'], target.builds.JPG)
+    prepare_source('libjpeg-turbo', SOURCES['JPGTURBO'], target.builds.JPGTURBO)
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE)
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE, 'Makefile') )
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
 
-    shutil.copy(join(ROOT_DIR, 'external', 'Makefile.in.zlib'), join(target.builds.ZLIB, 'Makefile.in'))
-    shutil.copy(join(ROOT_DIR, 'external', 'Makefile.libpng.mingw32'), join(target.builds.PNG, 'Makefile'))
-    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    if options.oggdecoder == 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisidec.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
+        Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'rm -rf %s' % target.builds.SDL_MIXER
+        Popen(shlex.split(cmd), env=env).communicate()
+    elif options.oggdecoder != 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisenc.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
+        Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'rm -rf %s' % target.builds.SDL_MIXER
+        Popen(shlex.split(cmd), env=env).communicate()
+
+    prepare_source('OGG', SOURCES['LIBOGG'], target.builds.LIBOGG)
+    prepare_source('VORBIS', SOURCES[options.oggdecoder], target.builds.OGGDECODER)
     prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
 
-def make(env, target):
+def make(env, target, options):
     ncpu = multiprocessing.cpu_count()
     # Build zlib
     if isfile(join(target.dist, 'lib', 'libz.a')):
@@ -36,9 +46,7 @@ def make(env, target):
     if not isfile(join(target.builds.ZLIB, 'Makefile')):
         cmd = './configure --static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make -j%d V=0' % ncpu
-    Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
-    cmd = 'make V=0 install'
+    cmd = 'make -j%d V=0 install' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.ZLIB, env=env).communicate()
     if isfile(join(target.dist, 'lib', 'libz.a')):
         log('zlib built successfully')
@@ -49,41 +57,37 @@ def make(env, target):
     # Build libpng
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         os.remove(join(target.dist, 'lib', 'libpng.a'))
-    cmd = 'make V=0 prefix="%s"' % (target.dist,)
+
+    if not isfile(join(target.builds.PNG, 'Makefile')):
+        cmd = './configure --enable-static --disable-shared --prefix="%s" --with-zlib-prefix="%s"'% (target.dist,target.builds.ZLIB)
+        Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
+
+    cmd = 'make -j%d install ' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
-    cmd = 'make V=0 install prefix="%s"' % (target.dist,)
-    Popen(shlex.split(cmd), cwd = target.builds.PNG, env=env).communicate()
+
     if isfile(join(target.dist, 'lib', 'libpng.a')):
         log('libpng built successfully')
     else:
         error('Problem building libpng')
         exit()
 
-    # Build libjpeg
+    # Build libjpeg-turbo
+    if isfile(join(target.dist, 'lib', 'libturbojpeg.a')):
+        os.remove(join(target.dist, 'lib', 'libturbojpeg.a'))
     if isfile(join(target.dist, 'lib', 'libjpeg.a')):
         os.remove(join(target.dist, 'lib', 'libjpeg.a'))
 
-    if not isfile(join(target.builds.JPG, 'Makefile')):
+    if not isfile(join(target.builds.JPGTURBO, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" LIBTOOL= --host=i686-w64-mingw32 --disable-shared --enable-static --prefix="%s"'% (target.dist,)
-        Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-        # Fixes for the Makefile
-        cmd = SED_CMD + '"s|\./libtool||g" %s' % (join(target.builds.JPG, 'Makefile'))
-        Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-        cmd = SED_CMD + '"s|^O = lo|O = o|g" %s' % (join(target.builds.JPG, 'Makefile'))
-        Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-        cmd = SED_CMD + '"s|^A = la|A = a|g" %s' % (join(target.builds.JPG, 'Makefile'))
-        Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
+        Popen(shlex.split(cmd), cwd = target.builds.JPGTURBO, env=env).communicate()
 
-    cmd = 'make -j%d V=0' % ncpu
-    Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-    cmd = 'make V=0 install-lib'
-    Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-    cmd = 'make V=0 install-headers'
-    Popen(shlex.split(cmd), cwd = target.builds.JPG, env=env).communicate()
-    if isfile(join(target.dist, 'lib', 'libjpeg.a')):
-        log('libjpeg built successfully')
+    cmd = 'make -j%d install V=0 ' % ncpu
+    Popen(shlex.split(cmd), cwd = target.builds.JPGTURBO, env=env).communicate()
+
+    if isfile(join(target.dist, 'lib', 'libturbojpeg.a')) and isfile(join(target.dist, 'lib', 'libjpeg.a')) :
+        log('libjpeg-turbo built successfully')
     else:
-        error('Problem building libjpeg')
+        error('Problem building libjpeg-turbo')
         exit()
 
     if isfile(join(target.dist, 'lib', 'libSDL2.a')):
@@ -91,14 +95,6 @@ def make(env, target):
     if not isfile(join(target.builds.SDL, 'Makefile')):
         cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-stdio-redirect --host=i686-w64-mingw32 --disable-shared --enable-static --prefix="%s"'% (target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
-
-        # HACK FIX for SDL problem, this can be removed once SDL fixes this error
-    #            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_XAUDIO2.*||g" %s' % (join(target.builds.SDL, 'include', 'SDL_config_windows.h'),)
-    #            Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
-    #            cmd = 'sed -i "s|#define SDL_AUDIO_DRIVER_DSOUND.*||g" %s' % (join(target.builds.SDL, 'include', 'SDL_config_windows.h'),)
-    #            Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
-
-
 
     cmd = 'make -j%d V=0' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.SDL, env=env).communicate()
@@ -163,5 +159,76 @@ def make(env, target):
     else:
         error('Problem building SDL TTF')
         exit()
+
+    # Build OGG
+    if isfile(join(target.dist, 'lib', 'libogg.a')):
+        os.remove(join(target.dist, 'lib', 'libogg.a'))
+
+    if not isfile(join(target.builds.LIBOGG, 'Makefile')):
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-oggtest --prefix="%s"'% (target.dist)
+        Popen(shlex.split(cmd), cwd = target.builds.LIBOGG, env=env).communicate()
+
+    cmd = 'make -j%d install V=0' % ncpu
+    Popen(shlex.split(cmd), cwd = target.builds.LIBOGG, env=env).communicate()
+
+    if isfile(join(target.dist, 'lib', 'libogg.a')):
+        log('Libogg built successfully')
+    else:
+        error('Problem building Libogg')
+        exit()
+
+
+    # Build OGG Decoder
+    if isfile(join(target.dist, 'lib', 'libvorbis.a')):
+        os.remove(join(target.dist, 'lib', 'libvorbis.a'))
+
+    if isfile(join(target.dist, 'lib', 'libvorbisidec.a')):
+        os.remove(join(target.dist, 'lib', 'libvorbisidec.a'))
+
+    if not isfile(join(target.builds.OGGDECODER, 'configure')):
+        cmd = './autogen.sh'
+        Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
+        if isfile(join(target.builds.OGGDECODER, 'Makefile')):
+            os.remove(join(target.builds.OGGDECODER, 'Makefile'))
+
+    if not isfile(join(target.builds.OGGDECODER, 'Makefile')):
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc" --disable-shared --enable-static --disable-oggtest --prefix="%s"'% (target.dist)
+        Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
+
+    cmd = 'make -j%d install V=0' % ncpu
+    Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
+
+    if options.oggdecoder == 'VORBIS':
+        sdl_mixer_ogg = '--enable-music-ogg --disable-music-ogg-tremor'
+        # Libvorbis
+        if isfile(join(target.dist, 'lib', 'libvorbis.a')):
+            log('Libvorbis built successfully')
+        else:
+            error('Problem building Libvorbis')
+            exit(1)
+    else:
+        sdl_mixer_ogg = '--enable-music-ogg-tremor'
+        # Tremor
+        if isfile(join(target.dist, 'lib', 'libvorbisidec.a')):
+            log('Tremor built successfully')
+        else:
+            error('Problem building Tremor')
+            exit(1)
+
+    # Build SDL_mixer
+
+    if not isfile(join(target.builds.SDL_MIXER, 'Makefile')):
+        cmd = './configure --enable-silent-rules LDFLAGS="-static-libgcc %s" CFLAGS="%s" --disable-shared --enable-static --with-sdl-prefix="%s" --prefix="%s" --exec-prefix="%s" %s'% (env['CFLAGS'], env['LDFLAGS'], target.dist, target.dist, target.dist, sdl_mixer_ogg)
+        Popen(shlex.split(cmd), cwd = target.builds.SDL_MIXER, env=env).communicate()
+
+    cmd = 'make -j%d install V=0' % ncpu
+    Popen(shlex.split(cmd), cwd = target.builds.SDL_MIXER, env=env).communicate()
+
+    if isfile(join(target.dist, 'lib', 'libSDL2_mixer.a')):
+        log('SDL Mixer built successfully')
+    else:
+        error('Problem building SDL Mixer')
+        exit(1)
+
 
     return True

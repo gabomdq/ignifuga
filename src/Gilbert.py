@@ -239,13 +239,14 @@ class Gilbert:
         self.renderer = Renderer(width=options.width, height=options.height, fullscreen= not options.windowed, display=options.display, autoflip=not options.remotescreen)
         self.dataManager = DataManager()
 
+        options.port = int(options.port)
         if options.remote:
             self.startRemoteConsole(options.ip, options.port, options.staticglobals)
         elif options.jsremote:
             self.startWebsocketRemoteConsole(options.ip, options.port, options.staticglobals)
         elif options.telnetremote:
             self.startSocketRemoteConsole(options.ip, options.port, options.staticglobals)
-        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole, remoteScreen = options.remotescreen, ip=options.ip, port=int(options.port)+1)
+        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole, remoteScreen = options.remotescreen, ip=options.ip, port=options.port+1)
 
         if options.capture:
             print "System paused, press Enter to continue"

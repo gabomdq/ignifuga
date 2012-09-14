@@ -98,7 +98,6 @@ cdef class GameLoop(GameLoopBase):
 #endif
                 if self.enableRemoteScreen:
                     if self.remoteScreenHandlers:
-                        print len(self.remoteScreenHandlers)
                         jpegBuf = NULL
                         jpegBufSize = 0
                         if self.renderer.captureScreenJPEG(<unsigned char**>&jpegBuf, &jpegBufSize):

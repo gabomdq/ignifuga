@@ -41,7 +41,7 @@ SOURCES['SDL_IMAGE'] = join(ROOT_DIR, 'external', 'SDL_image')
 SOURCES['SDL_TTF'] = join(ROOT_DIR, 'external', 'SDL_ttf')
 SOURCES['SDL_MIXER'] = join(ROOT_DIR, 'external', 'SDL_mixer')
 SOURCES['FREETYPE'] = join(ROOT_DIR, 'external', 'freetype')
-SOURCES['PNG'] = join(ROOT_DIR, 'external', 'png')
+SOURCES['PNG'] = join(ROOT_DIR, 'external', 'libpng')
 #SOURCES['JPG'] = join(ROOT_DIR, 'external', 'jpeg')
 SOURCES['JPGTURBO'] = join(ROOT_DIR, 'external', 'libjpeg-turbo')
 SOURCES['ZLIB'] = join(ROOT_DIR, 'external', 'zlib')
@@ -54,6 +54,7 @@ SOURCES['GC'] = join(ROOT_DIR, 'external', 'gc')
 SOURCES['VORBIS'] = join(ROOT_DIR, 'external', 'libvorbis')
 SOURCES['TREMOR'] = join(ROOT_DIR, 'external', 'Tremor')
 SOURCES['TREMORLM'] = join(ROOT_DIR, 'external', 'Tremor-LM')
+SOURCES['LIBOGG'] = join(ROOT_DIR, 'external', 'libogg')
 
 ########################################################################################################################
 
@@ -852,8 +853,8 @@ if __name__ == '__main__':
     parser.add_option("--enable-valgrind",
         action="store_true", dest="valgrind", default=False,
         help="Create a Valgrind friendly build (although much slower)")
-    parser.add_option("--ogg",
-        default=None, dest="libogg",
+    parser.add_option("--oggdecoder",
+        default=None, dest="oggdecoder",
         help="Ogg decoder implementation, valid values are: vorbis (uses libvorbis), tremor, tremorlm (uses the low mem branch of Tremor)")
 
     (options, args) = parser.parse_args()
@@ -878,7 +879,7 @@ if __name__ == '__main__':
     # Temporarily disable intel_mingw64
     if options.platform == 'intel_mingw64':
         print "MingW64 support is temporarily disabled until this is solved: https://github.com/python-greenlet/greenlet/issues/20"
-        exit(1)
+        #exit(1)
 
     if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
         error('Invalid target platform. Valid platforms: %s' % AVAILABLE_PLATFORMS)
@@ -913,10 +914,10 @@ if __name__ == '__main__':
     # Check the availability of host tools, build host Python if required.
     check_host_tools()
 
-    libogg = options.libogg
+    oggdecoder = options.oggdecoder
 
     for platform in platforms:
-        options.libogg = validate_ogg_implementation(platform, libogg)
+        options.oggdecoder = validate_ogg_decoder(platform, oggdecoder)
         locals()["build_"+platform](options)
 
     info ('Ignifuga engine files are ready.')

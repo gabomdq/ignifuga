@@ -33,11 +33,23 @@ def prepare(env, target, options):
         Popen(shlex.split(cmd), cwd = target.builds.PNG).communicate()
         cmd = SED_CMD + '-e "s|prefix=.*|prefix=%s|g" %s' % (join(target.builds.PNG, 'Makefile'), target.dist)
         Popen(shlex.split(cmd), cwd = target.builds.PNG).communicate()
-    prepare_source('libjpeg', SOURCES['JPG'], target.builds.JPG)
+    prepare_source('libjpeg-turbo', SOURCES['JPGTURBO'], target.builds.JPGTURBO)
     prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE)
     shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE, 'Makefile') )
     prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
-    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG)
+    if options.oggdecoder == 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisidec.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
+        Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'rm -rf %s' % target.builds.SDL_MIXER
+        Popen(shlex.split(cmd), env=env).communicate()
+    elif options.oggdecoder != 'VORBIS' and isfile(join(target.builds.OGGDECODER, 'vorbisenc.pc.in')):
+        cmd = 'rm -rf %s' % target.builds.OGGDECODER
+        Popen(shlex.split(cmd), env=env).communicate()
+        cmd = 'rm -rf %s' % target.builds.SDL_MIXER
+        Popen(shlex.split(cmd), env=env).communicate()
+
+    prepare_source('OGG', SOURCES['LIBOGG'], target.builds.LIBOGG)
+    prepare_source('VORBIS', SOURCES[options.oggdecoder], target.builds.OGGDECODER)
     prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER)
 
 def make(env, target):

@@ -31,7 +31,7 @@ iseeking_example_SOURCES = iseeking_example.c
 iseeking_example_LDFLAGS = -static 
 iseeking_example_LDADD = libvorbisidec.la @OGG_LIBS@
 
-includedir = $(prefix)/include/tremor
+#includedir = $(prefix)/include/tremor
 
 include_HEADERS = ivorbiscodec.h ivorbisfile.h config_types.h
 

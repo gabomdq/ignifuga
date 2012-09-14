@@ -47,12 +47,14 @@ def prepare(env, target, ignifuga_src, python_build):
 
     # ldl is required by SDL dynamic library loading
     # llog, lz, lc are required by STL and Ignifuga logging
-    ignifuga_module = "\nignifuga %s -I%s -I%s %s -L%s %s -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
+    ignifuga_module = "\nignifuga %s -I%s -I%s -I%s %s -L%s -L%s %s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
                                                                                                                                                            target.builds.IGNIFUGA,
                                                                                                                                                            join(target.builds.FREETYPE, 'include'),
+                                                                                                                                                           join(target.builds.JPGTURBO),
                                                                                                                                                            stlflags,
                                                                                                                                                            join(target.builds.SDL, 'libs', 'armeabi'),
-                                                                                                                                                           sdlflags)
+                                                                                                                                                           join(target.builds.SDL, 'jni', 'jpeg'),
+                                                                                                                                             sdlflags)
     return ignifuga_module
 
 

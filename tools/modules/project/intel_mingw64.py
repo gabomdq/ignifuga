@@ -20,7 +20,7 @@ def make(options, env, target, sources, cython_src, cfiles):
     pngflags = get_png_flags(target)
 
     extralibs = "-lodbc64 -lwinspool -lwinmm -lshell64 -lcomctl64 -lctl3d64 -lodbc64 -ladvapi64 -lopengl64 -lglu64 -lole64 -loleaut64 -luuid -lgdi64 -limm64 -lversion"
-    cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN64 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw64 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -ljpeg -lfreetype -lz -lws2_64 -lwsock64 -lstdc++ %s %s %s -o %s' % \
+    cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN64 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw64 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -lturbojpeg -ljpeg -lfreetype -lz -lws2_64 -lwsock64 -lstdc++ %s %s %s -o %s' % \
     (env['CC'],
     sources,
     join(target.dist, 'include'),

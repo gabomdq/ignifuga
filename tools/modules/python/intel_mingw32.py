@@ -32,7 +32,7 @@ def prepare(env, target, ignifuga_src, python_build):
     shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
     shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
 
-    ignifuga_module = "\nignifuga %s -I%s -I%s -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
+    ignifuga_module = "\nignifuga %s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
 
     return ignifuga_module
 

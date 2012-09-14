@@ -14,28 +14,35 @@ from schafer import prepare_source, SED_CMD, SOURCES
 import multiprocessing
 
 def prepare(env, target, options):
-    prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_armv6')
-    prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+'_armv7')
-    prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+'_armv6')
-    prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+'_armv7')
-    prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF+'_armv6')
-    prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF+'_armv7')
+
     prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
     prepare_source('libpng', SOURCES['PNG'], target.builds.PNG)
     if not isfile(join(target.builds.PNG, 'Makefile')):
         shutil.copy(join(target.builds.PNG, 'scripts', 'makefile.ios'), join(target.builds.PNG, 'Makefile'))
-    prepare_source('libjpeg', SOURCES['JPG'], target.builds.JPG)
-    prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF)
+    prepare_source('libjpeg-turbo', SOURCES['JPGTURBO'], target.builds.JPGTURBO)
 
-    prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE+'_armv6')
-    shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+'_armv6', 'Makefile') )
-    prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE+'_armv7')
-    shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+'_armv7', 'Makefile') )
 
-    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG+'_armv6')
-    prepare_source('OGG', SOURCES[options.libogg], target.builds.OGG+'_armv7')
-    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER+'_armv6')
-    prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER+'_armv7')
+    for arch_suffix in ['_armv6', '_armv7']:
+        prepare_source('SDL', SOURCES['SDL'], target.builds.SDL+arch_suffix)
+        prepare_source('SDL_image', SOURCES['SDL_IMAGE'], target.builds.SDL_IMAGE+arch_suffix)
+        prepare_source('SDL_ttf', SOURCES['SDL_TTF'], target.builds.SDL_TTF+arch_suffix)
+        prepare_source('freetype', SOURCES['FREETYPE'], target.builds.FREETYPE+arch_suffix)
+        shutil.copy(join(SOURCES['FREETYPE'], 'Makefile'), join(target.builds.FREETYPE+arch_suffix, 'Makefile') )
+
+        prepare_source('OGG', SOURCES['LIBOGG'], target.builds.LIBOGG+arch_suffix)
+        if options.oggdecoder == 'VORBIS' and isfile(join(target.builds.OGGDECODER+arch_suffix, 'vorbisidec.pc.in')):
+            cmd = 'rm -rf %s' % target.builds.OGGDECODER+arch_suffix
+            Popen(shlex.split(cmd), env=env).communicate()
+            cmd = 'rm -rf %s' % target.builds.SDL_MIXER+arch_suffix
+            Popen(shlex.split(cmd), env=env).communicate()
+        elif options.oggdecoder != 'VORBIS' and isfile(join(target.builds.OGGDECODER+arch_suffix, 'vorbisenc.pc.in')):
+            cmd = 'rm -rf %s' % target.builds.OGGDECODER+arch_suffix
+            Popen(shlex.split(cmd), env=env).communicate()
+            cmd = 'rm -rf %s' % target.builds.SDL_MIXER+arch_suffix
+            Popen(shlex.split(cmd), env=env).communicate()
+
+        prepare_source('SDL_mixer', SOURCES['SDL_MIXER'], target.builds.SDL_MIXER+arch_suffix)
+
 
 
 def make(env, target):

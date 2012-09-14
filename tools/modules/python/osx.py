@@ -23,7 +23,7 @@ def prepare(env, target, ignifuga_src, python_build):
     cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.osx.diff'), python_build)
     Popen(shlex.split(cmd)).communicate()
 
-    ignifuga_module = "\nignifuga %s -I%s -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+    ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
 def make(env, target, options, freeze_modules, frozen_file):

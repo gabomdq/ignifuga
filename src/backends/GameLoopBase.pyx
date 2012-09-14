@@ -103,13 +103,14 @@ cdef class GameLoopBase(object):
             self.startRunnable(self.remoteConsole, False, self.remoteConsole.process)
 
         if self.enableRemoteScreen:
+            debug("Opening remote screen on IP %s PORT %d" % (ip, port))
             self.remoteScreenServer = MultiThreadedHTTPServer((ip, port), HTTPRemoteScreenHandler)
             self.remoteScreenHandlers = []
             def _wrapper():
                 try:
                     self.remoteScreenServer.serve_forever()
                 except :
-                    print "Halting remote screen server"
+                    error("Halting remote screen server")
                     self.remoteScreenServer.socket.close()
 
             thread.start_new_thread(_wrapper, ())
