@@ -72,6 +72,9 @@ def prepare_intel_linux64_env(target, pp=None, openmp=False):
         env['CFLAGS'] += "-fopenmp"
         env['CPPFLAGS'] += "-fopenmp"
         env['LDFLAGS'] += '-lgomp'
+
+    env['HOST'] = '--host x86_64-pc-linux-gnu'
+    env['WITH_SYSROOT'] = ''
     return env, pp
 
 
@@ -95,6 +98,8 @@ def prepare_intel_linux32_env(target, pp=None, openmp=False):
         env['CFLAGS'] += "-fopenmp"
         env['CPPFLAGS'] += "-fopenmp"
         env['LDFLAGS'] += '-lgomp'
+    env['HOST'] = '--host i686-pc-linux-gnu'
+    env['WITH_SYSROOT'] = ''
     return env, pp
 
 
@@ -124,6 +129,8 @@ def prepare_osx_env(target, pp=None, openmp=False):
     env['STRIP'] = 'strip'
     env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 --sysroot=%s -I%s/include' % (OSX_SDK, target.dist)
     env['LDFLAGS'] = ("" if not 'LDFLAGS' in env else env['LDFLAGS']) + '-L%s/lib' % target.dist
+    env['HOST'] = '--host x86_64-apple-darwin'
+    env['WITH_SYSROOT'] = '--with-sysroot="%s"' % OSX_SDK
     return env, pp
 
 def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget='3.0'):
@@ -160,6 +167,8 @@ def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget='3.0'):
     env['RANLIB'] = env['DEVROOT'] + "/usr/bin/ranlib"
     env['STRIP'] = env['DEVROOT'] + "/usr/bin/strip"
     env['LDFLAGS'] = "-L%s/usr/lib/ -isysroot %s -miphoneos-version-min=%s -L%s/lib" % (env['SDKROOT'], env['SDKROOT'], ostarget, target.dist)
+    env['HOST'] = '--host arm-apple-darwin'
+    env['WITH_SYSROOT'] = '--with-sysroot="%s"' % env['SDKROOT']
     return env, pp
 
 ANDROID_VALID_GCC = ['4.4.3', '4.6']
@@ -245,8 +254,11 @@ def prepare_arm_android_env(target, pp=None, openmp=False, api_level=10, gcc='4.
 
     env['CFLAGS'] ="-DANDROID -mandroid -fomit-frame-pointer --sysroot %s -I%s/include" % (env['SYSROOT'], target.dist)
 
+
+    env['HOST'] = '--host arm-eabi'
     if env['ARCH'] == "armeabi-v7a":
         env['CFLAGS']+=" -march=armv7-a -mfloat-abi=softfp -mfpu=vfp -mthumb"
+        env['HOST'] = '--host armeabi-v7a'
     env['CXXFLAGS'] = env['CFLAGS']
     env['CC'] = 'arm-linux-androideabi-gcc %s' % (env['CFLAGS'],)
     env['CXX'] = 'arm-linux-androideabi-g++ %s' % (env['CXXFLAGS'],)
@@ -254,6 +266,8 @@ def prepare_arm_android_env(target, pp=None, openmp=False, api_level=10, gcc='4.
     env['RANLIB'] = "arm-linux-androideabi-ranlib"
     env['STRIP'] = "arm-linux-androideabi-strip --strip-unneeded"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=arm-eabi- CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
+
+    env['WITH_SYSROOT'] = '--with-sysroot="%s"' % env['SYSROOT']
 
     # Debugging
 #    env['NDK_DEBUG'] = "1"
@@ -297,6 +311,8 @@ def prepare_intel_mingw32_env(target, pp=None, openmp=False):
     env['OBJDUMP'] = "i686-w64-mingw32-objdump"
     env['RESCOMP'] = "i686-w64-mingw32-windres"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw32msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
+    env['HOST'] = '--host=i686-w64-mingw32'
+    env['WITH_SYSROOT'] = ''
     return env, pp
 
 
@@ -333,4 +349,6 @@ def prepare_intel_mingw64_env(target, pp=None, openmp=False):
     env['OBJDUMP'] = "x86_64-w64-mingw32-objdump"
     env['RESCOMP'] = "x86_64-w64-mingw32-windres"
     env['MAKE'] = 'make V=0 -k -j%d HOSTPYTHON=%s HOSTPGEN=%s CROSS_COMPILE=mingw64msvc CROSS_COMPILE_TARGET=yes' % (multiprocessing.cpu_count(), HOSTPYTHON, HOSTPGEN)
+    env['HOST'] = '--host=x86_64-w64-mingw32'
+    env['WITH_SYSROOT'] = ''
     return env, pp

@@ -21,7 +21,8 @@
 		057ACB85155DA0DD001F2261 /* libSDL2_image.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB7E155DA0DD001F2261 /* libSDL2_image.a */; };
 		057ACB86155DA0DD001F2261 /* libSDL2_ttf.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB7F155DA0DD001F2261 /* libSDL2_ttf.a */; };
 		057ACB87155DA0DD001F2261 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB80155DA0DD001F2261 /* libSDL2.a */; };
-		057ACB88155DA0DD001F2261 /* libz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB81155DA0DD001F2261 /* libz.a */; };
+		057ACB88155DA0DD001F2261 /* libz.a in Frameworks */ = {isa = PBXBuildFile; fileRef =    057ACB81155DA0DD001F2261 /* libz.a */; };
+		057ACB89155DA0DD001F2261 /* libturbojpeg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB90155DA0DD001F2261 /* libturbojpeg.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		057ACB7F155DA0DD001F2261 /* libSDL2_ttf.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libSDL2_ttf.a; sourceTree = "<group>"; };
 		057ACB80155DA0DD001F2261 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libSDL2.a; sourceTree = "<group>"; };
 		057ACB81155DA0DD001F2261 /* libz.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libz.a; sourceTree = "<group>"; };
+		057ACB90155DA0DD001F2261 /* libturbojpeg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libturbojpeg.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +59,7 @@
 				057ACB86155DA0DD001F2261 /* libSDL2_ttf.a in Frameworks */,
 				057ACB87155DA0DD001F2261 /* libSDL2.a in Frameworks */,
 				057ACB88155DA0DD001F2261 /* libz.a in Frameworks */,
+				057ACB89155DA0DD001F2261 /* libturbojpeg.a in Frameworks */,
 				057ACB7A155DA09C001F2261 /* QuartzCore.framework in Frameworks */,
 				057ACB78155DA093001F2261 /* CoreAudio.framework in Frameworks */,
 				057ACB76155DA08B001F2261 /* AudioToolbox.framework in Frameworks */,
@@ -80,6 +83,7 @@
 				057ACB7F155DA0DD001F2261 /* libSDL2_ttf.a */,
 				057ACB80155DA0DD001F2261 /* libSDL2.a */,
 				057ACB81155DA0DD001F2261 /* libz.a */,
+				057ACB90155DA0DD001F2261 /* libturbojpeg.a */,
 				057ACB79155DA09C001F2261 /* QuartzCore.framework */,
 				057ACB77155DA093001F2261 /* CoreAudio.framework */,
 				057ACB75155DA08B001F2261 /* AudioToolbox.framework */,

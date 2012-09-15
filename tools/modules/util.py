@@ -213,6 +213,30 @@ def check_host_tools():
 
     if system == 'Darwin':
         check_xcode()
+        nasm = check_version('nasm', (2,7))
+        if nasm is None:
+            error('We need a NASM version of at least 2.7, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            exit()
+        autoconf = check_version('autoconf', (2,69))
+        if autoconf is None:
+            error('We need a autoconf version of at least 2.69, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            exit()
+        pkgconfig = check_version('pkg-config', (0,27))
+        if pkgconfig is None:
+            error('We need a pkgconfig version of at least 2.69, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            exit()
+        automake = check_version('automake', (1,12))
+        if automake is None:
+            error('We need a automake version of at least 2.69, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            exit()
+        # Try the standard Mac Ports path
+        libtool = check_version('/opt/local/libexec/gnubin/libtool', (2,4))
+        if libtool is None:
+            libtool = check_version('libtool', (2,4))
+        if libtool is None:
+            error('We need a Libtool version of at least 2.4, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            exit()
+
 
 
     if not isfile(HOSTPYTHON) or not isfile(HOSTPGEN):
@@ -296,7 +320,19 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
     elif system == 'Darwin':
         check_xcode()
         install_mac_ports()
+        cmd = 'sudo port selfupdate'
+        Popen(shlex.split(cmd)).communicate()
         cmd = 'sudo port install rsync'
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo port install nasm'
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo port install libtool'
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo port install autoconf'
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo port install automake'
+        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo port install pkgconfig'
         Popen(shlex.split(cmd)).communicate()
 
     cython = find_cython()
@@ -514,3 +550,39 @@ def validate_ogg_decoder(platform, oggdecoder=None):
         if oggdecoder in ['TREMOR', 'TREMORLM']:
             return oggdecoder
         return 'TREMORLM'
+
+def check_version(executable, min=(0,0)):
+    # Check the file version available
+    if not isfile(executable):
+        cmd = 'which ' + executable
+        output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
+        executable = output.split('\n')[0]
+    if isfile(executable):
+        # Get the version
+        cmd = '%s --version' % executable
+        output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
+        version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
+        v = re.search("(\d+)\.(\d+)(.*)", version)
+        if v is None:
+            cmd = '%s -v' % executable
+            output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
+            version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
+            v = re.search("(\d+)\.(\d+)(.*)", version)
+
+        installed_ver = []
+        counter = 0
+        while True:
+            try:
+                installed_ver.append(int(v.group(counter+1)))
+                counter += 1
+            except:
+                break
+        try:
+            if installed_ver[0] > min[0]:
+                return executable
+            if installed_ver[0] == min[0]:
+                if installed_ver[1] >= min[1]:
+                    return executable
+        except:
+            pass
+    return None

@@ -16,7 +16,7 @@ import multiprocessing
 
 def prepare(env, target, ignifuga_src, python_build):
     # Hardcoded for now as SDL doesn't give us the proper dependencies with sdl2-config
-    sdlflags = '-I%s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lz -lfreetype -lpng -lm -liconv -lobjc -Wl,-framework,Foundation -Wl,-framework,UIKit -Wl,-framework,OpenGLES -Wl,-framework,QuartzCore -Wl,-framework,CoreAudio -Wl,-framework,AudioToolbox -Wl,-framework,CoreGraphics' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
+    sdlflags = '-I%s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lz -lfreetype -lpng12 -lm -liconv -lobjc -Wl,-framework,Foundation -Wl,-framework,UIKit -Wl,-framework,OpenGLES -Wl,-framework,QuartzCore -Wl,-framework,CoreAudio -Wl,-framework,AudioToolbox -Wl,-framework,CoreGraphics' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
 
     # Patch some problems with cross compilation
     cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.ios.diff'), python_build)
