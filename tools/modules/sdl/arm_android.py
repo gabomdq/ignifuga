@@ -128,13 +128,6 @@ def make(env, target, options):
         Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
     cmd = 'make -j%d V=0 install' % ncpu
     Popen(shlex.split(cmd), cwd = target.builds.FREETYPE, env=env).communicate()
-#    if isfile(join(target.builds.FREETYPE, 'objs', '.libs', 'libfreetype.a')):
-#        cmd = 'rsync -aqut --exclude .svn --exclude .hg %s/ %s' % (join(target.builds.FREETYPE, 'include'), join(target.builds.SDL, 'jni', 'freetype', 'include'))
-#        Popen(shlex.split(cmd)).communicate()
-#        shutil.copy(join(target.builds.FREETYPE, 'objs', '.libs', 'libfreetype.a'), join(target.builds.SDL, 'jni', 'freetype', 'libfreetype.a'))
-#    else:
-#        error('Error compiling freetype')
-#        exit()
 
     if isfile(join(jni_dir, 'freetype', 'libfreetype.a')):
         log('Freetype built successfully')

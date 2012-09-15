@@ -878,8 +878,8 @@ if __name__ == '__main__':
 
     # Temporarily disable intel_mingw64
     if options.platform == 'intel_mingw64':
-        print "MingW64 support is temporarily disabled until this is solved: https://github.com/python-greenlet/greenlet/issues/20"
-        #exit(1)
+        error("MingW64 support is temporarily disabled until this is solved: https://github.com/python-greenlet/greenlet/issues/20")
+        exit(1)
 
     if options.platform not in AVAILABLE_PLATFORMS and options.platform != 'all':
         error('Invalid target platform. Valid platforms: %s' % AVAILABLE_PLATFORMS)

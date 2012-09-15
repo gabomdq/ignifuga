@@ -91,9 +91,9 @@ def prepare_intel_linux32_env(target, pp=None, openmp=False):
     env = deepcopy(os.environ)
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
-    env['CFLAGS'] = ("" if not 'CFLAGS' in env else env['CFLAGS']) + ' -m64 -I%s/include' % target.dist
-    env['CPPFLAGS'] = ("" if not 'CPPFLAGS' in env else env['CPPFLAGS']) + ' -m64 -I%s/include' % target.dist
-    env['LDFLAGS'] = ("" if not 'LDFLAGS' in env else env['LDFLAGS']) + ' -m64 -L%s/lib' % target.dist
+    env['CFLAGS'] = ("" if not 'CFLAGS' in env else env['CFLAGS']) + ' -m32 -I%s/include' % target.dist
+    env['CPPFLAGS'] = ("" if not 'CPPFLAGS' in env else env['CPPFLAGS']) + ' -m32 -I%s/include' % target.dist
+    env['LDFLAGS'] = ("" if not 'LDFLAGS' in env else env['LDFLAGS']) + ' -m32 -L%s/lib' % target.dist
     if openmp:
         env['CFLAGS'] += "-fopenmp"
         env['CPPFLAGS'] += "-fopenmp"
