@@ -1,6 +1,6 @@
-dist$
-tmp$
-host$
+^dist/
+^tmp/
+^host/
 .idea
 .pyc
 .DS_Store
