@@ -283,7 +283,7 @@ def prepare_ignifuga(platform, pp, options, srcdir=SOURCES['IGNIFUGA']):
     if not options.rocket:
         excludes += '--exclude Rocket*'
 
-    cmd = 'rsync -auqPm --exclude .svn %s --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.hpp" --include "*.inl" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (excludes, SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
+    cmd = 'rsync -auqPm --exclude .svn %s --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.hpp" --include "*.inl" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (excludes, srcdir, target.builds.IGNIFUGA)
     Popen(shlex.split(cmd), cwd = srcdir).communicate()
 
     # Copy Rocket from external
