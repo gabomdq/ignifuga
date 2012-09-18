@@ -14,11 +14,18 @@ from schafer import prepare_source, make_python_freeze, SED_CMD, SOURCES
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 import multiprocessing
 
-def prepare(env, target, ignifuga_src, python_build):
+def prepare(env, target, options, ignifuga_src, python_build):
     # Get some required flags
-    sdlflags = get_sdl_flags(target)
-    freetypeflags = get_freetype_flags(target)
-    ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+
+    if options.bare:
+        if options.baresrc is None:
+            ignifuga_module = ''
+        else:
+            ignifuga_module = "\n%s %s -I%s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, options.baredependencies if options.baredependencies is not None else '')
+    else:
+        sdlflags = get_sdl_flags(target)
+        freetypeflags = get_freetype_flags(target)
+        ignifuga_module = "\n%s %s -I%s %s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
 
     # For Linux we build our own libgc, because currently Ubuntu is marking libgc-dev:amd64 and libgc-dev:i386 as conflicting,
     # so we can't build a 32 bits version from a 64 bits system using the system provided library.
@@ -49,15 +56,19 @@ def make(env, target, options, freeze_modules, frozen_file):
 
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
-        sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
-        sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] + env['CFLAGS']
+        if options.bare:
+            sdlldflags = sdlcflags = ''
+        else:
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
+            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
+            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] + env['CFLAGS']
+
         # Fully static config, doesnt load OpenGL from SDL under Linux for some reason
         #cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static -Wl,-Bstatic %s" CPPFLAGS="-static -fPIC %s" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
         # Mostly static, minus pthread and dl - Linux
         # http://wiki.python.org/moin/DebuggingWithGdb -> -g -fno-inline -fno-strict-aliasing
-        cmd = './configure --enable-silent-rules LDFLAGS="%s -L%s -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s -static -fPIC" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'%\
+        cmd = './configure --enable-silent-rules LDFLAGS="%s -L%s -Wl,--no-export-dynamic -Wl,-Bstatic" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s -static -fPIC" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" LINKFORSHARED=" " LDLAST="-static-libgcc -static-libstdc++ -Wl,-Bstatic %s -lz -lgccpp -lstdc++ -lgc -Wl,-Bdynamic -lpthread -ldl" DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'%\
               (env['LDFLAGS'], join(target.dist, 'lib'), env['CPPFLAGS'], sdlcflags,sdlldflags,target.dist,)
         if options.valgrind:
             cmd += ' --with-valgrind'

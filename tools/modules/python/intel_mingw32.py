@@ -16,10 +16,7 @@ from schafer import prepare_source, make_python_freeze, SED_CMD, HOSTPYTHON, HOS
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 import multiprocessing
 
-def prepare(env, target, ignifuga_src, python_build):
-    # Get some required flags
-    sdlflags = get_sdl_flags(target).replace('-mwindows', '').replace('-Dmain=SDL_main', '')
-    freetypeflags = get_freetype_flags(target)
+def prepare(env, target, options, ignifuga_src, python_build):
     # Patch some problems with cross compilation
     cmd = 'patch -p0 -i %s -d %s' % (join(PATCHES_DIR, 'python.mingw32.diff'), python_build)
     Popen(shlex.split(cmd)).communicate()
@@ -32,7 +29,16 @@ def prepare(env, target, ignifuga_src, python_build):
     shutil.copy(join(target.builds.PYTHON, 'PC', 'getpathp.c'), join(target.builds.PYTHON, 'Python', 'getpathp.c'))
     shutil.copy(join(target.builds.PYTHON, 'PC', 'errmap.h'), join(target.builds.PYTHON, 'Objects', 'errmap.h'))
 
-    ignifuga_module = "\nignifuga %s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
+    if options.bare:
+        if options.baresrc is None:
+            ignifuga_module = ''
+        else:
+            ignifuga_module = "\%s %s -I%s -I%s -lws2_32 -lwsock32 %s\n" % (options.modulename, ' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), options.baredependencies if options.baredependencies is not None else '')
+    else:
+        # Get some required flags
+        sdlflags = get_sdl_flags(target).replace('-mwindows', '').replace('-Dmain=SDL_main', '')
+        freetypeflags = get_freetype_flags(target)
+        ignifuga_module = "\n%s %s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (options.modulename, ' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
 
     return ignifuga_module
 
@@ -40,17 +46,20 @@ def prepare(env, target, ignifuga_src, python_build):
 def make(env, target, options, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
         # Linux is built in almost static mode (minus libdl/pthread which make OpenGL fail if compiled statically)
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
-        sdlldflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
-        sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
+        if options.bare:
+            sdlldflags = sdlcflags = ''
+        else:
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
+            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0].replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
+            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
         extralibs = "-lodbc32 -lwinspool -lwinmm -lshell32 -lcomctl32 -lctl3d32 -lodbc32 -ladvapi32 -lopengl32 -lglu32 -lole32 -loleaut32 -luuid"
         cmd = 'rm -f configure'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = 'autoconf'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         # -DSTATIC_LIB is used for compiling libRocket as fully static under mingw
-        cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -DSTATIC_LIB -D__MINGW32__ -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -DSTATIC_LIB -static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i686-w64-mingw32 --build=i686-pc-linux-gnu  --prefix="%s"'% (sdlldflags, extralibs, sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
+        cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static-libgcc -static %s %s %s" LDLAST="-lws2_32 -lwsock32" CFLAGS="%s -DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -DSTATIC_LIB -D__MINGW32__ -DMS_WIN32 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -DSTATIC_LIB -static %s" LINKFORSHARED=" " LIBOBJS="import_nt.o dl_nt.o getpathp.o" THREADOBJ="Python/thread.o" DYNLOADFILE="dynload_win.o" --disable-shared HOSTPYTHON=%s HOSTPGEN=%s --host=i686-w64-mingw32 --build=i686-pc-linux-gnu  --prefix="%s"'% (env['LDFLAGS'], sdlldflags, extralibs, env['CFLAGS'], sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
         if options.valgrind:
             cmd += ' --with-valgrind'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()

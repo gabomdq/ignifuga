@@ -101,7 +101,7 @@ def check_ignifuga_libraries(platform):
 # PYTHON BUILDING - Requires Ignifuga building!
 # ===============================================================================================================
 
-def prepare_python(platform, ignifuga_src, python_build, env):
+def prepare_python(platform, ignifuga_src, python_build, options, env):
     target = get_target(platform)
     if not isdir(target.tmp):
         os.makedirs(target.tmp)
@@ -122,7 +122,7 @@ def prepare_python(platform, ignifuga_src, python_build, env):
         # Append the Ignifuga sources
         if ignifuga_src != None:
             mod = __import__('modules.python.'+platform, fromlist=['prepare'])
-            ignifuga_module = mod.prepare(env, target, ignifuga_src, python_build)
+            ignifuga_module = mod.prepare(env, target, options, ignifuga_src, python_build)
 
             f = open(setupfile, 'at')
             f.write(ignifuga_module)
@@ -275,7 +275,7 @@ def preprocess_sources(pp, folder, extensions=['pyx', 'pxd', 'py']):
         pp.parse()
 
 
-def prepare_ignifuga(platform, pp, options):
+def prepare_ignifuga(platform, pp, options, srcdir=SOURCES['IGNIFUGA']):
     # Copy .py, .pyx .pxd .h .c .cpp files
     log("Preparing Ignifuga source code")
     target = get_target(platform)
@@ -284,22 +284,21 @@ def prepare_ignifuga(platform, pp, options):
         excludes += '--exclude Rocket*'
 
     cmd = 'rsync -auqPm --exclude .svn %s --include "*/" --include "*.py" --include "*.pyx" --include "*.pxd" --include "*.h" --include "*.hpp" --include "*.inl" --include "*.c" --include "*.cpp" --exclude "*" %s/ %s' % (excludes, SOURCES['IGNIFUGA'], target.builds.IGNIFUGA)
-    Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
-
+    Popen(shlex.split(cmd), cwd = srcdir).communicate()
 
     # Copy Rocket from external
-    if options.rocket:
+    if options.rocket and not options.bare:
         log("Preparing libRocket source code")
         cmd = 'rsync -auqPm %s/Source/ %s' % (SOURCES['ROCKET'], join(target.builds.IGNIFUGA, 'Rocket'))
-        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        Popen(shlex.split(cmd), cwd = srcdir).communicate()
         cmd = 'rsync -auqPm %s/Include/Rocket/ %s' % (SOURCES['ROCKET'], join(target.builds.IGNIFUGA, 'Rocket'))
-        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        Popen(shlex.split(cmd), cwd = srcdir).communicate()
 
         log("Preparing boost::python source code")
         cmd = 'rsync -auqPm %s/python/src/ %s' % (SOURCES['BOOST'], join(target.builds.IGNIFUGA, 'boost'))
-        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        Popen(shlex.split(cmd), cwd = srcdir).communicate()
         cmd = 'rsync -auqPm %s/python/include/ %s' % (SOURCES['BOOST'], join(target.builds.IGNIFUGA, 'boost'))
-        Popen(shlex.split(cmd), cwd = SOURCES['IGNIFUGA']).communicate()
+        Popen(shlex.split(cmd), cwd = srcdir).communicate()
 
     preprocess_sources(pp, target.builds.IGNIFUGA)
 
@@ -331,7 +330,7 @@ init%s(){
     return glue
 
 def make_ignifuga(build_dir, options):
-    return cythonize(build_dir, 'ignifuga', options)
+    return cythonize(build_dir, options.modulename, options)
     
 def cythonize(build_dir, package_name, options, skip=[]):
     files = []
@@ -532,18 +531,32 @@ def build_generic(options, platform, pp, env=None):
         os.makedirs(target.tmp)
             
     # Compile SDL statically
-    if 'sdl' in options.modules:
+    if 'sdl' in options.modules and not options.bare:
         info('Building SDL')
         prepare_sdl(platform, options, env)
         make_sdl(platform, options, env)
 
+    if options.bare:
+        # We need to build zlib
+        target = get_target(platform)
+        prepare_source('zlib', SOURCES['ZLIB'], target.builds.ZLIB)
+        mod = __import__('modules.sdl.common', fromlist=['make_common'])
+        mod.make_common(env, target, options, ['zlib',])
+
     # Compile Ignifuga then Python statically
     if 'ignifuga' in options.modules:
         info('Building Ignifuga')
-        prepare_ignifuga(platform, pp, options)
-        ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA, options)
+        if options.bare:
+            if options.baresrc:
+                prepare_ignifuga(platform, pp, options, options.baresrc)
+                ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA, options)
+            else:
+                ignifuga_src, glue_h, glue_c = [], '', ''
+        else:
+            prepare_ignifuga(platform, pp, options)
+            ignifuga_src, glue_h, glue_c = make_ignifuga(target.builds.IGNIFUGA, options)
         info('Building Python')
-        prepare_python(platform, ignifuga_src, target.builds.PYTHON, env)
+        prepare_python(platform, ignifuga_src, target.builds.PYTHON, options, env)
         make_python(platform, ignifuga_src, options, env)
 
 # ===============================================================================================================
@@ -856,6 +869,20 @@ if __name__ == '__main__':
     parser.add_option("--oggdecoder",
         default=None, dest="oggdecoder",
         help="Ogg decoder implementation, valid values are: vorbis (uses libvorbis), tremor, tremorlm (uses the low mem branch of Tremor)")
+
+    # Bare mode options
+    parser.add_option("--bare",
+        action="store_true", dest="bare", default=False,
+        help="Enable Bare Mode, this creates a static Python binary with as few contents as possible")
+    parser.add_option("--bare-src",
+        default=None, dest="baresrc",
+        help="Source directory for Bare mode, everything from inside this folder (*.h, *.c, *.cpp, *.py, *.pyx and *.pxd) will be compiled into the bare Python interpreter")
+    parser.add_option("--bare-dependencies",
+        default=None, dest="baredependencies",
+        help='Dependencies (includes/libraries) required to build in bare mode (i.e. "--bare-dependencies -lstdc++ -I/usr/include")')
+    parser.add_option("--module-name",
+        default='ignifuga', dest="modulename",
+        help="Module name under which to build the contents of src (default: ignifuga)")
 
     (options, args) = parser.parse_args()
 

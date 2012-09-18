@@ -14,26 +14,35 @@ from schafer import prepare_source, make_python_freeze, SED_CMD, PATCHES_DIR
 from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 import multiprocessing
 
-def prepare(env, target, ignifuga_src, python_build):
-    # Get some required flags
-    sdlflags = get_sdl_flags(target)
-    freetypeflags = get_freetype_flags(target)
+def prepare(env, target, options, ignifuga_src, python_build):
+    if options.bare:
+        if options.baresrc is None:
+            ignifuga_module = ''
+        else:
+            ignifuga_module = "\n%s %s -I%s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, options.baredependencies if options.baredependencies is not None else '')
+    else:
+        # Get some required flags
+        sdlflags = get_sdl_flags(target)
+        freetypeflags = get_freetype_flags(target)
 
-    # Patch some problems with cross compilation
-    cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.osx.diff'), python_build)
-    Popen(shlex.split(cmd)).communicate()
+        # Patch some problems with cross compilation
+        cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.osx.diff'), python_build)
+        Popen(shlex.split(cmd)).communicate()
 
-    ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+        ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
 def make(env, target, options, freeze_modules, frozen_file):
     if not isfile(join(target.builds.PYTHON, 'pyconfig.h')) or not isfile(join(target.builds.PYTHON, 'Makefile')):
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
-        sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] #.replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
-        cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
-        sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
+        if options.bare:
+            sdlldflags = sdlcflags = ''
+        else:
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --static-libs'
+            sdlldflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0] #.replace('-lpthread', '').replace('-ldl', '') # Removing pthread and dl to make them dynamically bound (req'd for Linux)
+            cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
+            sdlcflags = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split('\n')[0]
         # As static as possible
-        cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
+        cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDLAST="-lz" LDFLAGS="-static-libgcc %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (sdlldflags,sdlcflags,target.dist,)
         if options.valgrind:
             cmd += ' --with-valgrind'
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
