@@ -25,7 +25,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
     else:
         sdlflags = get_sdl_flags(target)
         freetypeflags = get_freetype_flags(target)
-        ignifuga_module = "\n%s %s -I%s %s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+        ignifuga_module = "\n%s %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
 
     # For Linux we build our own libgc, because currently Ubuntu is marking libgc-dev:amd64 and libgc-dev:i386 as conflicting,
     # so we can't build a 32 bits version from a 64 bits system using the system provided library.
