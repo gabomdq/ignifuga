@@ -578,7 +578,7 @@ def build_project_generic(options, platform, target, pp, env=None):
         exit()
 
     platform_build = join(target.project, platform)
-    main_file = join(platform_build, options.main)
+    main_file = join(platform_build, basename(options.main))
     cython_src = join(target.project, platform, 'cython_src')
     info('Building %s for %s  (package: %s)' % (options.project, platform, package))
     if not isdir(target.project):
@@ -586,34 +586,36 @@ def build_project_generic(options, platform, target, pp, env=None):
 
     # Prepare and cythonize project sources
     prepare_project(target.project_root, platform_build)
+    # Remove main file as it'll be cythonized differently
+    if isfile(main_file):
+        os.unlink(main_file)
     cfiles, glue_h, glue_c = cythonize(platform_build, package, options, [options.main,])
 
     # Cythonize main file
-    main_file_ct = getctime(main_file)
-    main_file_c = join(cython_src, splitext(options.main)[0] + '.cpp')
+    main_file_ct = getctime(abspath(options.main))
+    main_file_c = join(cython_src, splitext(basename(options.main))[0] + '.cpp')
     cfiles.append(main_file_c)
 
     if not isfile(main_file_c) or getctime(main_file_c) < main_file_ct:
         log('Cythonizing main file %s' % main_file)
-        cmd = 'cython --embed --cplus --include-dir "%s/.." "%s"' % (ROOT_DIR, main_file)
-        #cmd = 'cython --embed --cplus %s' % ( main_file)
-        mfc = join(platform_build, splitext(main_file)[0] + '.cpp')
-        Popen(shlex.split(cmd), cwd = platform_build).communicate()
+        mfc = join(cython_src, splitext(basename(main_file))[0] + '.cpp')
+        cmd = 'cython --embed --cplus --include-dir "%s/.." -o "%s" "%s" ' % (ROOT_DIR, mfc, abspath(options.main))
+        Popen(shlex.split(cmd), cwd = cython_src).communicate()
         if not isfile(mfc):
             error ('Could not cythonize main file')
             exit()
 
         # Insert SDL.h into the cythonized file
-        with file(mfc, 'r') as original: mfc_data = original.read()
-        mfc_data = mfc_data.replace('PyErr_Print();', 'PyErr_Print();fflush(stdout);fflush(stderr);')
-        with file(mfc, 'w') as modified: modified.write("#include \"SDL.h\"\n"+mfc_data)
-        shutil.move(mfc, main_file_c)
+        if not options.bare:
+            with file(mfc, 'r') as original: mfc_data = original.read()
+            mfc_data = mfc_data.replace('PyErr_Print();', 'PyErr_Print();fflush(stdout);fflush(stderr);')
+            with file(mfc, 'w') as modified: modified.write("#include \"SDL.h\"\n"+mfc_data)
+            shutil.move(mfc, main_file_c)
 
     # Build the executable
     sources = ''
     for cf in cfiles:
         sources += cf + ' '
-
     mod = __import__('modules.project.'+platform, fromlist=['make'])
     mod.make(options, env, target, sources, cython_src, cfiles)
 

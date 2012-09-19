@@ -21,6 +21,10 @@ def make(options, env, target, sources, cython_src, cfiles):
         error("You have to supply a CodeSign Authority with --ios-codesign")
         exit()
 
+    if options.bare:
+        error("We don't support bare mode projects for iOS yet")
+        exit()
+
     # Copy/update the skeleton
     platform_build = join(target.project, 'ios')
     ios_project = join(platform_build, 'ios_project')

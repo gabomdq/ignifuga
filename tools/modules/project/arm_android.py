@@ -15,6 +15,10 @@ from schafer import prepare_source, make_python_freeze
 def make(options, env, target, sources, cython_src, cfiles):
     from schafer import SED_CMD, ANDROID_SDK, ANDROID_NDK
 
+    if options.bare:
+        error("We don't support bare mode projects for Android yet")
+        exit()
+
     # Copy/update the skeleton
     platform_build = join(target.project, options.platform)
     android_project = join(platform_build, 'android_project')
