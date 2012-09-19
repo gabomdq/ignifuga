@@ -243,17 +243,24 @@ def check_host_tools():
         # First let's make the host version of Python, statically linked
         info('Building Python for the host')
         python_build = join(ROOT_DIR, 'tmp', 'python_host')
+
+        # Fake a few command line options
+        class _options(object):
+            bare = True
+            baresrc = None
+        options = _options()
+
         if system == 'Linux':
             if arch == '64bit':
-                prepare_python('intel_linux64', None, python_build, os.environ)
+                prepare_python('intel_linux64', None, python_build, options, os.environ)
                 cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
                 Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
             else:
-                prepare_python('intel_linux32', None, python_build, os.environ)
+                prepare_python('intel_linux32', None, python_build, options, os.environ)
                 cmd = './configure --enable-silent-rules LDFLAGS="-Wl,--no-export-dynamic -static -static-libgcc -lz" LDLAST="-static-libgcc -lz" CPPFLAGS="-static -fPIC" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
                 Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         elif system == 'Darwin':
-            prepare_python('osx', None, python_build, os.environ)
+            prepare_python('osx', None, python_build, options, os.environ)
             cmd = './configure --enable-silent-rules --with-universal-archs=intel --enable-universalsdk LDFLAGS="-static-libgcc -lz" LDLAST="-static-libgcc -lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" --disable-shared --prefix="%s"'% (HOST_DIST_DIR,)
             Popen(shlex.split(cmd), cwd = python_build, env=os.environ).communicate()
         cmd = 'make V=0 install -k -j%d' % multiprocessing.cpu_count()

@@ -442,7 +442,7 @@ def cythonize(build_dir, package_name, options, skip=[]):
             glue_c += '    PyImport_AppendInittab("%s", init%s);\n' % (package, package.replace('.', '_'))
 
 
-    if options.rocket:
+    if options.rocket and not options.bare:
         # Special case: add libRocket to the glue
         glue_h += "extern void init_rocketcore(void);\n"
         glue_c += '    PyImport_AppendInittab("_rocketcore", init_rocketcore);\n'
