@@ -871,6 +871,9 @@ if __name__ == '__main__':
     parser.add_option("--oggdecoder",
         default=None, dest="oggdecoder",
         help="Ogg decoder implementation, valid values are: vorbis (uses libvorbis), tremor, tremorlm (uses the low mem branch of Tremor)")
+    parser.add_option("--force-static",
+        action="store_true", dest="forcestatic", default=False,
+        help="Under Linux, build the engine in fully static mode (libdl and libpthread are statically compiled). Not recommended as the engine crashes when loading OpenGL on some (all?) systems.")
 
     # Bare mode options
     parser.add_option("--bare",

@@ -6,7 +6,9 @@
 # xcython: profile=True
 
 from libc.stdlib cimport free, malloc
+from libcpp.map cimport *
 from ignifuga.Log import error
+from Sound cimport initializeSound
 
 DEF SDL_INIT_EVERYTHING = 0x0000FFFF
 
@@ -16,8 +18,23 @@ cpdef initializeSDL():
     #print "SDL INITED"
     #SDL_EnableUNICODE(1) -- skip this as its not currently available 2012-01-23
     TTF_Init()
+    Mix_Init(MIX_INIT_FLAC | MIX_INIT_MOD | MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_FLUIDSYNTH)
+    cdef int audio_rate = 22050
+    cdef Uint16 audio_format = AUDIO_S16
+    cdef int audio_channels = 2
+    cdef int audio_buffers = 4096
+    if Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers) != 0:
+        error("Problem initializing audio")
+        exit(1)
+
+    initializeSound()
+
+
+
 
 cpdef terminateSDL():
+    Mix_CloseAudio()
+    Mix_Quit()
     TTF_Quit()
     SDL_Quit()
 

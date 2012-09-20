@@ -14,6 +14,7 @@ from ignifuga.Log import debug, error
 from SDL import *
 from ignifuga.backends.DataManagerBase import *
 from Canvas import Canvas
+from Sound import Chunk, Music
 from Font import Font
 from os.path import abspath, join, dirname, getmtime, isfile, isdir
 
@@ -111,6 +112,48 @@ class DataManager(DataManagerBase):
                     return None
             else:
                 self.cache[url] = Canvas(srcURL=join(ROOT_DIR, url))
+
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+                watchURL = self._urlToWatchUrl(url)
+                if watchURL not in self.watches:
+                    Gilbert().gameLoop.addWatch(watchURL)
+                    self.watches.append(watchURL)
+#endif
+
+        return self.cache[url]
+
+    def getChunk(self, url):
+        if url not in self.cache:
+            if url.startswith('embedded:'):
+                data = Gilbert().getEmbedded(url[9:])
+                if data != None:
+                    self.cache[url] = Chunk(embedded=data)
+                else:
+                    error('Error loading embedded data with id: %s', url)
+                    return None
+            else:
+                self.cache[url] = Chunk(srcURL=join(ROOT_DIR, url))
+
+#if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
+                watchURL = self._urlToWatchUrl(url)
+                if watchURL not in self.watches:
+                    Gilbert().gameLoop.addWatch(watchURL)
+                    self.watches.append(watchURL)
+#endif
+
+        return self.cache[url]
+
+    def getMusic(self, url):
+        if url not in self.cache:
+            if url.startswith('embedded:'):
+                data = Gilbert().getEmbedded(url[9:])
+                if data != None:
+                    self.cache[url] = Music(embedded=data)
+                else:
+                    error('Error loading embedded data with id: %s', url)
+                    return None
+            else:
+                self.cache[url] = Music(srcURL=join(ROOT_DIR, url))
 
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 watchURL = self._urlToWatchUrl(url)

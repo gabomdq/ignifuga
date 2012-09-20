@@ -408,6 +408,22 @@ cdef extern from "SDL.h":
     cdef int SDL_GL_BindTexture(SDL_Texture *texture, float *texw, float *texh)
     cdef int SDL_GL_UnbindTexture(SDL_Texture *texture)
     cdef int SDL_RenderReadPixels(SDL_Renderer * renderer, SDL_Rect * rect, Uint32 format, void *pixels, int pitch) nogil
+    
+    # Sound audio formats
+    Uint16 AUDIO_U8	#0x0008  /**< Unsigned 8-bit samples */
+    Uint16 AUDIO_S8	#0x8008  /**< Signed 8-bit samples */
+    Uint16 AUDIO_U16LSB	#0x0010  /**< Unsigned 16-bit samples */
+    Uint16 AUDIO_S16LSB	#0x8010  /**< Signed 16-bit samples */
+    Uint16 AUDIO_U16MSB	#0x1010  /**< As above, but big-endian byte order */
+    Uint16 AUDIO_S16MSB	#0x9010  /**< As above, but big-endian byte order */
+    Uint16 AUDIO_U16	#AUDIO_U16LSB
+    Uint16 AUDIO_S16	#AUDIO_S16LSB
+    Uint16 AUDIO_S32LSB	#0x8020  /**< 32-bit Uint16eger samples */
+    Uint16 AUDIO_S32MSB	#0x9020  /**< As above, but big-endian byte order */
+    Uint16 AUDIO_S32	#AUDIO_S32LSB
+    Uint16 AUDIO_F32LSB	#0x8120  /**< 32-bit floating point samples */
+    Uint16 AUDIO_F32MSB	#0x9120  /**< As above, but big-endian byte order */
+    Uint16 AUDIO_F32	#AUDIO_F32LSB
 
 cdef extern from "SDL_image.h":
     cdef SDL_Surface *IMG_Load(char *file)
@@ -560,16 +576,116 @@ cdef extern from "SDL_ttf.h":
     # Get the kerning size of two glyphs */
     cdef int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index)
 
+cdef extern from "SDL_mixer.h":
+    cdef struct Mix_Chunk:
+        int allocated
+        Uint8 *abuf
+        Uint32 alen
+        Uint8 volum
+    ctypedef struct Mix_Music:
+        pass
+    ctypedef enum Mix_Fading: 
+        MIX_NO_FADING
+        MIX_FADING_OUT
+        MIX_FADING_IN
+    ctypedef enum Mix_MusicType:
+        MUS_NONE
+        MUS_CMD
+        MUS_WAV
+        MUS_MOD
+        MUS_MID
+        MUS_OGG
+        MUS_MP3
+        MUS_MP3_MAD
+        MUS_FLAC
+        MUS_MODPLUG
+    ctypedef enum MIX_InitFlags:
+        MIX_INIT_FLAC        = 0x00000001
+        MIX_INIT_MOD         = 0x00000002
+        MIX_INIT_MP3         = 0x00000004
+        MIX_INIT_OGG         = 0x00000008
+        MIX_INIT_FLUIDSYNTH  = 0x00000010
+
+
+    cdef int Mix_Init(int flags)
+    cdef void Mix_Quit()
+    cdef int Mix_OpenAudio(int frequency, Uint16 format, int channels, int chunksize)
+    cdef  int  Mix_AllocateChannels(int numchans)
+    cdef  int  Mix_QuerySpec(int *frequency,Uint16 *format,int *channels)
+    cdef  Mix_Chunk *  Mix_LoadWAV_RW(SDL_RWops *src, int freesrc)
+    cdef  Mix_Chunk *  Mix_LoadWAV(char *file)
+    cdef  Mix_Music *  Mix_LoadMUS(char *file)
+    cdef  Mix_Music *  Mix_LoadMUS_RW(SDL_RWops *rw)
+    cdef  Mix_Music *  Mix_LoadMUSType_RW(SDL_RWops *rw, Mix_MusicType type, int freesrc)
+    cdef  Mix_Chunk *  Mix_QuickLoad_WAV(Uint8 *mem)
+    cdef  Mix_Chunk *  Mix_QuickLoad_RAW(Uint8 *mem, Uint32 len)
+    cdef  void  Mix_FreeChunk(Mix_Chunk *chunk)
+    cdef  void  Mix_FreeMusic(Mix_Music *music)
+    cdef int  Mix_GetNumChunkDecoders()
+    cdef  char *  Mix_GetChunkDecoder(int index)
+    cdef int  Mix_GetNumMusicDecoders()
+    cdef  char *  Mix_GetMusicDecoder(int index)
+    cdef Mix_MusicType  Mix_GetMusicType( Mix_Music *music)
+    cdef void  Mix_SetPostMix(void (*mix_func)(void *udata, Uint8 *stream, int len), void *arg)
+    cdef void  Mix_HookMusic(void (*mix_func) (void *udata, Uint8 *stream, int len), void *arg)
+    cdef void  Mix_HookMusicFinished(void (*music_finished)())
+    cdef void *  Mix_GetMusicHookData()
+    cdef void  Mix_ChannelFinished(void (*channel_finished)(int channel))
+    #    typedef void (*Mix_EffectFunc_t)(int chan, void *stream, int len, void *udata)
+    #    typedef void (*Mix_EffectDone_t)(int chan, void *udata)
+    #    cdef int  Mix_RegisterEffect(int chan, Mix_EffectFunc_t f,
+    #    cdef int  Mix_UnregisterEffect(int channel, Mix_EffectFunc_t f)
+    cdef int  Mix_UnregisterAllEffects(int channel)
+    cdef int Mix_SetPanning(int channel, Uint8 left, Uint8 right)
+    cdef int  Mix_SetPosition(int channel, Sint16 angle, Uint8 distance)
+    cdef int  Mix_SetDistance(int channel, Uint8 distance)
+    cdef int  Mix_SetReverseStereo(int channel, int flip)
+    cdef int  Mix_ReserveChannels(int num)
+    cdef int  Mix_GroupChannel(int which, int tag)
+    cdef int  Mix_GroupChannels(int _from, int to, int tag)
+    cdef int  Mix_GroupAvailable(int tag)
+    cdef int  Mix_GroupCount(int tag)
+    cdef int  Mix_GroupOldest(int tag)
+    cdef int  Mix_GroupNewer(int tag)
+    cdef int  Mix_PlayChannel(int channel, Mix_Chunk *chunk, int loops)
+    cdef int  Mix_PlayChannelTimed(int channel, Mix_Chunk *chunk, int loops, int ticks)
+    cdef int  Mix_PlayMusic(Mix_Music *music, int loops)
+    cdef int  Mix_FadeInMusic(Mix_Music *music, int loops, int ms)
+    cdef int  Mix_FadeInMusicPos(Mix_Music *music, int loops, int ms, double position)
+    cdef int  Mix_FadeInChannel(int channel, Mix_Chunk *chunk, int loops, int ms)
+    cdef int  Mix_FadeInChannelTimed(int channel, Mix_Chunk *chunk, int loops, int ms, int ticks)
+    cdef int  Mix_Volume(int channel, int volume)
+    cdef int  Mix_VolumeChunk(Mix_Chunk *chunk, int volume)
+    cdef int  Mix_VolumeMusic(int volume)
+    cdef int  Mix_HaltChannel(int channel)
+    cdef int  Mix_HaltGroup(int tag)
+    cdef int  Mix_HaltMusic()
+    cdef int  Mix_ExpireChannel(int channel, int ticks)
+    cdef int  Mix_FadeOutChannel(int which, int ms)
+    cdef int  Mix_FadeOutGroup(int tag, int ms)
+    cdef int  Mix_FadeOutMusic(int ms)
+    cdef Mix_Fading  Mix_FadingMusic()
+    cdef Mix_Fading  Mix_FadingChannel(int which)
+    cdef void  Mix_Pause(int channel)
+    cdef void  Mix_Resume(int channel)
+    cdef int  Mix_Paused(int channel)
+    cdef void  Mix_PauseMusic()
+    cdef void  Mix_ResumeMusic()
+    cdef void  Mix_RewindMusic()
+    cdef int  Mix_PausedMusic()
+    cdef int  Mix_SetMusicPosition(double position)
+    cdef int  Mix_Playing(int channel)
+    cdef int  Mix_PlayingMusic()
+    cdef int  Mix_SetMusicCMD( char *command)
+    cdef int  Mix_SetSynchroValue(int value)
+    cdef int  Mix_GetSynchroValue()
+    cdef int  Mix_SetSoundFonts( char *paths)
+    cdef  char*  Mix_GetSoundFonts()
+    #cdef int  Mix_EachSoundFont(int (*function)( char*, void*), void *data)
+    cdef Mix_Chunk *  Mix_GetChunk(int channel)
+    cdef void  Mix_CloseAudio()
+
 cpdef str readFile(str name)
-
-#cdef extern from "stdlib.h":
-#    ctypedef int size_t
-#    void* malloc(size_t)
-#    void free(void*)
-#    void *memcpy(void *dst, void *src, long n)
-
-#cdef extern from "SDL_ignifuga.h":
-#    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)
 
 cdef extern from "turbojpeg.h":
     ctypedef void* tjhandle
@@ -675,3 +791,13 @@ cdef extern from "turbojpeg.h":
 
     cdef int tjCompress2(tjhandle handle, unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf, unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags) nogil
     cdef void tjFree(unsigned char *buffer) nogil
+
+
+#cdef extern from "stdlib.h":
+#    ctypedef int size_t
+#    void* malloc(size_t)
+#    void free(void*)
+#    void *memcpy(void *dst, void *src, long n)
+
+#cdef extern from "SDL_ignifuga.h":
+#    cdef int SDL_NVIDIA_CurrentMetamode(char *metamode, int charcount)

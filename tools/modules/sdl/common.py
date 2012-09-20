@@ -224,9 +224,19 @@ def make_common(env, target, options, libs=['zlib', 'png', 'jpeg', 'sdl', 'sdl_i
 
         cmd = 'make -j%d install V=0' % ncpu
         Popen(shlex.split(cmd), cwd = target.builds.OGGDECODER, env=env).communicate()
+        if options.oggdecoder != 'VORBIS':
+            # Make a couple of symlinks
+            tremor_include_dir = join(target.dist, 'include', 'tremor')
+            if not isdir(tremor_include_dir):
+                os.makedirs(tremor_include_dir)
+
+            if not exists(join(tremor_include_dir, 'ivorbisfile.h')):
+                os.symlink(join(target.dist, 'include', 'ivorbisfile.h'), join(tremor_include_dir, 'ivorbisfile.h'))
+            if not exists(join(tremor_include_dir, 'ivorbiscodec.h')):
+                os.symlink(join(target.dist, 'include', 'ivorbiscodec.h'), join(tremor_include_dir, 'ivorbiscodec.h'))
 
         if options.oggdecoder == 'VORBIS':
-            env['SDL_MIXER_OGG'] = '--enable-music-ogg --disable-music-ogg-tremor'
+            env['SDL_MIXER_OGG'] = '--enable-music-ogg --disable-music-ogg-tremor --disable-music-ogg-shared'
             # Libvorbis
             if isfile(join(target.dist, 'lib', 'libvorbis.a')):
                 log('Libvorbis built successfully')
@@ -234,7 +244,7 @@ def make_common(env, target, options, libs=['zlib', 'png', 'jpeg', 'sdl', 'sdl_i
                 error('Problem building Libvorbis')
                 exit(1)
         else:
-            env['SDL_MIXER_OGG'] = '--enable-music-ogg-tremor'
+            env['SDL_MIXER_OGG'] = '--enable-music-ogg-tremor --disable-music-ogg-shared'
             # Tremor
             if isfile(join(target.dist, 'lib', 'libvorbisidec.a')):
                 log('Tremor built successfully')
@@ -245,9 +255,10 @@ def make_common(env, target, options, libs=['zlib', 'png', 'jpeg', 'sdl', 'sdl_i
     # Build SDL_mixer
     if 'sdl_mixer' in libs:
         if not isfile(join(target.builds.SDL_MIXER, 'Makefile')):
+            #LIBS="-lvorbis -logg -lm"
             cmd = './configure --enable-silent-rules %(HOST)s LDFLAGS="-static-libgcc %(LDFLAGS)s" CFLAGS="%(CFLAGS)s" --disable-shared --enable-static --with-sdl-prefix="%(TARGET_DIST)s" --prefix="%(TARGET_DIST)s" --exec-prefix="%(TARGET_DIST)s" %(SDL_MIXER_OGG)s' % env
+            print cmd
             Popen(shlex.split(cmd), cwd = target.builds.SDL_MIXER, env=env).communicate()
-
         cmd = 'make -j%d install V=0' % ncpu
         Popen(shlex.split(cmd), cwd = target.builds.SDL_MIXER, env=env).communicate()
 

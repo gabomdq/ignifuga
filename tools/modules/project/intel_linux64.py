@@ -16,16 +16,22 @@ from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 def make(options, env, target, sources, cython_src, cfiles):
     # Get some required flags
     if options.bare:
-        cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lm -lutil -lz -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), options.project)
+        if options.forcestatic:
+            cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lm -lutil -lz -lpthread -ldl -lc -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), options.project)
+        else:
+            cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lm -lutil -lz -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), options.project)
     else:
-        sdlflags = '-lSDL2_ttf -lSDL2_image ' + get_sdl_flags(target) + ' -lturbojpeg -ljpeg -lgccpp -lstdc++ -lgc -lgomp'
+        sdlflags = '-lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisfile -lvorbis -logg ' + get_sdl_flags(target) + ' -lturbojpeg -ljpeg -lgccpp -lstdc++ -lgc -lgomp'
         freetypeflags = get_freetype_flags(target)
         pngflags = get_png_flags(target)
 
         sdlflags = sdlflags.replace('-lpthread', '').replace('-ldl', '') + env['LDFLAGS'] + ' ' + env['CFLAGS']
         freetypeflags = freetypeflags.replace('-lpthread', '').replace('-ldl', '')
         pngflags = pngflags.replace('-lpthread', '').replace('-ldl', '')
-        cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil %s -lm %s %s -lz -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), sdlflags, pngflags, freetypeflags, options.project)
+        if options.forcestatic:
+            cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil %s -lm %s %s -lz -lpthread -ldl -lc -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), sdlflags, pngflags, freetypeflags, options.project)
+        else:
+            cmd = '%s %s %s -static-libgcc -static-libstdc++ -Wl,--no-export-dynamic -Wl,-Bstatic -fPIC %s -I%s -I%s -L%s -lpython2.7 -lutil %s -lm %s %s -lz -Wl,-Bdynamic -lpthread -ldl -o %s' % (env['CC'], env['CFLAGS'], env['LDFLAGS'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), sdlflags, pngflags, freetypeflags, options.project)
 
     Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
     if not isfile(join(cython_src, options.project)):

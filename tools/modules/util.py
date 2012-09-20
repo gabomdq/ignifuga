@@ -548,7 +548,10 @@ def validate_ogg_decoder(platform, oggdecoder=None):
     Valid oggdecoder values are None, vorbis, tremor, tremorlm
     """
     oggdecoder = oggdecoder.upper() if oggdecoder is not None else None
-    if platform in ['intel_linux64', 'intel_linux32', 'intel_mingw32', 'intel_mingw64', 'osx']:
+    if platform in ['intel_linux64', 'intel_linux32']:
+        # Tremor does not seem to work on Linux
+        return 'VORBIS'
+    elif platform in ['intel_mingw32', 'intel_mingw64', 'osx']:
         if oggdecoder in ['VORBIS', 'TREMOR', 'TREMORLM']:
             return oggdecoder
         return 'VORBIS'
