@@ -801,6 +801,7 @@ ctypedef enum SDL_USER_EVENT_CODES:
     FILEWATCHER_DEL = 0x00000002
     FILEWATCHER_MOD = 0x00000004
     MIX_CHANNEL_STOPPED = 0x00000008
+    MIX_MUSIC_STOPPED = 0x0000000A
 
 #cdef extern from "stdlib.h":
 #    ctypedef int size_t

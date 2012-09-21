@@ -108,6 +108,8 @@ class Entity(object):
         self.scene = None
 
         for component in self._components.itervalues():
+            # Mark them not active because some components (like sound) depend on it
+            component.active=False
             component.free()
 
         self._components = {}

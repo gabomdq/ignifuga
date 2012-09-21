@@ -158,7 +158,10 @@ cdef class GameLoopBase(object):
 
             self.released = True
 
-    def run(self):
+    cpdef run(self):
+        raise Exception('not implemented')
+
+    cpdef cleanup(self):
         raise Exception('not implemented')
 
     property fps:

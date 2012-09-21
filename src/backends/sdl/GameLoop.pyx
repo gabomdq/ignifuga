@@ -77,7 +77,7 @@ cdef class GameLoop(GameLoopBase):
 
 # TODO: When pausing/resuming, fix up the timing in the active actions so there's no abrupt jump
 
-        while not self.quit:
+        while True:
             nowx = SDL_GetPerformanceCounter()
             now = nowx / freqx
 
@@ -119,6 +119,14 @@ cdef class GameLoop(GameLoopBase):
                 # in this case, there's not enough time
                 self.renderer.flip()
 
+            if self.quit:
+                break
+
+    cpdef cleanup(self):
+        # Run the event loop one last time to purge any lingering messages
+        cdef SDL_Event ev
+        while SDL_PollEvent(&ev):
+            self.handleSDLEvent(&ev)
 
     cdef handleSDLEvent(self, SDL_Event *sdlev):
         cdef SDL_MouseMotionEvent *mmev
@@ -215,9 +223,9 @@ cdef class GameLoop(GameLoopBase):
                 Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
             elif uev.code == FILEWATCHER_MOD:
                 Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
-            elif uev.code == MIX_CHANNEL_STOPPED:
+            elif uev.code == MIX_CHANNEL_STOPPED or uev.code == MIX_MUSIC_STOPPED:
                 pycb = <PyObject*>uev.data1
-                cb = <object>pycb
+                cb = <object>uev.data1
                 Py_XDECREF(pycb)
                 cb()
 

@@ -99,4 +99,5 @@ cdef class GameLoopBase(object):
     cpdef free(self)
     cpdef addRemoteScreenHandler(self, handler)
     cpdef removeRemoteScreenHandler(self, handler)
-    #cpdef checkStatus(self)
+    cpdef run(self)
+    cpdef cleanup(self)

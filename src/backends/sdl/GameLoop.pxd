@@ -33,7 +33,6 @@ cdef class GameLoop(GameLoopBase):
     cdef bint touchCaptured
     cdef int active_touches
 
-    cpdef run(self)
     cdef handleSDLEvent(self, SDL_Event *sdlev)
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev)
 

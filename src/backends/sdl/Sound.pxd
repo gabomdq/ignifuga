@@ -12,8 +12,9 @@ from libcpp.map cimport *
 
 cdef initializeSound()
 cdef public void ChannelFinishedCallback( int channel ) with gil
+cdef public void MusicFinishedCallback( ) with gil
 
-cdef class Chunk:
+cdef class MixChunk:
     cdef bytes _srcURL, embedded_data
     cdef Mix_Chunk *chunk
 
@@ -21,7 +22,7 @@ cdef class Chunk:
     cpdef reload(self, url)
     cdef free(self)
 
-cdef class Music:
+cdef class MixMusic:
     cdef bytes _srcURL, embedded_data
     cdef Mix_Music *music
 
@@ -30,9 +31,9 @@ cdef class Music:
     cdef free(self)
 
 cdef class _SoundComponent:
-    cdef Chunk chunk
+    cdef MixChunk chunk
     cdef int channel, _loop, _loopMax, _volume
-    cdef public int fadeIn, fadeOut, length
+    cdef public int fadeIn, fadeOut
     cdef public bint fadeInLoop
     cdef public object onStart, onLoop, onStop
 
@@ -46,6 +47,20 @@ cdef class _SoundComponent:
     cpdef channelStopped(self)
 
 cdef class _MusicComponent:
-    cdef Music music
+    cdef MixMusic music
+    cdef int _loop, _loopMax, _volume
+    cdef public int fadeIn, fadeOut, length
+    cdef public bint fadeInLoop, stopOnDeactivation
+    cdef public object onStart, onLoop, onStop
+    cdef bint _released
+    cdef object stopCallback
+
     cpdef init(self)
     cpdef free(self)
+    cpdef play(self, int fadein=?)
+    cpdef stop(self, cb=?, int fadeout=?)
+    cpdef pause(self)
+    cpdef resume(self)
+    cdef setVolume(self, int vol)
+    cpdef musicStopped(self)
+

@@ -156,6 +156,9 @@ class Gilbert:
     __metaclass__ = Singleton
 
     def __init__(self):
+        # Import all components so they are registered with the system and can be instantiated by their class name
+        from ignifuga.components import Component, Action, Sprite, Text
+
         self.remoteConsole = None
         usage = "game [options]"
         self.parser = OptionParser(usage=usage, version="Ignifuga Build Utility 1.0")
@@ -214,6 +217,8 @@ class Gilbert:
             from backends.sdl.DataManager import DataManager as datamanager
             from backends.sdl.Canvas import Canvas as canvas
             from backends.sdl.Renderer import Renderer as renderer
+            # Import all SDL components so they are registered with the system and can be instantiated by their class name
+            from ignifuga.backends.sdl.components import Rocket, Music, Sound
             initializeBackend()
             GameLoop = gameloop
             DataManager = datamanager
@@ -288,13 +293,15 @@ class Gilbert:
         debug('Saving state')
         self.saveState()
 
-        # Release all data
+        self.resetScenes()
+        self.gameLoop.cleanup()
+
+        # Free all data
+        self.renderer.free()
         if self.backend == BACKENDS.sdl:
             from backends.sdl import terminateBackend
-
-        self.resetScenes()
-        self.renderer.free()
         del self.renderer
+
         self.gameLoop.free()
         del self.gameLoop
 

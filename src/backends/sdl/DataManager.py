@@ -14,7 +14,7 @@ from ignifuga.Log import debug, error
 from SDL import *
 from ignifuga.backends.DataManagerBase import *
 from Canvas import Canvas
-from Sound import Chunk, Music
+from Sound import MixChunk, MixMusic
 from Font import Font
 from os.path import abspath, join, dirname, getmtime, isfile, isdir
 
@@ -127,12 +127,12 @@ class DataManager(DataManagerBase):
             if url.startswith('embedded:'):
                 data = Gilbert().getEmbedded(url[9:])
                 if data != None:
-                    self.cache[url] = Chunk(embedded=data)
+                    self.cache[url] = MixChunk(embedded=data)
                 else:
                     error('Error loading embedded data with id: %s', url)
                     return None
             else:
-                self.cache[url] = Chunk(srcURL=join(ROOT_DIR, url))
+                self.cache[url] = MixChunk(srcURL=join(ROOT_DIR, url))
 
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 watchURL = self._urlToWatchUrl(url)
@@ -148,12 +148,12 @@ class DataManager(DataManagerBase):
             if url.startswith('embedded:'):
                 data = Gilbert().getEmbedded(url[9:])
                 if data != None:
-                    self.cache[url] = Music(embedded=data)
+                    self.cache[url] = MixMusic(embedded=data)
                 else:
                     error('Error loading embedded data with id: %s', url)
                     return None
             else:
-                self.cache[url] = Music(srcURL=join(ROOT_DIR, url))
+                self.cache[url] = MixMusic(srcURL=join(ROOT_DIR, url))
 
 #if DEBUG and (__LINUX__ or __OSX__ or __MINGW__)
                 watchURL = self._urlToWatchUrl(url)
