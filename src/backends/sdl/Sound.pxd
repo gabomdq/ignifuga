@@ -31,10 +31,18 @@ cdef class Music:
 
 cdef class _SoundComponent:
     cdef Chunk chunk
-    cdef int channel
+    cdef int channel, _loop, _loopMax, _volume
+    cdef public int fadeIn, fadeOut, length
+    cdef public bint fadeInLoop
+    cdef public object onStart, onLoop, onStop
+
     cpdef init(self)
     cpdef free(self)
-    cpdef play(self, int loops=?)
+    cpdef play(self, int fadein=?, int ticks=?)
+    cpdef stop(self, int fadeout=?)
+    cpdef pause(self)
+    cpdef resume(self)
+    cdef setVolume(self, int vol)
     cpdef channelStopped(self)
 
 cdef class _MusicComponent:

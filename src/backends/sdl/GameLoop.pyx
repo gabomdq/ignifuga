@@ -127,6 +127,7 @@ cdef class GameLoop(GameLoopBase):
         cdef SDL_WindowEvent *winev
         cdef SDL_TouchFingerEvent *fev
         cdef SDL_UserEvent *uev
+        cdef PyObject *pycb
 
         #if ROCKET
         self.renderer.rocket.PushSDLEvent(sdlev)
@@ -208,7 +209,17 @@ cdef class GameLoop(GameLoopBase):
             # Used by the FileWatcher to report file changes
             uev = <SDL_UserEvent*>sdlev
             # TODO: Different actions depending on uev.code
-            Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
+            if uev.code == FILEWATCHER_ADD:
+                Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
+            elif uev.code == FILEWATCHER_DEL:
+                Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
+            elif uev.code == FILEWATCHER_MOD:
+                Gilbert().dataManager.urlReloaded(bytes(<char*>uev.data1))
+            elif uev.code == MIX_CHANNEL_STOPPED:
+                pycb = <PyObject*>uev.data1
+                cb = <object>pycb
+                Py_XDECREF(pycb)
+                cb()
 
     cdef normalizeFingerEvent(self, SDL_TouchFingerEvent *fev):
         """ Normalize the finger event coordinates from 0->32768 to the screen resolution """

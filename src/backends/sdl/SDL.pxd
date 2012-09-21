@@ -408,6 +408,7 @@ cdef extern from "SDL.h":
     cdef int SDL_GL_BindTexture(SDL_Texture *texture, float *texw, float *texh)
     cdef int SDL_GL_UnbindTexture(SDL_Texture *texture)
     cdef int SDL_RenderReadPixels(SDL_Renderer * renderer, SDL_Rect * rect, Uint32 format, void *pixels, int pitch) nogil
+    cdef int SDL_PushEvent(SDL_Event * event) nogil
     
     # Sound audio formats
     Uint16 AUDIO_U8	#0x0008  /**< Unsigned 8-bit samples */
@@ -606,6 +607,8 @@ cdef extern from "SDL_mixer.h":
         MIX_INIT_OGG         = 0x00000008
         MIX_INIT_FLUIDSYNTH  = 0x00000010
 
+    cdef int MIX_MAX_VOLUME
+
 
     cdef int Mix_Init(int flags)
     cdef void Mix_Quit()
@@ -792,6 +795,12 @@ cdef extern from "turbojpeg.h":
     cdef int tjCompress2(tjhandle handle, unsigned char *srcBuf, int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf, unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags) nogil
     cdef void tjFree(unsigned char *buffer) nogil
 
+
+ctypedef enum SDL_USER_EVENT_CODES:
+    FILEWATCHER_ADD = 0x00000001
+    FILEWATCHER_DEL = 0x00000002
+    FILEWATCHER_MOD = 0x00000004
+    MIX_CHANNEL_STOPPED = 0x00000008
 
 #cdef extern from "stdlib.h":
 #    ctypedef int size_t

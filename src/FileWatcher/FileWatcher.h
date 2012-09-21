@@ -169,12 +169,35 @@ namespace FW
 
 	};//class FileWatchListener
 #if FILEWATCHER_PLATFORM != FILEWATCHER_PLATFORM_NONE
+
+/* The following codes must match those from SDL.pxd
+ctypedef enum SDL_USER_EVENT_CODES:
+    FILEWATCHER_ADD = 0x00000001
+    FILEWATCHER_DEL = 0x00000002
+    FILEWATCHER_MOD = 0x00000004
+*/
+#define FILEWATCHER_ADD 1
+#define FILEWATCHER_DEL 2
+#define FILEWATCHER_MOD 4
+
 	class FileWatchListenerIgnifuga : public FileWatchListener
 	{
 	    void handleFileAction(WatchID watchid, const String& dir, const String& filename, Action action) {
             SDL_Event event;
             event.type = SDL_USEREVENT;
-            event.user.code = action;
+            switch(action) {
+                case 1:
+                    event.user.code = FILEWATCHER_ADD;
+                    break;
+                case 2:
+                    event.user.code = FILEWATCHER_DEL;
+                    break;
+                case 4:
+                default:
+                    event.user.code = FILEWATCHER_MOD;
+                    break;
+            }
+
             event.user.data1 = (void*)dir.c_str();
             event.user.data2 = (void*)filename.c_str();
             SDL_PushEvent(&event);
