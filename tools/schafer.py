@@ -383,7 +383,6 @@ def cythonize(build_dir, package_name, options, skip=[]):
     # Walk the files, arrange the package in the proper hierachy
     glue_h = ""
     glue_c = ""
-    modules = {}
     packages = [package_name,]
     for f in cfiles:
         filename = basename(f)
@@ -393,16 +392,8 @@ def cythonize(build_dir, package_name, options, skip=[]):
         module = package.split('.')[-1]
         # Remove the module from the package
         package = '.'.join(package.split('.')[:-1])
-
-        module_location = modules
-        for sp in package.split('.'):
-            if sp != '':
-                if not sp in module_location:
-                    module_location[sp] = {}
-                module_location = module_location[sp]
-            
-        module_location[module] = f
         subpackage = package.split('.')
+
         if len(subpackage)>0:
             subpackage = subpackage[-1]
         else:
@@ -415,8 +406,6 @@ def cythonize(build_dir, package_name, options, skip=[]):
         
         if package not in packages:
                 packages.append(package)
-
-        #print "Cfile: %s, Package: %s, Subpackage: %s, Module: %s" % (f, package,subpackage,module)
 
         # Patch the correct paths and package name in the updated cython generated files
         if f in updatedfiles:
