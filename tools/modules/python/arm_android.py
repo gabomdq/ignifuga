@@ -28,7 +28,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
             ignifuga_module = "\n%s %s -I%s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, options.baredependencies if options.baredependencies is not None else '')
     else:
         # Hardcoded for now
-        sdlflags = '-I%s -I%s -I%s ' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
+        sdlflags = '-I%s -I%s -I%s -I%s' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'), join(target.builds.SDL, 'jni', 'SDL_mixer'))
 
         # Figure out where the STL headers are
         if env['STL'] == 'gnu':
@@ -53,7 +53,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
 
         # ldl is required by SDL dynamic library loading
         # llog, lz, lc are required by STL and Ignifuga logging
-        ignifuga_module = "\nignifuga %s -I%s -I%s -I%s %s -L%s -L%s %s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
+        ignifuga_module = "\nignifuga %s -I%s -I%s -I%s %s -L%s -L%s %s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lSDL2 -ldl -lGLESv1_CM -lGLESv2 -llog -lz -lc -lgcc\n" % (' '.join(ignifuga_src),
                                                                                                                                                                target.builds.IGNIFUGA,
                                                                                                                                                                join(target.builds.FREETYPE, 'include'),
                                                                                                                                                                join(target.builds.JPGTURBO),

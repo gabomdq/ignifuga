@@ -29,7 +29,7 @@ def make(options, env, target, sources, cython_src, cfiles):
         sdlflags = get_sdl_flags(target)
         freetypeflags = get_freetype_flags(target)
         pngflags = get_png_flags(target)
-        cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN64 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw64 -lSDL2_ttf -lSDL2_image -lSDL2main -lSDL2 -lpng -lturbojpeg -ljpeg -lfreetype -lz -lws2_64 -lwsock64 -lstdc++ %s %s %s -o %s' % \
+        cmd = '%s -Wl,--no-export-dynamic -static-libgcc -static -DMS_WIN64 -DMS_WINDOWS -DHAVE_USABLE_WCHAR_T %s -I%s -I%s -L%s -lpython2.7 -mwindows -lmingw64 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisfile -lvorbis -logg -lSDL2main -lSDL2 -lpng -lturbojpeg -ljpeg -lfreetype -lz -lws2_64 -lwsock64 -lstdc++ %s %s %s -o %s' % \
         (env['CC'],
         sources,
         join(target.dist, 'include'),

@@ -38,7 +38,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
         # Get some required flags
         sdlflags = get_sdl_flags(target).replace('-mwindows', '').replace('-Dmain=SDL_main', '')
         freetypeflags = get_freetype_flags(target)
-        ignifuga_module = "\n%s %s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (options.modulename, ' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
+        ignifuga_module = "\n%s %s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisfile -lvorbis -logg %s %s -lpng12 -ljpeg -lz -lws2_32 -lwsock32 -lstdc++ -lgcc\n" % (options.modulename, ' '.join(ignifuga_src), target.builds.IGNIFUGA, join(target.builds.PYTHON, 'Include'), sdlflags, freetypeflags)
 
     return ignifuga_module
 
