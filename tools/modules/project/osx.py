@@ -3,7 +3,7 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-# Schafer Module: Build Project for OS X (i386 and x86_64)
+# Schafer Module: Build Project for OS X (see prepare_osx_env for available platforms)
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import os, shlex, shutil
@@ -15,13 +15,17 @@ from ..util import get_sdl_flags, get_freetype_flags, get_png_flags
 
 def make(options, env, target, sources, cython_src, cfiles):
     # Get some required flags
+    archs = ''
+    for arch in env['ARCHS'].split(' '):
+        archs+= ' -arch ' + arch + ' '
+
     if options.bare:
-        cmd = '%s -arch i386 -arch x86_64 -static-libgcc -static-libstdc++ -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lm -lpthread -ldl -o %s' % (env['CC'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), options.project)
+        cmd = '%s %s -static-libgcc -static-libstdc++ -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lm -lpthread -ldl -o %s' % (env['CC'], archs, sources, join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), options.project)
     else:
         sdlflags = get_sdl_flags(target)
         freetypeflags = get_freetype_flags(target)
         pngflags = get_png_flags(target)
-        cmd = '%s -arch i386 -arch x86_64 -static-libgcc -static-libstdc++ -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image %s -lturbojpeg -ljpeg -lm -lstdc++ %s %s -lpthread -ldl -o %s' % (env['CC'], sources,join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
+        cmd = '%s %s -static-libgcc -static-libstdc++ -fPIC %s -I%s -I%s -L%s -lobjc -lpython2.7 -lutil -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisfile -lvorbis -logg %s -lturbojpeg -ljpeg -lm -lstdc++ %s %s -lpthread -ldl -o %s' % (env['CC'], archs, sources, join(target.dist, 'include'), join(target.dist, 'include', 'python2.7'), join(target.dist, 'lib'), pngflags, sdlflags, freetypeflags, options.project)
     Popen(shlex.split(cmd), cwd = cython_src, env=env).communicate()
 
     if not isfile(join(cython_src, options.project)):

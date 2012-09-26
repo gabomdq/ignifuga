@@ -669,13 +669,13 @@ def build_osx (options):
     info('Building Ignifuga For OS X')
     if not isdir(target.dist):
         os.makedirs(target.dist)
-    env, pp = prepare_osx_env(target, openmp=options.openmp)
+    env, pp = prepare_osx_env(target, openmp=options.openmp, sdk=options.applesdk, ostarget=options.appletarget)
     build_generic(options, platform, pp, env)
 
 def build_project_osx(options, project_root):
     platform = 'osx'
     target = get_target(platform)
-    env, pp = prepare_osx_env(target, openmp=options.openmp)
+    env, pp = prepare_osx_env(target, openmp=options.openmp, sdk=options.applesdk, ostarget=options.appletarget)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -697,14 +697,14 @@ def build_ios (options):
     if options.main and check_ignifuga_libraries(platform):
         return
     info('Building Ignifuga For iOS')
-    env, pp = prepare_ios_env(target, None, options.openmp, options.iossdk, options.iostarget)
+    env, pp = prepare_ios_env(target, None, options.openmp, options.applesdk, options.appletarget)
     prepare_ios_skeleton()
     build_generic(options, platform, pp, env)
 
 def build_project_ios(options, project_root):
     platform = 'ios'
     target = get_target(platform)
-    env, pp = prepare_ios_env(target, None, options.openmp, options.iossdk, options.iostarget)
+    env, pp = prepare_ios_env(target, None, options.openmp, options.applesdk, options.appletarget)
     target = get_target(platform, project_root)
     build_project_generic(options, platform, target, pp, env)
 
@@ -830,12 +830,12 @@ if __name__ == '__main__':
     parser.add_option("--android-keyalias",
         default="", dest="androidkeyalias",
         help="Android key alias used to sign the package ")
-    parser.add_option("--ios-sdk",
-        default=None, dest="iossdk",
-        help="Version of the iOS SDK to use for compiling, if none provided an automagic search will be performed for the latest SDK available")
-    parser.add_option("--ios-target",
-        default="3.0", dest="iostarget",
-        help="Minimum iOS version that will be required to run the project")
+    parser.add_option("--apple-sdk",
+        default=None, dest="applesdk",
+        help="Version of the iOS/OSX SDK to use for compiling, if none provided an automagic search will be performed for the latest SDK available")
+    parser.add_option("--apple-target",
+        default=None, dest="appletarget",
+        help="Minimum iOS/OS X version that will be required to run the project")
     parser.add_option("--ios-codesign",
         default=None, dest="ioscodesign",
         help="Code Sign Authority For Signing Apps for iOS (required only for project building) ")

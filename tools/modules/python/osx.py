@@ -3,7 +3,7 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-# Schafer Module: Build Python for OS X (i386 and x86_64)
+# Schafer Module: Build Python for OS X (for available architectures see prepare_osx_env)
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import os, shlex, shutil
@@ -29,7 +29,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
         cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.osx.diff'), python_build)
         Popen(shlex.split(cmd)).communicate()
 
-        ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
+        ignifuga_module = "\nignifuga %s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisfile -lvorbis -logg -lSDL2 -lpng12 -ljpeg %s %s -lstdc++\n" % (' '.join(ignifuga_src),target.builds.IGNIFUGA, sdlflags, freetypeflags)
     return ignifuga_module
 
 def make(env, target, options, freeze_modules, frozen_file):

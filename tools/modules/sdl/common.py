@@ -256,7 +256,7 @@ def make_common(env, target, options, libs=['zlib', 'png', 'jpeg', 'sdl', 'sdl_i
     if 'sdl_mixer' in libs:
         if not isfile(join(target.builds.SDL_MIXER, 'Makefile')):
             #LIBS="-lvorbis -logg -lm"
-            cmd = './configure --enable-silent-rules %(HOST)s LDFLAGS="-static-libgcc %(LDFLAGS)s" CFLAGS="%(CFLAGS)s" --disable-shared --enable-static --with-sdl-prefix="%(TARGET_DIST)s" --prefix="%(TARGET_DIST)s" --exec-prefix="%(TARGET_DIST)s" %(SDL_MIXER_OGG)s' % env
+            cmd = './configure --enable-silent-rules --disable-music-midi %(HOST)s LDFLAGS="-static-libgcc %(LDFLAGS)s" CFLAGS="%(CFLAGS)s" --disable-shared --enable-static --with-sdl-prefix="%(TARGET_DIST)s" --prefix="%(TARGET_DIST)s" --exec-prefix="%(TARGET_DIST)s" %(SDL_MIXER_OGG)s' % env
             print cmd
             Popen(shlex.split(cmd), cwd = target.builds.SDL_MIXER, env=env).communicate()
         cmd = 'make -j%d install V=0' % ncpu

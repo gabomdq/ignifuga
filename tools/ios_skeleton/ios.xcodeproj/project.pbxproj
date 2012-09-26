@@ -21,8 +21,11 @@
 		057ACB85155DA0DD001F2261 /* libSDL2_image.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB7E155DA0DD001F2261 /* libSDL2_image.a */; };
 		057ACB86155DA0DD001F2261 /* libSDL2_ttf.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB7F155DA0DD001F2261 /* libSDL2_ttf.a */; };
 		057ACB87155DA0DD001F2261 /* libSDL2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB80155DA0DD001F2261 /* libSDL2.a */; };
-		057ACB88155DA0DD001F2261 /* libz.a in Frameworks */ = {isa = PBXBuildFile; fileRef =    057ACB81155DA0DD001F2261 /* libz.a */; };
+		057ACB88155DA0DD001F2261 /* libz.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB81155DA0DD001F2261 /* libz.a */; };
 		057ACB89155DA0DD001F2261 /* libturbojpeg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB90155DA0DD001F2261 /* libturbojpeg.a */; };
+		057ACB8A155DA0DD001F2261 /* libSDL2_mixer.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB91155DA0DD001F2261 /* libSDL2_mixer.a */; };
+		057ACB8B155DA0DD001F2261 /* libogg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB92155DA0DD001F2261 /* libogg.a */; };
+		057ACB8C155DA0DD001F2261 /* libvorbisidec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 057ACB93155DA0DD001F2261 /* libvorbisidec.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +48,9 @@
 		057ACB80155DA0DD001F2261 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libSDL2.a; sourceTree = "<group>"; };
 		057ACB81155DA0DD001F2261 /* libz.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libz.a; sourceTree = "<group>"; };
 		057ACB90155DA0DD001F2261 /* libturbojpeg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libturbojpeg.a; sourceTree = "<group>"; };
+		057ACB91155DA0DD001F2261 /* libSDL2_mixer.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libSDL2_mixer.a; sourceTree = "<group>"; };
+		057ACB92155DA0DD001F2261 /* libogg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libogg.a; sourceTree = "<group>"; };
+		057ACB93155DA0DD001F2261 /* libvorbisidec.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libvorbisidec.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +66,9 @@
 				057ACB87155DA0DD001F2261 /* libSDL2.a in Frameworks */,
 				057ACB88155DA0DD001F2261 /* libz.a in Frameworks */,
 				057ACB89155DA0DD001F2261 /* libturbojpeg.a in Frameworks */,
+				057ACB8A155DA0DD001F2261 /* libSDL2_mixer.a in Frameworks */,
+				057ACB8B155DA0DD001F2261 /* libogg.a in Frameworks */,
+				057ACB8C155DA0DD001F2261 /* libvorbisidec.a in Frameworks */,
 				057ACB7A155DA09C001F2261 /* QuartzCore.framework in Frameworks */,
 				057ACB78155DA093001F2261 /* CoreAudio.framework in Frameworks */,
 				057ACB76155DA08B001F2261 /* AudioToolbox.framework in Frameworks */,
@@ -84,6 +93,9 @@
 				057ACB80155DA0DD001F2261 /* libSDL2.a */,
 				057ACB81155DA0DD001F2261 /* libz.a */,
 				057ACB90155DA0DD001F2261 /* libturbojpeg.a */,
+				057ACB91155DA0DD001F2261 /* libSDL2_mixer.a */,
+				057ACB92155DA0DD001F2261 /* libogg.a */,
+				057ACB93155DA0DD001F2261 /* libvorbisidec.a */,
 				057ACB79155DA09C001F2261 /* QuartzCore.framework */,
 				057ACB77155DA093001F2261 /* CoreAudio.framework */,
 				057ACB75155DA08B001F2261 /* AudioToolbox.framework */,
@@ -212,7 +224,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "armv6 armv7";
+				ARCHS = "[[PROJECT_ARCHS]]";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "[[CODESIGN_DEVELOPER]]";
 				COPY_PHASE_STRIP = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -227,7 +239,7 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
+				IPHONEOS_DEPLOYMENT_TARGET = [[DEPLOY_TARGET]];
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -237,7 +249,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "armv6 armv7";
+				ARCHS = "[[PROJECT_ARCHS]]";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "[[CODESIGN_DEVELOPER]]";
 				COPY_PHASE_STRIP = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -245,7 +257,7 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
+				IPHONEOS_DEPLOYMENT_TARGET = [[DEPLOY_TARGET]];
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

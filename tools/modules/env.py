@@ -1,13 +1,15 @@
 from copy import deepcopy
 import os
 from os.path import *
-from log import error
-from util import find_xcode, find_ios_sdk
+from log import error, info
+from util import find_xcode, find_apple_sdk
 import multiprocessing
 from pypreprocessor import preprocessor
 
 XCODE_ROOT = None
 BEST_IOS_SDK = None
+IOS_SDK = None
+BEST_OSX_SDK = None
 OSX_SDK = None
 
 class Target(object):
@@ -104,12 +106,15 @@ def prepare_intel_linux32_env(target, pp=None, openmp=False):
 
 
 
-def prepare_osx_env(target, pp=None, openmp=False):
+def prepare_osx_env(target, pp=None, openmp=False, sdk=None, ostarget=None):
     """ Set up the environment variables for OS X native compilation from a OS X environment, fat builds for i386 and x86_64"""
-    global XCODE_ROOT, OSX_SDK
+    global XCODE_ROOT, OSX_SDK, BEST_OSX_SDK
 
     if pp is None:
         pp = preprocessor()
+
+    if ostarget is None:
+        ostarget = '10.6'
 
     pp.defines.append('__OSX__')
     pp.defines.append('LITTLE_ENDIAN')
@@ -118,22 +123,37 @@ def prepare_osx_env(target, pp=None, openmp=False):
     if XCODE_ROOT is None:
         XCODE_ROOT = find_xcode()
 
+    if BEST_OSX_SDK is None:
+        BEST_OSX_SDK = find_apple_sdk('macosx')
+
+    if sdk is None:
+        sdk = BEST_OSX_SDK
+
     if OSX_SDK is None:
-        OSX_SDK = '%s/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk' % XCODE_ROOT
+        OSX_SDK = '%s/Platforms/MacOSX.platform/Developer/SDKs/MacOSX%s.sdk' % (XCODE_ROOT, sdk)
         if not isdir(OSX_SDK):
             error('Could not locate OS X SDK at %s' % OSX_SDK)
             exit()
 
+        info('Using OS X SDK %s' % sdk)
+
+
+
     env = deepcopy(os.environ)
+
+    env['ARCHS'] = 'i386 x86_64'
+    info("Building for the following architectures: %s" % env['ARCHS'])
+    info("Building for OS X >= %s" % ostarget)
+
     env['CC'] = 'gcc'
     env['STRIP'] = 'strip'
-    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=10.6 --sysroot=%s -I%s/include' % (OSX_SDK, target.dist)
+    env['CFLAGS'] = env['CXXFLAGS'] = '-g -O2 -mmacosx-version-min=%s --sysroot=%s -I%s/include' % (ostarget, OSX_SDK, target.dist)
     env['LDFLAGS'] = ("" if not 'LDFLAGS' in env else env['LDFLAGS']) + '-L%s/lib' % target.dist
     env['HOST'] = '--host x86_64-apple-darwin'
     env['WITH_SYSROOT'] = '--with-sysroot="%s"' % OSX_SDK
     return env, pp
 
-def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget='3.0'):
+def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget=None):
     """ Set up the environment variables for iOS cross compilation from a OS X environment, fat builds for armv6 and armv7"""
     if pp is None:
         pp = preprocessor()
@@ -143,19 +163,46 @@ def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget='3.0'):
     pp.undefines.append('BIG_ENDIAN')
 
     env = deepcopy(os.environ)
-    global XCODE_ROOT, BEST_IOS_SDK
+    global XCODE_ROOT, BEST_IOS_SDK, IOS_SDK
 
     if XCODE_ROOT is None:
         XCODE_ROOT = find_xcode()
 
     if BEST_IOS_SDK is None:
-        BEST_IOS_SDK = find_ios_sdk()
+        BEST_IOS_SDK = find_apple_sdk('iphoneos')
 
     if sdk is None:
         sdk = BEST_IOS_SDK
 
     env['DEVROOT'] = join(XCODE_ROOT, 'Platforms/iPhoneOS.platform/Developer')
-    env['SDKROOT'] = env['DEVROOT'] + '/SDKs/iPhoneOS%s.sdk' % sdk
+    if IOS_SDK is None:
+        IOS_SDK = env['DEVROOT'] + '/SDKs/iPhoneOS%s.sdk' % sdk
+        if not isdir(IOS_SDK):
+            error('Could not locate iOS SDK at %s' % IOS_SDK)
+            exit()
+
+        info('Using iOS SDK %s' % sdk)
+
+    if float(sdk) >= 6:
+        # iOS SDK >= 6 does not have armv6 support nor support for iOS < 4.3
+        env['ARCHS'] = 'armv7 armv7s'
+        if ostarget is None:
+            ostarget = '4.3'
+        elif float(ostarget) < 4.3:
+            error('The selected SDK version %s does not support iOS %s (use --apple-sdk and --apple-target). If you want to find out how to install older SDKs, this guide may be useful: http://blog.chpwn.com/post/31824877081' % (sdk, ostarget))
+            exit()
+    else:
+        env['ARCHS'] = 'armv6 armv7'
+        if ostarget is None:
+            ostarget = '3.0'
+        elif float(ostarget) < 3:
+            error('The selected SDK version %s does not support iOS %s' % (sdk, ostarget))
+            exit()
+
+    info("Building for the following architectures: %s" % env['ARCHS'])
+    info("Building for iOS >= %s" % ostarget)
+    env['IPHONEOS_DEPLOYMENT_TARGET'] = ostarget
+    env['SDKROOT'] = IOS_SDK
     env['CFLAGS'] = env['CXXFLAGS'] = "-g -O2 -pipe -no-cpp-precomp -isysroot %s -miphoneos-version-min=%s -I%s/usr/include/ -I%s/include" % (env['SDKROOT'], ostarget, env['SDKROOT'], target.dist)
     env['CXXCPP'] = env['CPP'] = env['DEVROOT'] + "/usr/bin/llvm-cpp-4.2"
     env['CXX'] = env['DEVROOT'] + "/usr/bin/llvm-g++-4.2"
@@ -169,6 +216,10 @@ def prepare_ios_env(target, pp=None, openmp=False, sdk=None, ostarget='3.0'):
     env['LDFLAGS'] = "-L%s/usr/lib/ -isysroot %s -miphoneos-version-min=%s -L%s/lib" % (env['SDKROOT'], env['SDKROOT'], ostarget, target.dist)
     env['HOST'] = '--host arm-apple-darwin'
     env['WITH_SYSROOT'] = '--with-sysroot="%s"' % env['SDKROOT']
+
+    # This seems to be required with iOS SDK > 5.1, I hope it does not affect SDKs <= 5.1
+    env['CODESIGN_ALLOCATE'] = join(env['DEVROOT'], 'usr/bin/codesign_allocate')
+
     return env, pp
 
 ANDROID_VALID_GCC = ['4.4.3', '4.6']

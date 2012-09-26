@@ -45,6 +45,8 @@ def make(options, env, target, sources, cython_src, cfiles):
     # Modify the skeleton to suit the project
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
     Popen(shlex.split(cmd)).communicate()
+    cmd = SED_CMD + "'s|\[\[PROJECT_ARCHS\]\]|%s|g' %s" % (env['ARCHS'], join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+    Popen(shlex.split(cmd)).communicate()
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'ios.xcscheme'))
     Popen(shlex.split(cmd)).communicate()
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (project_name, join(ios_project, 'ios.xcodeproj', 'xcuserdata', 'user.xcuserdatad', 'xcschemes', 'xcschememanagement.plist'))
@@ -53,7 +55,7 @@ def make(options, env, target, sources, cython_src, cfiles):
     cmd = SED_CMD + "'s|\[\[CODESIGN_DEVELOPER\]\]|%s|g' %s" % (options.ioscodesign, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
     Popen(shlex.split(cmd)).communicate()
 
-    cmd = SED_CMD + "'s|\[\[DEPLOY_TARGET\]\]|%s|g' %s" % (options.iostarget, join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
+    cmd = SED_CMD + "'s|\[\[DEPLOY_TARGET\]\]|%s|g' %s" % (env['IPHONEOS_DEPLOYMENT_TARGET'], join(ios_project, 'ios.xcodeproj', 'project.pbxproj'))
     Popen(shlex.split(cmd)).communicate()
 
     project = XcodeProject.Load(join(ios_project, 'ios.xcodeproj', 'project.pbxproj' ))
@@ -95,11 +97,14 @@ def make(options, env, target, sources, cython_src, cfiles):
         error('error building iOS app')
         return False
 
+    log ('iOS app built, now we will codesign it and build the IPA'
+    )
     # Hacky way to make an ad hoc distributable IPA
     cmd = "/usr/bin/xcrun -sdk iphoneos PackageApplication \"%s\" -o \"%s\" --sign \"%s\" --embed \"%s\"" % (app, ipa, options.ioscodesign, join(app, 'embedded.mobileprovision'))
-    print cmd
-    Popen(shlex.split(cmd), cwd=ios_project, env=os.environ).communicate()
+    # Use env here, or codesign may fail for using the wrong codesign_allocate binary
+    Popen(shlex.split(cmd), cwd=ios_project, env=env).communicate()
 
+    print cmd
     if isfile(ipa):
         log('iOS app built succesfully')
     else:

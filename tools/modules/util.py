@@ -95,23 +95,20 @@ def check_xcode():
         error('Can not detect XCode, please install it')
         exit()
 
-    # Check SDKs
-    cmd = 'xcodebuild -showsdks'
-    output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
-    sdks = ['macosx10.6', 'macosx10.7', 'iphoneos5', 'iphonesimulator5', None]
+    # Check that we have at least one SDK for Desktop, iOS and iOS simulator
+    sdk = find_apple_sdk('macosx', 10, 6)
+    if sdk is None:
+        error("Could not find a valid OS X SDK")
+        exit()
 
-    for line in output:
+    sdk = find_apple_sdk('iphoneos', 5)
+    if sdk is None:
+        error("Could not find a valid iOS SDK")
+        exit()
 
-        for sdk in sdks:
-            if sdk != None and sdk in line:
-                break
-        if sdk != None:
-            sdks.remove(sdk)
-
-    sdks.remove(None)
-    if sdks:
-        for sdk in sdks:
-            error('Could not find XCode SDK: %s' % sdk)
+    sdk = find_apple_sdk('iphonesimulator', 5)
+    if sdk is None:
+        error("Could not find a valid iOS simulator SDK")
         exit()
 
     return True
@@ -130,7 +127,12 @@ def find_xcode():
         error("Can not find XCode's location")
         exit()
 
-def find_ios_sdk(major=5):
+def find_apple_sdk(type='iphoneos', major=5, minor=None):
+    type = type.lower()
+    if type not in [ 'macosx', 'iphoneos', 'iphonesimulator']:
+        error("Invalid Apple SDK type %s" % type)
+        exit()
+
     if check_tool('xcodebuild', False) == None:
         error('Can not detect XCode, please install it')
         exit()
@@ -139,11 +141,16 @@ def find_ios_sdk(major=5):
     cmd = 'xcodebuild -showsdks'
     output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0].split("\n")
     for line in output:
-        if 'iphoneos' in line:
-            v = re.search("iphoneos(\d+)\.(.*)", line)
+        if type in line:
+            v = re.search(type+"(\d+)\.(.*)", line)
             if v is not None:
                 if v.group(1) >= major:
-                    return v.group(1)+'.'+v.group(2)
+                    if minor is None:
+                        return v.group(1)+'.'+v.group(2)
+                    elif v.group(2) >= minor:
+                        return v.group(1)+'.'+v.group(2)
+
+    return None
 
 def validate_android_api_level(level, ANDROID_SDK):
     try:

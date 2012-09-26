@@ -3,7 +3,7 @@
 #Permission to use this file is granted under the conditions of the Ignifuga Game Engine License
 #whose terms are available in the LICENSE file or at http://www.ignifuga.org/license
 
-# Schafer Module: Build SDL for OS X (i386 and x86_64)
+# Schafer Module: Build SDL for OS X (see prepare_osx_env for available platforms)
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import shlex
@@ -41,15 +41,16 @@ def setup(env_base, target_base, arch):
 def prepare(env, target, options):
     env_base = deepcopy(env)
     target_base = deepcopy(target)
-    for arch in ['i386', 'x86_64']:
+    for arch in env['ARCHS'].split(' '):
         env, target = setup(env_base, target_base, arch)
         prepare_common(env, target, options)
 
 def make(env, target, options):
-    # Build all libraries in universal mode (i386 and x86_64)
+    # Build all libraries in universal mode (see prepare_osx_env for available platforms)
     env_base = deepcopy(env)
     target_base = deepcopy(target)
-    for arch in ['i386', 'x86_64']:
+    archs = env['ARCHS'].split(' ')
+    for arch in archs:
         env, target = setup(env_base, target_base, arch)
         env['PKG_CONFIG_PATH'] = join(target.dist, 'lib', 'pkgconfig')
         make_common(env, target, options)
@@ -59,11 +60,15 @@ def make(env, target, options):
     cmd = 'mkdir -p ' + join(target.dist, 'lib')
     Popen(shlex.split(cmd), env=env).communicate()
 
-    for lib in ['SDL2', 'SDL2main', 'SDL2_image', 'SDL2_ttf', 'SDL2_mixer', 'turbojpeg', 'png12', 'jpeg', 'freetype', 'z']:
+    for lib in ['SDL2', 'SDL2main', 'SDL2_image', 'SDL2_ttf', 'SDL2_mixer', 'turbojpeg', 'png12', 'jpeg', 'freetype', 'z', 'vorbis', 'vorbisfile', 'ogg']:
         libfile = 'lib'+lib+'.a'
 
-        cmd = 'lipo -create %s %s -output %s' % (join(target.dist+'_i386', 'lib', libfile), join(target.dist+'_x86_64', 'lib', libfile), join(target.dist, 'lib', libfile))
+        cmd = 'lipo -create '
+        for arch in archs:
+            cmd += join(target.dist+'_' + arch, 'lib', libfile) + ' '
+        cmd +=' -output %s' %  join(target.dist, 'lib', libfile)
         Popen(shlex.split(cmd), env=env).communicate()
+
         cmd = 'ranlib %s' % join(target.dist, 'lib', libfile)
         Popen(shlex.split(cmd), env=env).communicate()
 
@@ -74,10 +79,10 @@ def make(env, target, options):
             exit()
 
     for path in ['bin', 'include']:
-        cmd = 'rsync -aqut --exclude .svn --exclude .hg --exclude Makefile %s/ %s' % (join(target.dist+'_x86_64', path), join(target.dist, path))
+        cmd = 'rsync -aqut --exclude .svn --exclude .hg --exclude Makefile %s/ %s' % (join(target.dist+'_'+archs[0], path), join(target.dist, path))
         Popen(shlex.split(cmd), env=env).communicate()
 
     for cfg in ['freetype-config', 'libpng12-config', 'sdl2-config']:
-        cmd = SED_CMD + 's|_x86_64||g ' +  join(target.dist, 'bin', cfg)
+        cmd = SED_CMD + ('s|_%s||g ' % archs[0]) +  join(target.dist, 'bin', cfg)
         Popen(shlex.split(cmd), env=env).communicate()
     return True

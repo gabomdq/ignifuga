@@ -22,7 +22,7 @@ def prepare(env, target, options, ignifuga_src, python_build):
             ignifuga_module = "\n%s %s -I%s %s\n" % (options.modulename, ' '.join(ignifuga_src),target.builds.IGNIFUGA, options.baredependencies if options.baredependencies is not None else '')
     else:
         # Hardcoded for now as SDL doesn't give us the proper dependencies with sdl2-config
-        sdlflags = '-I%s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2 -lz -lfreetype -lpng12 -lm -liconv -lobjc -Wl,-framework,Foundation -Wl,-framework,UIKit -Wl,-framework,OpenGLES -Wl,-framework,QuartzCore -Wl,-framework,CoreAudio -Wl,-framework,AudioToolbox -Wl,-framework,CoreGraphics' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
+        sdlflags = '-I%s -I%s -I%s -lturbojpeg -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lvorbisidec -logg -lSDL2 -lz -lfreetype -lpng12 -lm -liconv -lobjc -Wl,-framework,Foundation -Wl,-framework,UIKit -Wl,-framework,OpenGLES -Wl,-framework,QuartzCore -Wl,-framework,CoreAudio -Wl,-framework,AudioToolbox -Wl,-framework,CoreGraphics' % (join(target.builds.SDL, 'jni', 'SDL', 'include'), join(target.builds.SDL, 'jni', 'SDL_image'), join(target.builds.SDL, 'jni', 'SDL_ttf'))
 
         # Patch some problems with cross compilation
         cmd = 'patch -p1 -i %s -d %s' % (join(PATCHES_DIR, 'python.ios.diff'), python_build)
@@ -43,7 +43,11 @@ def make(env, target, options, freeze_modules, frozen_file):
             cmd = join(target.dist, 'bin', 'sdl2-config' ) + ' --cflags'
             sdlcflags = Popen(shlex.split(cmd), stdout=PIPE, env=env).communicate()[0].split('\n')[0]
 
-        cmd = './configure --enable-silent-rules LDLAST="-lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" LDFLAGS="-arch armv6 -arch armv7 -static-libgcc %s %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -arch armv6 -arch armv7 %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE -arch armv6 -arch armv7 %s %s" HOSTPYTHON=%s HOSTPGEN=%s --disable-toolbox-glue --host=arm-apple-darwin --disable-shared --prefix="%s"'% (env['LDFLAGS'], sdlldflags, env['CFLAGS'], env['CFLAGS'], sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
+        archs = ''
+        for arch in env['ARCHS'].split(' '):
+            archs+= ' -arch ' + arch + ' '
+
+        cmd = './configure --enable-silent-rules LDLAST="-lz" LINKFORSHARED=" " DYNLOADFILE="dynload_stub.o" LDFLAGS="%s -static-libgcc %s %s" CPPFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s %s" CFLAGS="-DBOOST_PYTHON_STATIC_LIB -DBOOST_PYTHON_SOURCE %s %s %s" HOSTPYTHON=%s HOSTPGEN=%s --disable-toolbox-glue --host=arm-apple-darwin --disable-shared --prefix="%s"'% (archs, env['LDFLAGS'], sdlldflags, archs, env['CFLAGS'], archs, env['CFLAGS'], sdlcflags, HOSTPYTHON, HOSTPGEN, target.dist,)
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON, env=env).communicate()
         cmd = SED_CMD + '"s|^INSTSONAME=\(.*.so\).*|INSTSONAME=\\1|g" %s' % (join(target.builds.PYTHON, 'Makefile'))
         Popen(shlex.split(cmd), cwd = target.builds.PYTHON).communicate()
