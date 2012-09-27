@@ -203,13 +203,17 @@ cdef class GameLoop(GameLoopBase):
                 debug('Window minimized')
             elif winev.event == SDL_WINDOWEVENT_FOCUS_GAINED:
                 debug('Window focus gained')
-                #self.paused = False
+                self.paused = False
+                Mix_ResumeMusic()
+                Mix_Resume(-1)
             elif winev.event == SDL_WINDOWEVENT_FOCUS_LOST:
                 # Pause here is strictly required for fullscreen Direct3D backed apps...
                 # but it doesn't hurt to pause in windowed apps or other platforms
                 # TODO: Should we make pausing here optional? Command line option enabled?
                 debug('Window focus lost')
-                #self.paused = True
+                self.paused = True
+                Mix_PauseMusic()
+                Mix_Pause(-1)
             elif winev.event == SDL_WINDOWEVENT_CLOSE:
                 debug('Window closed')
                 Gilbert().endLoop()
