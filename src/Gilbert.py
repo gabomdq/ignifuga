@@ -157,7 +157,7 @@ class Gilbert:
 
     def __init__(self):
         # Import all components so they are registered with the system and can be instantiated by their class name
-        from ignifuga.components import Component, Action, Sprite, Text
+        from ignifuga.components import Component, Action, Text
 
         self.remoteConsole = None
         usage = "game [options]"

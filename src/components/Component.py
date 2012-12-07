@@ -41,7 +41,6 @@ class Component(object):
         self._entity = None
         self._active = False
         self._initiallyActive = active
-        self.entity = entity
         self.frequency = frequency
         self.tags = []
         self.entityTags = []
@@ -55,6 +54,8 @@ class Component(object):
         self.entityTags += self.ENTITY_TAGS
         self.properties += self.PROPERTIES
 
+        # Do this at the very end as it depends on the above initialization
+        self.entity = entity
 
     def _loadDefaults(self, data):
         """ Load data into the instance if said data doesn't exist """

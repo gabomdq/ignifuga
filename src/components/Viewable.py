@@ -34,7 +34,7 @@ class Viewable(Component):
     """
     TAGS = ['viewable',]
     ENTITY_TAGS = ['viewable',]
-    PROPERTIES = ['canvas', 'position', 'x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax', 'getRect', 'getRenderArea']
+    PROPERTIES = ['canvas', 'position', 'x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax', 'getRect']
     PROPERTIES_PERSIST = ['x', 'y', 'z', 'angle', 'center', 'zscale', 'width', 'height', 'visible', 'flipv', 'fliph', 'alpha', 'red', 'green', 'blue', 'parallax']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
         # We have to do this here otherwise the z ordering thingy breaks
@@ -66,9 +66,7 @@ class Viewable(Component):
             '_scrolly': 0,
             'interactive': False,
         })
-
-        super(Viewable, self).__init__(id, entity, active, frequency, **data)
-
+        super(Viewable, self).__init__( id, entity, active, frequency, **data)
 
     @Component.active.setter
     def active(self, active):
@@ -182,6 +180,10 @@ class Viewable(Component):
         return self._red
     @red.setter
     def red(self, value):
+        if value < 0.0:
+            value = 0.0
+        elif value > 1.0:
+            value = 1.0
         self._red = value
 
     @property
@@ -189,6 +191,10 @@ class Viewable(Component):
         return self._green
     @green.setter
     def green(self, value):
+        if value < 0.0:
+            value = 0.0
+        elif value > 1.0:
+            value = 1.0
         self._green = value
 
     @property
@@ -196,6 +202,11 @@ class Viewable(Component):
         return self._blue
     @blue.setter
     def blue(self, value):
+        if value < 0.0:
+            value = 0.0
+        elif value > 1.0:
+            value = 1.0
+
         self._blue = value
 
     @property
@@ -203,6 +214,10 @@ class Viewable(Component):
         return self._alpha
     @alpha.setter
     def alpha(self, value):
+        if value < 0.0:
+            value = 0.0
+        elif value > 1.0:
+            value = 1.0
         self._alpha = value
 
     @property
@@ -236,9 +251,6 @@ class Viewable(Component):
     def getRect(self):
         """ Get the x,y,w,h rectangle the node occupies in scene coordinates """
         return (self.x, self.y, self.width, self.height)
-
-    def getRenderArea(self):
-        return [0, 0, self.width, self.height, self.x, self.y, self.width, self.height]
 
     def _updateSize(self):
         self._width_src = self._width_pre = self._width if self._width != None else 0

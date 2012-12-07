@@ -105,14 +105,17 @@ cdef class Renderer:
     cdef bint _indexSprite(self, _Sprite *sprite)
     cdef bint _unindexSprite(self, _Sprite *sprite)
 
+    cdef _Sprite* _addSprite(self,  obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a)
     cpdef Sprite addSprite(self, obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a)
     cpdef bint removeSprite(self, Sprite sprite_w)
+    cdef bint _removeSprite(self, _Sprite *sprite)
     cpdef bint spriteZ(self, Sprite sprite_w, int z)
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h)
     cpdef bint spriteDst(self, Sprite sprite_w, int x, int y, int w, int h)
     cpdef bint spriteRot(self, Sprite sprite_w, double angle, int centerx, int centery, int flip)
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a)
     cpdef bint spriteInteractive(self, Sprite sprite_w, bint interactive)
+    cdef bint _spriteZ(self, _Sprite *sprite, int z)
     cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil

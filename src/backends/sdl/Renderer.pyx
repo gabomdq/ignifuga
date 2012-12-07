@@ -350,9 +350,9 @@ cdef class Renderer:
                 inc(iter)
         return False
 
-    cpdef Sprite addSprite(self,  obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
+    cdef _Sprite* _addSprite(self,  obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
         cdef _Sprite sprite, *spritep
-        cdef Sprite sprite_wrap = Sprite()
+
 
         sprite.texture = canvas._surfacehw
         sprite.src.x = sx
@@ -388,11 +388,15 @@ cdef class Renderer:
             spritep = &self.active_sprites.back()
 
         self._indexSprite(spritep)
-        sprite_wrap.sprite = spritep
+
+        return spritep
+
+    cpdef Sprite addSprite(self,  obj, bint interactive, Canvas canvas, int z, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh, double angle, int centerx, int centery, int flip, float r, float g, float b, float a):
+        cdef Sprite sprite_wrap = Sprite()
+        sprite_wrap.sprite = self._addSprite(obj, interactive, canvas, z, sx, sy, sw, sh, dx, dy, dw, dh, angle, centerx, centery, flip, r, g, b, a)
         return sprite_wrap
 
-    cpdef bint removeSprite(self, Sprite sprite_w):
-        cdef _Sprite *sprite = sprite_w.sprite
+    cdef bint _removeSprite(self, _Sprite *sprite):
         cdef deque[_Sprite].iterator iter
         if self._unindexSprite(sprite):
             Py_XDECREF(sprite.component)
@@ -400,9 +404,11 @@ cdef class Renderer:
             sprite.free = True
         return False
 
-
-    cpdef bint spriteZ(self, Sprite sprite_w, int z):
+    cpdef bint removeSprite(self, Sprite sprite_w):
         cdef _Sprite *sprite = sprite_w.sprite
+        return self._removeSprite(sprite)
+
+    cdef bint _spriteZ(self, _Sprite *sprite, int z):
         cdef deque[Sprite_p] *ds
         cdef deque_Sprite_iterator iter
         cdef zmap_iterator ziter = self.zmap.begin()
@@ -420,6 +426,10 @@ cdef class Renderer:
                 inc(iter)
             inc(ziter)
         return False
+
+    cpdef bint spriteZ(self, Sprite sprite_w, int z):
+        cdef _Sprite *sprite = sprite_w.sprite
+        return self._spriteZ(sprite, z)
 
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h):
         cdef _Sprite *sprite = sprite_w.sprite
@@ -529,15 +539,15 @@ cdef class Renderer:
     cpdef getTimestamp(self):
         """ Return the current frame timestamp in ms """
         return self.frameTimestamp
-    
+
     cpdef checkRate(self, Uint32 lastTime, Uint32 rate):
         """ Check if for a given frame rate in hz enough time in milliseconds has elapsed since lastTime"""
         return self.frameTimestamp - lastTime > 60000/rate
-    
+
     cpdef checkLapse(self, Uint32 lastTime, Uint32 lapse):
         """ Check that a given time lapse in milliseconds has passed since lastTime"""
         return self.frameTimestamp - lastTime > lapse
-    
+
     cpdef setNativeResolution(self, double w=-1.0, double h=-1.0, bint keep_aspect=1, bint autoscale=1):
         """ This function receives the scene native resolution. Based on it, it sets the scaling factor to the screen to fit the scene """
         self._native_res_w = w
@@ -579,7 +589,7 @@ cdef class Renderer:
         """ This function receives the scene size. Based on it, it controls the scrolling allowed """
         self._native_size_w = w
         self._native_size_h = h
-        
+
     cpdef _calculateScale(self, double scene_w, double scene_h, int screen_w, int screen_h, bint keep_aspect=1):
         cdef double sx, sy
         self.dirty = True

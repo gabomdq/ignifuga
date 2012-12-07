@@ -10,6 +10,7 @@
 
 from ignifuga.backends.sdl.Sound import Sound, Music
 from ignifuga.backends.sdl.Rocket import RocketComponent
+from ignifuga.backends.sdl.Sprite import Sprite as Sprite
 
 class Rocket(RocketComponent):
     pass

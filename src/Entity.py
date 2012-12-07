@@ -9,7 +9,6 @@
 
 from ignifuga.Gilbert import Event, Gilbert
 from ignifuga.Log import error, debug
-from ignifuga.components.Component import Component
 from Task import *
 
 import weakref,traceback
@@ -124,6 +123,7 @@ class Entity(object):
 
     def init(self,**data):
         """ Initialize the required external data, take into account that this function may be called more than once if initialization fails """
+        from ignifuga.components.Component import Component
         if not self._initialComponents and 'components' in self._data:
             if isinstance(self._data['components'], dict):
                 for c_id, c_data in self._data['components'].iteritems():
@@ -287,6 +287,7 @@ class Entity(object):
 
     def remove(self, component):
         """ Remove a component from the entity (accepts either the component object or the id) """
+        from ignifuga.components.Component import Component
         if not isinstance(component, Component):
             if component in self._components:
                 component = self._components[component]

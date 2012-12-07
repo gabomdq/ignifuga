@@ -8,7 +8,7 @@
 # Text component
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
-from Sprite import Sprite
+from ignifuga.backends.sdl.Sprite import Sprite
 from ignifuga.Gilbert import Gilbert, Canvas
 from ignifuga.Task import *
 from ignifuga.Log import *
