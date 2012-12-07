@@ -22,7 +22,31 @@ cdef class _SpriteComponent:
         self._started = False
         self._dirty = True
         self._rendererSprite = NULL
+        self.forward = True
+        self.interactive = False
+        self.remainActiveOnStop = False
+        self._static = False
+        self._paused = False
+        self._parent = None
+        self._blur = 0
+        self._width_src = 0
+        self._height_src = 0
+        self._width_pre = 0
+        self._height_pre = 0
+        self.onStart = None
+        self.onLoop = None
+        self.onStop = None
+        self.lastBlurAmount = -1
+        self._blur = 0
+        self.loopMax = -1
+        self.loop = 0
+        self._spriteData = None
+        self._atlas = None          # The "source" image where the sprite info comes from
+        self._tmpcanvas = None      # An internal canvas where we perform composition of overlays and do bluring
+        self._canvas = None         # A pointer to the external "face" of the sprite, it can point to self._atlas, self._tmpcanvas or self.sprite.canvas
+        self.sprite =  None
         self.overlays = new map[int,SPRITE_OVERLAY]()
+        self.lastUpdate = 0
 
     cpdef init(self):
         self.renderer = <Renderer>Gilbert().renderer
@@ -77,33 +101,37 @@ cdef class _SpriteComponent:
                 self._started = True
                 self.run(self.onStart)
 
-            if self.loopMax == None or self.loop < self.loopMax:
-                if self.forward:
-                    if self.sprite.nextFrame():
-                        if self.sprite._frame == 0:
-                            self.loop +=1
-                            self.run(self.onLoop)
-                        if self.loop == self.loopMax:
-                            self.run(self.onStop)
-                            if not self.remainActiveOnStop:
-                                self.active = False
-                                self.loop = 0
-                                self.frame = 0
-                        if not self.overlays.empty() or self._blur > 0:
-                            self._doCompositing()
-                else:
-                    if self.sprite.prevFrame():
-                        if self.sprite._frame == self.sprite.numFrames - 1:
-                            self.loop +=1
-                            self.run(self.onLoop)
-                        if self.loop == self.loopMax:
-                            self.run(self.onStop)
-                            if not self.remainActiveOnStop:
-                                self.active = False
-                                self.loop = 0
-                                self.frame = self.sprite.numFrames - 1
-                        if not self.overlays.empty() or self._blur > 0:
-                            self._doCompositing()
+            if self.loopMax == -1 or self.loop < self.loopMax:
+                # Control the frame rate
+                if now-self.lastUpdate>1000/self.frequency:
+                    if self.forward:
+                        if self.sprite.nextFrame():
+                            self.lastUpdate = now
+                            if self.sprite._frame == 0:
+                                self.loop +=1
+                                self.run(self.onLoop)
+                            if self.loop == self.loopMax:
+                                self.run(self.onStop)
+                                if not self.remainActiveOnStop:
+                                    self.active = False
+                                    self.loop = 0
+                                    self.frame = 0
+                            if not self.overlays.empty() or self._blur > 0:
+                                self._doCompositing()
+                    else:
+                        if self.sprite.prevFrame():
+                            self.lastUpdate = now
+                            if self.sprite._frame == self.sprite.numFrames - 1:
+                                self.loop +=1
+                                self.run(self.onLoop)
+                            if self.loop == self.loopMax:
+                                self.run(self.onStop)
+                                if not self.remainActiveOnStop:
+                                    self.active = False
+                                    self.loop = 0
+                                    self.frame = self.sprite.numFrames - 1
+                            if not self.overlays.empty() or self._blur > 0:
+                                self._doCompositing()
         elif not self.overlays.empty() or (self._blur > 0 and self._blur != self._lastBlurAmount):
             self._doCompositing()
 
@@ -411,6 +439,38 @@ cdef class _SpriteComponent:
             return True
         return False
 
+    cpdef setFrame(self, int frame):
+        cdef overlay_iterator iter
+        cdef SPRITE_OVERLAY *_sprite
+
+        if self.sprite != None:
+            self.sprite.frame(frame)
+
+        if frame == 0:
+            self._started = False
+
+
+        iter = self.overlays.begin()
+        while iter != self.overlays.end():
+            _sprite = &deref(iter).second
+            sprite = <object> _sprite.sprite
+            sprite.setFrame(frame)
+            inc(iter)
+
+    cpdef setPaused(self, value):
+    # Pause/unpause the overlays
+        cdef overlay_iterator iter
+        cdef SPRITE_OVERLAY *_sprite
+
+        iter = self.overlays.begin()
+        while iter != self.overlays.end():
+            _sprite = &deref(iter).second
+            sprite = <object> _sprite.sprite
+            sprite.setPaused(value)
+            inc(iter)
+
+        self._paused = value
+
 
     ##############
     # PROPERTIES #
@@ -425,15 +485,7 @@ cdef class _SpriteComponent:
         def __get__(self):
             return self.sprite._frame if self.sprite != None else 0
         def __set__(self, frame):
-            if self.sprite != None:
-                self.sprite.frame(frame)
-
-            if frame == 0:
-                self._started = False
-
-            for overlay in self._overlays.itervalues():
-                (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
-                sprite._frame(frame)
+            self.setFrame(frame)
 
     property frameCount:
         def __get__(self):
@@ -452,22 +504,19 @@ cdef class _SpriteComponent:
             return self._paused
 
         def __set__(self, value):
-            # Pause/unpause the overlays
-            for overlay in self._overlays.itervalues():
-                (id,x,y,op,_r,_g,_b,_a,sprite) = overlay
-                sprite.paused = value
-            self._paused = value
+            self.setPaused(value)
 
     property overlays:
         def __get__(self):
-            return self._overlays
+            return []
+            #return self._overlays
 
         def __set__(self, overlays):
             """ Overlays should have the format [(id, x, y, z, r, g, a, op), (id, x, y, z, r, g, a, op), ...]
             See addOverlay for the meaning of these parameters
             ie: "overlays":[["ci_ovl", 0,0,0,null, null, null, null, 2]]
             """
-            self._overlays = {}
+            self.clearOverlays()
 
             for overlay in overlays:
                 id,x,y,z,r,g,b,a,op = overlay
@@ -504,26 +553,7 @@ class Sprite(Viewable, _SpriteComponent):
         # Default values
         self._loadDefaults({
             'file': None,
-            '_spriteData': None,
-            '_atlas': None,         # The "source" image where the sprite info comes from
-            '_tmpcanvas': None,     # An internal canvas where we perform composition of overlays and do bluring
-            '_canvas': None,        # A pointer to the external "face" of the sprite, it can point to self._atlas, self._tmpcanvas or self.sprite.canvas
-            'sprite': None,
-            'loopMax': loop if loop >= 0 else None,
-            'loop': 0,
-            'onStart': None,
-            'onLoop': None,
-            'onStop': None,
-            'remainActiveOnStop': False,
-            'forward': True,
-            '_blur': 0,
-            '_lastBlurAmount': -1,
-            '_overlays': {},
-            '_static': False,
-            '_parent': None,
-            '_paused': False,
             })
-
         _SpriteComponent.__init__(self)
         super(Sprite, self).__init__(id, entity, active, frequency, **data)
 
@@ -703,6 +733,7 @@ cdef class _Sprite:
             nframe = 0
             for frameHitmap in self._hitmap:
                 self.hitmap.insert(pair[int, char_p](nframe, <char_p>frameHitmap))
+                nframe+=1
 
 
         hiter = self.hitmap.find(0)
@@ -745,9 +776,8 @@ cdef class _Sprite:
         if self._frame >= self.numFrames:
             self._frame=0
 
-
         iter = self.frames.find(self._frame)
-        if iter != self.frames.end():
+        if iter == self.frames.end():
             return False
 
         boxes = &deref(iter).second
@@ -782,7 +812,7 @@ cdef class _Sprite:
         if frame < self.numFrames:
             if self.type == SPRITE_TYPE_ATLAS or self.type == SPRITE_TYPE_DELTAP:
                 iter = self.frames.find(0)
-                if iter != self.frames.end():
+                if iter == self.frames.end():
                     return False
 
                 boxes = &deref(iter).second
