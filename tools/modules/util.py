@@ -13,7 +13,6 @@ from log import info, log, error
 import multiprocessing, tempfile
 
 
-CYTHON_GIT = 'https://github.com/cython/cython.git'
 ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r8-linux-x86.tar.bz2',
                    'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r8-darwin-x86.tar.bz2'}
 ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r18-linux.tgz',
@@ -30,7 +29,7 @@ def find_cython():
         output = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE).communicate()
         version = output[0].split('\n')[0] if output[0] != '' else output[1].split('\n')[0]
         v = re.search("(\d+)\.(\d+)(.*)", version)
-        # We are looking for 0.16 or higher
+        # We are looking for 0.17 or higher
         cython_ver = []
         counter = 0
         while True:
@@ -43,7 +42,7 @@ def find_cython():
             if cython_ver[0] > 0:
                 return cython
             if cython_ver[0] == 0:
-                if cython_ver[1] > 15:
+                if cython_ver[1] >= 17:
                     return cython
     #            if v.group(1) == 16:
     #                if v.groups(2).startswith('1+') or v.groups(2) >= 2:
@@ -281,6 +280,12 @@ def check_host_tools():
 def install_mac_ports():
     if check_tool('port', False) == None:
         # Install Mac Ports
+        log('This tool needs to install Mac Ports, is that ok? (y/N)')
+        choice = raw_input().lower()
+        if choice != 'y':
+            error('Can not proceed without Mac Ports, install dependencies manually')
+            exit()
+
         log('Installing Mac Ports (macports.org)')
         portsdmg = join(tempfile.gettempdir(), 'MacPorts.dmg')
         cmd = 'curl -o %s https://distfiles.macports.org/MacPorts/MacPorts-2.0.3-10.7-Lion.dmg' % portsdmg
@@ -351,39 +356,28 @@ def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
 
     cython = find_cython()
     if cython == None:
-        git = check_tool('git', False)
-        if git == None:
+        pip = check_tool('pip', False)
+        if pip == None:
             # Try to install GIT
-            log('Trying to install GIT')
+            log('Trying to install PIP')
             if system == 'Linux':
-                cmd = 'sudo apt-get -y install git'
+                cmd = 'sudo apt-get -y install python-pip'
                 Popen(shlex.split(cmd)).communicate()
             else:
-                cmd = 'sudo port install git-core'
+                cmd = 'sudo port install py-pip'
                 Popen(shlex.split(cmd)).communicate()
-            git = check_tool('git', False)
+            git = check_tool('pip', False)
             if git == None:
-                error('Could not install GIT. Try installing it manually')
+                error('Could not install PIP which we need to install Cython. Try installing it manually')
                 exit()
-        log ('GIT is available')
+        log ('PIP is available')
 
         log ('Installing Cython')
-        tmp_cython = join(ROOT_DIR, 'tmp', 'cython')
-        if not isdir(tmp_cython):
-            cmd = 'mkdir -p %s' % tmp_cython
-            Popen(shlex.split(cmd)).communicate()
-            cmd = 'git clone %s %s' % (CYTHON_GIT, tmp_cython)
-            Popen(shlex.split(cmd)).communicate()
-        else:
-            cmd = 'git pull'
-            Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
-        cmd = 'sudo python setup.py install'
-        Popen(shlex.split(cmd), cwd=tmp_cython).communicate()
-#        cmd = 'sudo rm -rf %s' % tmp_cython
-#        Popen(shlex.split(cmd)).communicate()
+        cmd = 'sudo pip install cython'
+        Popen(shlex.split(cmd)).communicate()
         cython = find_cython()
         if cython == None:
-            error('Could not install Cython (0.16 or higher). Try installing it manually')
+            error('Could not install Cython (0.17 or higher). Try installing it manually')
             exit()
     else:
         log('Cython is available')

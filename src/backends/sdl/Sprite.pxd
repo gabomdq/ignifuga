@@ -72,6 +72,7 @@ cdef class _SpriteComponent:
     cdef _RendererSprite *_rendererSprite
     cdef map[int,SPRITE_OVERLAY] *overlays
     cdef int _lastBlurAmount, _blur
+    cdef unsigned long lastUpdate
 
     cpdef init(self)
     cpdef free(self)
@@ -91,3 +92,5 @@ cdef class _SpriteComponent:
     cpdef removeOverlay(self, int zindex, bint update=?)
     cpdef clearOverlays(self, update=?)
     cdef _doBluring(self, Canvas source, bint start_clean = ?)
+    cpdef setFrame(self, int frame)
+    cpdef setPaused(self, value)
