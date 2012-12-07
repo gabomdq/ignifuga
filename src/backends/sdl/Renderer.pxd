@@ -116,6 +116,7 @@ cdef class Renderer:
     cpdef bint spriteColor(self, Sprite sprite_w, float r, float g, float b, float a)
     cpdef bint spriteInteractive(self, Sprite sprite_w, bint interactive)
     cdef bint _spriteZ(self, _Sprite *sprite, int z)
+    cdef bint _spriteSrc(self, _Sprite *sprite, int x, int y, int w, int h)
     cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil
     cdef bint _spriteColor(self, _Sprite *sprite, Uint8 r, Uint8 g, Uint8 b, Uint8 a) nogil

@@ -27,7 +27,7 @@ cdef class _SpriteComponent:
         self.remainActiveOnStop = False
         self._static = False
         self._paused = False
-        self._parent = None
+        self.parent = None
         self._blur = 0
         self._width_src = 0
         self._height_src = 0
@@ -45,7 +45,7 @@ cdef class _SpriteComponent:
         self._tmpcanvas = None      # An internal canvas where we perform composition of overlays and do bluring
         self._canvas = None         # A pointer to the external "face" of the sprite, it can point to self._atlas, self._tmpcanvas or self.sprite.canvas
         self.sprite =  None
-        self.overlays = new map[int,SPRITE_OVERLAY]()
+        self._overlays = new map[int,SPRITE_OVERLAY]()
         self.lastUpdate = 0
 
     cpdef init(self):
@@ -63,6 +63,9 @@ cdef class _SpriteComponent:
                 self.sprite = None
                 self._canvas = self._atlas
                 self._static = True
+        if 'overlays' in self._data:
+            self.setOverlays(self._data['overlays'])
+
         self._updateSize()
         self.show()
 
@@ -88,8 +91,8 @@ cdef class _SpriteComponent:
             return
 
         # Update overlayed sprites that are marked inactive as they won't be updated by the entity
-        iter = self.overlays.begin()
-        while iter != self.overlays.end():
+        iter = self._overlays.begin()
+        while iter != self._overlays.end():
             _sprite = &deref(iter).second
             sprite = <object> _sprite.sprite
             if not sprite.active:
@@ -116,7 +119,7 @@ cdef class _SpriteComponent:
                                     self.active = False
                                     self.loop = 0
                                     self.frame = 0
-                            if not self.overlays.empty() or self._blur > 0:
+                            if not self._overlays.empty() or self._blur > 0:
                                 self._doCompositing()
                     else:
                         if self.sprite.prevFrame():
@@ -130,9 +133,9 @@ cdef class _SpriteComponent:
                                     self.active = False
                                     self.loop = 0
                                     self.frame = self.sprite.numFrames - 1
-                            if not self.overlays.empty() or self._blur > 0:
+                            if not self._overlays.empty() or self._blur > 0:
                                 self._doCompositing()
-        elif not self.overlays.empty() or (self._blur > 0 and self._blur != self._lastBlurAmount):
+        elif not self._overlays.empty() or (self._blur > 0 and self._blur != self._lastBlurAmount):
             self._doCompositing()
 
         if self._dirty:
@@ -141,7 +144,6 @@ cdef class _SpriteComponent:
 
     cdef _updateSize(self):
         # Update our "public" width,height
-
         if self._width != None:
             self._width_pre = self._width
         elif self._spriteData != None:
@@ -164,22 +166,23 @@ cdef class _SpriteComponent:
             self._width_pre = self.width * (1.0 + self._z*self.zscale)
             self._height_pre = self.height * (1.0 + self._z*self.zscale)
 
-        if self._spriteData != None:
+        if self._canvas == self._tmpcanvas:
+            self._width_src = self._canvas._width
+            self._height_src = self._canvas._height
+        elif self._spriteData != None:
             self._width_src = self.sprite.width
-        elif self._atlas != None:
-            self._width_src = self._atlas._width
-
-        if self._spriteData != None:
             self._height_src = self.sprite.height
         elif self._atlas != None:
+            self._width_src = self._atlas._width
             self._height_src = self._atlas._height
 
         self.updateRenderer()
 
     cdef _updateRenderer(self):
-        if self._parent is not None:
-            self._parent._doCompositing()
+        if self.parent is not None:
+            self.parent._doCompositing()
         elif self._rendererSprite != NULL:
+            self.renderer._spriteSrc(self._rendererSprite, 0, 0, self._width_src, self._height_src)
             self.renderer._spriteDst(self._rendererSprite, <int>self.x, <int>self.y, self._width_pre, self._height_pre)
             self.renderer._spriteRot(self._rendererSprite,
                 self._angle,
@@ -211,8 +214,8 @@ cdef class _SpriteComponent:
         self._started = False
         self.loop = 0
 
-        iter = self.overlays.begin()
-        while iter != self.overlays.end():
+        iter = self._overlays.begin()
+        while iter != self._overlays.end():
             _sprite = &deref(iter).second
             sprite = <object> _sprite.sprite
             sprite.reset()
@@ -227,6 +230,11 @@ cdef class _SpriteComponent:
         cdef SPRITE_OVERLAY *_sprite
         cdef float r,g,b,a
         cdef int w, h
+        cdef Canvas canvas
+        cdef _SpriteComponent sprite
+
+        if self._tmpcanvas is not None and (self._width_pre != self._tmpcanvas._width or self._height_pre != self._tmpcanvas._height):
+            self._tmpcanvas = None
 
         if self._tmpcanvas is None and self._width_pre > 0 and self._height_pre > 0:
             self._tmpcanvas = Canvas(self._width_pre,self._height_pre, isRenderTarget = True)
@@ -240,25 +248,26 @@ cdef class _SpriteComponent:
                 source = None
 
             if source is not None:
-                if not self.overlays.empty():
+                if not self._overlays.empty():
+
                     use_tmpcanvas = True
                     source.mod(1.0,1.0,1.0,1.0)
-                    self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
-                    iter = self.overlays.begin()
-                    while iter != self.overlays.end():
+                    self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas._width, self._tmpcanvas._height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
+                    iter = self._overlays.begin()
+                    while iter != self._overlays.end():
                         _sprite = &deref(iter).second
-                        sprite = <object> _sprite.sprite
+                        sprite = <_SpriteComponent> _sprite.sprite
 
-                        w = sprite.width
-                        h = sprite.height
-                        canvas = sprite.canvas
+                        w = sprite._width_pre
+                        h = sprite._height_pre
+                        canvas = sprite._canvas
                         if canvas is not None:
                             r = sprite._red
                             g = sprite._green
                             b = sprite._blue
                             a = sprite._alpha
                             canvas.mod(_sprite.r if _sprite.r >= 0.0 else r, _sprite.g if _sprite.g >= 0.0 else g, _sprite.b if _sprite.b >= 0.0 else b, _sprite.a if _sprite.a >= 0.0 else a)
-                            self._tmpcanvas.blitCanvas(canvas,0,0,w,h,_sprite.x,_sprite.y,w,h,_sprite.op)
+                            self._tmpcanvas.blitCanvas(canvas,0,0,w,h,_sprite.x,_sprite.y,canvas._width,canvas._height,_sprite.op)
                             canvas.mod(r,g,b,a)
                         inc(iter)
 
@@ -314,12 +323,13 @@ cdef class _SpriteComponent:
         """
         cdef overlay_iterator iter
         cdef SPRITE_OVERLAY _sprite
+
         if self.entity is not None:
             sprite = self.entity.getComponent(id)
             if sprite is not None and isinstance(sprite, Sprite):
 
-                iter = self.overlays.find(z)
-                if iter != self.overlays.end():
+                iter = self._overlays.find(z)
+                if iter != self._overlays.end():
                     self.removeOverlay(z, False)
 
                 _sprite.x = x
@@ -331,25 +341,29 @@ cdef class _SpriteComponent:
                 _sprite.op = op
                 _sprite.sprite = <PyObject*> sprite
                 Py_XINCREF(_sprite.sprite)
-                self.overlays.insert(pair[int,SPRITE_OVERLAY](z,_sprite))
+                self._overlays.insert(pair[int,SPRITE_OVERLAY](z,_sprite))
                 sprite.parent = self
                 if update:
                     self._doCompositing()
                 return True
-        return False
+            else:
+                raise Exception("Sprite component %s, can't find overlay %s" % (self.id, id))
+        else:
+            raise Exception("Sprite component %s does not have an entity associated, can't add overlay %s" % (self.id, id))
+
 
     cpdef removeOverlay(self, int zindex, bint update=False):
         """ Remove an overlay by index"""
         cdef overlay_iterator iter
         cdef SPRITE_OVERLAY *_sprite
 
-        iter = self.overlays.find(zindex)
-        if iter != self.overlays.end():
+        iter = self._overlays.find(zindex)
+        if iter != self._overlays.end():
             _sprite = &deref(iter).second
             sprite = <object> _sprite.sprite
             sprite.parent = None
             Py_XDECREF(_sprite.sprite)
-            self.overlays.erase(iter)
+            self._overlays.erase(iter)
 
         if update:
             self._doCompositing()
@@ -359,12 +373,12 @@ cdef class _SpriteComponent:
         cdef overlay_iterator iter
         cdef SPRITE_OVERLAY *_sprite
 
-        iter = self.overlays.begin()
-        while iter != self.overlays.end():
+        iter = self._overlays.begin()
+        while iter != self._overlays.end():
             self.removeOverlay(deref(iter).first, False)
             inc(iter)
 
-        self.overlays.clear()
+        self._overlays.clear()
         if update:
             self._doCompositing()
 
@@ -413,18 +427,18 @@ cdef class _SpriteComponent:
         if self._blur > 0 and self._tmpcanvas is not None:
             if start_clean:
                 source.mod(1.0,1.0,1.0,1.0)
-                self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
+                self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas._width, self._tmpcanvas._height, 0,0,source.width,source.height, self._tmpcanvas.BLENDMODE_NONE)
             source.mod(1.0,1.0,1.0,0.2)
             b = int (self._blur / 2)
-            w = self._tmpcanvas.width-b
-            h = self._tmpcanvas.height-b
+            w = self._tmpcanvas._width-b
+            h = self._tmpcanvas._height-b
             self._tmpcanvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             self._tmpcanvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             self._tmpcanvas.blitCanvas(source,0,b,w,h,b,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             self._tmpcanvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             b = self._blur
-            w = self._tmpcanvas.width-b
-            h = self._tmpcanvas.height-b
+            w = self._tmpcanvas._width-b
+            h = self._tmpcanvas._height-b
             source.mod(1.0,1.0,1.0,0.1)
             self._tmpcanvas.blitCanvas(source,0,0,w,h,b,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             self._tmpcanvas.blitCanvas(source,b, b, w, h, 0,0,w,h, self._tmpcanvas.BLENDMODE_BLEND)
@@ -432,7 +446,7 @@ cdef class _SpriteComponent:
             self._tmpcanvas.blitCanvas(source,b,0,w,h,0,b,w,h, self._tmpcanvas.BLENDMODE_BLEND)
             # Up the alpha to 1.0
             source.mod(0.0,0.0,0.0,1.0)
-            self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas.width, self._tmpcanvas.height, 0,0,self._tmpcanvas.width,self._tmpcanvas.height, self._tmpcanvas.BLENDMODE_ADD)
+            self._tmpcanvas.blitCanvas(source, 0, 0, self._tmpcanvas._width, self._tmpcanvas._height, 0,0,self._tmpcanvas._width,self._tmpcanvas._height, self._tmpcanvas.BLENDMODE_ADD)
 
             # Preserve the value used for bluring to save time in case it's not modified for the next cycle
             self._lastBlurAmount = self._blur
@@ -450,8 +464,8 @@ cdef class _SpriteComponent:
             self._started = False
 
 
-        iter = self.overlays.begin()
-        while iter != self.overlays.end():
+        iter = self._overlays.begin()
+        while iter != self._overlays.end():
             _sprite = &deref(iter).second
             sprite = <object> _sprite.sprite
             sprite.setFrame(frame)
@@ -462,14 +476,28 @@ cdef class _SpriteComponent:
         cdef overlay_iterator iter
         cdef SPRITE_OVERLAY *_sprite
 
-        iter = self.overlays.begin()
-        while iter != self.overlays.end():
+        iter = self._overlays.begin()
+        while iter != self._overlays.end():
             _sprite = &deref(iter).second
             sprite = <object> _sprite.sprite
             sprite.setPaused(value)
             inc(iter)
 
         self._paused = value
+
+    cpdef setOverlays(self, overlays):
+        """ Overlays should have the format [(id, x, y, z, r, g, a, op), (id, x, y, z, r, g, a, op), ...]
+        See addOverlay for the meaning of these parameters
+        ie: "overlays":[["ci_ovl", 0,0,0,null, null, null, null, 2]]
+        """
+
+        self.clearOverlays()
+        for overlay in overlays:
+            id,x,y,z,r,g,b,a,op = overlay
+            self.addOverlay(id,int(x),int(y),int(z),float(r) if r is not None else -1.0,float(g) if g is not None else -1.0,float(b) if b is not None else -1.0,float(a) if a is not None else -1.0,int(op))
+
+        self._doCompositing()
+
 
 
     ##############
@@ -516,13 +544,8 @@ cdef class _SpriteComponent:
             See addOverlay for the meaning of these parameters
             ie: "overlays":[["ci_ovl", 0,0,0,null, null, null, null, 2]]
             """
-            self.clearOverlays()
-
-            for overlay in overlays:
-                id,x,y,z,r,g,b,a,op = overlay
-                self.addOverlay(id,int(x),int(y),int(z),float(r) if r is not None else -1.0,float(g) if g is not None else -1.0,float(b) if b is not None else -1.0,float(a) if a is not None else -1.0,int(op))
-
-            self._doCompositing()
+            if self.initialized:
+                self.setOverlays(overlays)
 
     property blur:
         def __get__(self):

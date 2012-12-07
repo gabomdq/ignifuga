@@ -433,12 +433,7 @@ cdef class Renderer:
 
     cpdef bint spriteSrc(self, Sprite sprite_w, int x, int y, int w, int h):
         cdef _Sprite *sprite = sprite_w.sprite
-        sprite.src.x = x
-        sprite.src.y = y
-        sprite.src.w = w
-        sprite.src.h = h
-        sprite.dirty = True
-        return True
+        return self._spriteSrc(sprite, x, y, w, h)
 
     cdef bint _spriteRot(self, _Sprite *sprite, double angle, int centerx, int centery, int flip) nogil:
         sprite.angle = angle
@@ -453,6 +448,14 @@ cdef class Renderer:
         sprite.g = g
         sprite.b = b
         sprite.a = a
+        return True
+
+    cdef bint _spriteSrc(self, _Sprite *sprite, int x, int y, int w, int h):
+        sprite.src.x = x
+        sprite.src.y = y
+        sprite.src.w = w
+        sprite.src.h = h
+        sprite.dirty = True
         return True
 
     cdef bint _spriteDst(self, _Sprite *sprite, int x, int y, int w, int h) nogil:

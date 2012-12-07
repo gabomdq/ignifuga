@@ -10,7 +10,7 @@
 from ignifuga.Log import error, debug
 from ignifuga.Gilbert import Gilbert
 import traceback
-from copy import copy
+from copy import copy, deepcopy
 
 class Component(object):
     TYPE = None
@@ -38,6 +38,7 @@ class Component(object):
     def __init__(self, id=None, entity=None, active=True, frequency=15.0, **data):
         self._id = id if id != None else hash(self)
         self.released = False
+        self.initialized = False
         self._entity = None
         self._active = False
         self._initiallyActive = active
@@ -47,6 +48,9 @@ class Component(object):
         self.properties = []
         self.persist = self.PROPERTIES_PERSIST
 
+        # Do this here as it depends on the above init and it needs to go before load
+        self.entity = entity
+
         self.load(data)
 
         # Add some tags that may not have been specified
@@ -54,8 +58,7 @@ class Component(object):
         self.entityTags += self.ENTITY_TAGS
         self.properties += self.PROPERTIES
 
-        # Do this at the very end as it depends on the above initialization
-        self.entity = entity
+
 
     def _loadDefaults(self, data):
         """ Load data into the instance if said data doesn't exist """
@@ -67,6 +70,8 @@ class Component(object):
         #Load data into the current instance
         for key,value in data.iteritems():
             setattr(self, key, value)
+
+        self._data = deepcopy(data)
 
     @property
     def id(self):
@@ -139,6 +144,7 @@ class Component(object):
 
     def init(self, **kwargs):
         self.active = self._initiallyActive
+        self.initialized = True
 
     def free(self, **kwargs):
         """ Release component data here """
@@ -149,6 +155,8 @@ class Component(object):
             self.entityTags = []
             self.properties = []
             self._entity = None
+            self.initialized = False
+            self._data = None
             self.released = True
 
     def update(self, now, **kwargs):
