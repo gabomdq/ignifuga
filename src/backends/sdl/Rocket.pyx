@@ -169,8 +169,11 @@ class RocketComponent(Viewable, _RocketComponent):
             self.docCtx['onUnload']()
         self._unloadDocument()
         if self.docCtx is not None:
-            del self.docCtx['gilbert']
             del self.docCtx['parent']
+            del self.docCtx['Gilbert']
+            del self.docCtx['Scene']
+            del self.docCtx['DataManager']
+            del self.docCtx['Renderer']
             del self.docCtx['pQuery']
             del self.docCtx['_']
             self.docCtx = None
