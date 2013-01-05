@@ -93,7 +93,8 @@ class Scene(Entity):
         """ Initialize the required external data """
 
         # Prepare a basic run environment for components to execute commands
-        self.runEnv['scene'] = self
+        # These should match those set up in the Rocket.pyx RocketComponent::loadDocument method.
+        self.runEnv['Scene'] = self
         self.runEnv['Gilbert'] = Gilbert()
         self.runEnv['DataManager'] = Gilbert().dataManager
         self.runEnv['Renderer'] = Gilbert().renderer
@@ -103,6 +104,7 @@ class Scene(Entity):
         self.runEnv['ERROR'] = ERROR
 
         from ignifuga.pQuery import pQuery
+        self.runEnv['pQuery'] = pQuery
         self.runEnv['_'] = pQuery
 
         # Build entities

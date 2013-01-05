@@ -142,8 +142,14 @@ class RocketComponent(Viewable, _RocketComponent):
         self._loadDocument(filename)
         Gilbert().dataManager.addListener(self.file, self)
         self.docCtx = self.getContext()
+
+        # Make a document context with a few useful variables.
+        # These should match those set up in the Scene.py Scene::init method.
         self.docCtx['parent'] = self
-        self.docCtx['gilbert'] = Gilbert()
+        self.docCtx['Gilbert'] = Gilbert()
+        self.docCtx['Scene'] = self.docCtx['Gilbert'].scene
+        self.docCtx['DataManager'] = self.docCtx['Gilbert'].dataManager
+        self.docCtx['Renderer'] = self.docCtx['Gilbert'].renderer
 
         def _pQuery(selector, context=None):
             if context is None:
