@@ -77,7 +77,7 @@ class HTTPRemoteScreenHandler(BaseHTTPRequestHandler):
         Gilbert().gameLoop.removeRemoteScreenHandler(self)
 
 cdef class GameLoopBase(object):
-    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322):
+    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322, pauseOnFocusLost=False):
         # SDL should be initialized at this point when Renderer was instantiated
         self.quit = False
         self.fps = fps
@@ -85,6 +85,7 @@ cdef class GameLoopBase(object):
         self.freezeRenderer = True
         self.released = False
         self.enableRemoteScreen = remoteScreen
+        self.pauseOnFocusLost = pauseOnFocusLost
 
         self.loading = new deque[_Task]()
         self.loading_tmp = new deque[_Task]()

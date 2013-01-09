@@ -18,7 +18,7 @@ import time, sys
 DEF NUM_STREAMS = 20
 
 cdef class GameLoop(GameLoopBase):
-    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322):
+    def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322, pauseOnFocusLost=False):
         super(GameLoop, self).__init__(fps, remoteConsole, remoteScreen, ip, port)
         self.renderer = <Renderer>Gilbert().renderer
         self._screen_w, self._screen_h = self.renderer.screenSize
@@ -190,30 +190,35 @@ cdef class GameLoop(GameLoopBase):
                 debug('Window moved to %s, %s' % (winev.data1, winev.data2))
             elif winev.event == SDL_WINDOWEVENT_SHOWN:
                 debug('Window shown')
-                self.paused = False
+                if self.pauseOnFocusLost:
+                    self.paused = False
             elif winev.event == SDL_WINDOWEVENT_HIDDEN:
                 debug('Window hidden')
-                self.paused = True
+                if self.pauseOnFocusLost:
+                    self.paused = True
             elif winev.event == SDL_WINDOWEVENT_RESTORED:
                 debug('Window is being restored')
-                self.paused = False
+                if self.pauseOnFocusLost:
+                    self.paused = False
                 debug('Window restored')
             elif winev.event == SDL_WINDOWEVENT_MINIMIZED:
-                self.paused = True
+                if self.pauseOnFocusLost:
+                    self.paused = True
                 debug('Window minimized')
             elif winev.event == SDL_WINDOWEVENT_FOCUS_GAINED:
                 debug('Window focus gained')
-                self.paused = False
-                Mix_ResumeMusic()
-                Mix_Resume(-1)
+                if self.pauseOnFocusLost:
+                    self.paused = False
+                    Mix_ResumeMusic()
+                    Mix_Resume(-1)
             elif winev.event == SDL_WINDOWEVENT_FOCUS_LOST:
                 # Pause here is strictly required for fullscreen Direct3D backed apps...
                 # but it doesn't hurt to pause in windowed apps or other platforms
-                # TODO: Should we make pausing here optional? Command line option enabled?
                 debug('Window focus lost')
-                self.paused = True
-                Mix_PauseMusic()
-                Mix_Pause(-1)
+                if self.pauseOnFocusLost:
+                    self.paused = True
+                    Mix_PauseMusic()
+                    Mix_Pause(-1)
             elif winev.event == SDL_WINDOWEVENT_CLOSE:
                 debug('Window closed')
                 Gilbert().endLoop()

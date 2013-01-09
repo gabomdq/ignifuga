@@ -609,16 +609,17 @@ def _pQueryIgnifuga(selector, targets):
                         _targets = []
             elif selector == '*':
                 # Select everything
-                if isinstance(target, Scene):
-                    # Select all entities and components in the scene
-                    for entity in target.entities.itervalues():
-                        _targets.append(entity)
-                        for component in entity.components.itervalues():
+                for target in targets:
+                    if isinstance(target, Scene):
+                        # Select all entities and components in the scene
+                        for entity in target.entities.itervalues():
+                            _targets.append(entity)
+                            for component in entity.components.itervalues():
+                                _targets.append(component)
+                    elif isinstance(target, Entity):
+                        # Select all components in the entity
+                        for component in target.components.itervalues():
                             _targets.append(component)
-                elif isinstance(target, Entity):
-                    # Select all components in the entity
-                    for component in target.components.itervalues():
-                        _targets.append(component)
             elif selector.startswith('#'):
                 # selector targets by id
                 id = selector[1:]

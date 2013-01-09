@@ -172,6 +172,7 @@ class Gilbert:
         self.parser.add_option("-t", "--telnetremote", action="store_true", dest="telnetremote", default=False,help="Enable A Telnet Remote Console")
         self.parser.add_option("-j", "--jsremote", action="store_true", dest="jsremote", default=False,help="Enable A Websockets Remote Console")
         self.parser.add_option("-s", "--remotescreen", action="store_true", dest="remotescreen", default=False,help="Create a MJPEG stream of the screen at port+1")
+        self.parser.add_option("-e", "--pauseonfocuslost", action="store_true", dest="pauseonfocuslost", default=False,help="Pause the engine when input focus is lost")
         self.parser.add_option("--staticglobals", action="store_true", dest="staticglobals", default=False,help="Dont update the remote console globals to match the current scene")
         self.parser.add_option("--port", dest="port", default=54321,help="Remote Console Port base (default: 54321)")
         self.parser.add_option("--ip", dest="ip", default='0.0.0.0',help="Remote Console IP to bind to (default: 0.0.0.0)")
@@ -251,7 +252,7 @@ class Gilbert:
             self.startWebsocketRemoteConsole(options.ip, options.port, options.staticglobals)
         elif options.telnetremote:
             self.startSocketRemoteConsole(options.ip, options.port, options.staticglobals)
-        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole, remoteScreen = options.remotescreen, ip=options.ip, port=options.port+1)
+        self.gameLoop = GameLoop(remoteConsole = self.remoteConsole, remoteScreen = options.remotescreen, ip=options.ip, port=options.port+1, pauseOnFocusLost = options.pauseonfocuslost)
 
         if options.capture:
             print "System paused, press Enter to continue"

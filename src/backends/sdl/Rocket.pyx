@@ -111,6 +111,7 @@ class RocketComponent(Viewable, _RocketComponent):
         # Default values
         self._loadDefaults({
             'file': None,
+            'document': None,
             'docCtx': None,
             'fonts': [],
             'pQuery': None
@@ -157,6 +158,8 @@ class RocketComponent(Viewable, _RocketComponent):
 
             return pQuery(selector, context)
 
+        self.document = self.docCtx['document']
+        self.pQuery = _pQuery
         self.docCtx['pQuery'] = _pQuery
         self.docCtx['_'] = _pQuery
 

@@ -81,7 +81,7 @@ cdef class GameLoopBase(object):
     cdef PyGreenlet *main_greenlet
     cdef bint updateRemoteConsole
     cdef object remoteConsole
-    cdef bint enableRemoteScreen
+    cdef bint enableRemoteScreen, pauseOnFocusLost
     cdef object remoteScreenServer, remoteScreenHandlers
 
 

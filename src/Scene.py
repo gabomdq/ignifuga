@@ -137,6 +137,11 @@ class Scene(Entity):
 
         super(Scene, self).init(**data)
 
+        # Add scene components to the runEnv
+        for component_id, component in self._components.iteritems():
+            if not str(component_id).isdigit():
+                self.runEnv[component_id] = component
+
     @property
     def resolution(self):
         return self._resolution
