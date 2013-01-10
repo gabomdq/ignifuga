@@ -115,7 +115,17 @@ class Action(Component):
     targets: The targets where the action will be applied. If not provided the action applies to its entity.
              If the action is owned by an entity, targets can be a list with None (to mark the owner entity), a Component instance or a component id
              If the action is owned by a scene, targets can be a list with None (to mark the owner scene), a component or entity instance, or an entity or component id (ie entity.component)
+             If the action is owned by a Rocket component, targets can be a pQuery selector or a document element object
     """
+
+    TYPE_NORMAL = 0 # Action executes associated to a Scene or Entity
+    TYPE_ROCKET = 1 # Action executes associated to a Rocket Component and affects the document's CSS attributes
+
+    CSS_PX = 0
+    CSS_EM = 1
+    CSS_PERCENTAGE = 2
+    CSS_COLOR = 3
+
     def __init__(self, id=None, entity=None, active=True, targets=None, frequency=15.0, duration=0.0, relative=False, easing='linear', onStart=None, onStop=None, onLoop=None, loop=1, persistent=False, root=True, runWith=None, runNext=None, **data):
         # Store some parameters for use in the actual initialization
         self._initParams = {
@@ -144,6 +154,7 @@ class Action(Component):
         self._root = root
         self._cancelUpdate = False
         self._freePending = False
+        self._type = Action.TYPE_NORMAL
 
         # Process runWith and runNext
         if runWith != None:
@@ -171,7 +182,11 @@ class Action(Component):
         else:
             from ignifuga.Entity import Entity
             from ignifuga.Scene import Scene
+            from ignifuga.backends.sdl.components import RocketComponent
+            from ignifuga.pQuery import pQuery
+
             if isinstance(self.entity, Scene):
+                self._type = Action.TYPE_NORMAL
                 # Targets can be other entities or components (by id or by object), None for the scene
                 for target in targets:
                     if target is None:
@@ -195,6 +210,7 @@ class Action(Component):
                     else:
                         raise Exception('Can not determine which type of target is %s' % target)
             elif isinstance(self.entity, Entity):
+                self._type = Action.TYPE_NORMAL
                 # Targets can be other components owned by the entity (passed by id or by object) or the entity itself if target=None
                 for target in targets:
                     if target is None:
@@ -209,6 +225,16 @@ class Action(Component):
                             raise Exception('Action target %s not found' % target)
                     else:
                         raise Exception('Action target %s not found' % target)
+            elif isinstance(self.entity, RocketComponent):
+                self._type = Action.TYPE_ROCKET
+                # Targets can be document element objects or pQuery selectors
+                for target in targets:
+                    if isinstance(target, str) or isinstance(target, unicode):
+                        for target_ in pQuery(target, self.entity.document).targets:
+                            self._targets.append(target_)
+                    else:
+                        # TODO: Double check target is a valid document element
+                        self._targets.append(target)
 
         # Process runWith and runNext
         for action in self._runWith:
@@ -235,9 +261,12 @@ class Action(Component):
                     # Root action being activated, add component, tags and properties to entity
                     self.entity.add(self)
                 else:
-                    # Root action being deactivated, remove tags and properties from entity
-                    self.entity.refreshTags()
-                    self.entity.removeProperties(self)
+                    if self._type == Action.TYPE_NORMAL:
+                        # Root action being deactivated, remove tags and properties from entity
+                        self.entity.refreshTags()
+                        self.entity.removeProperties(self)
+                    else:
+                        self.entity.remove(self)
             except Exception, ex:
                 self._active = False
                 raise ex
@@ -253,7 +282,18 @@ class Action(Component):
 
         if not self._running:
             if self._root:
-                Component.entity.fset(self, entity)
+                from ignifuga.backends.sdl.components import RocketComponent
+                if isinstance(entity, RocketComponent) or isinstance(self._entity, RocketComponent):
+                    # We are assigning a component (this Action) to another component (the Rocket document)
+                    # This is technically outside the entity->components model, but as we want to use the same codebase
+                    # to work on entities and on Rocket document elements, we do some minor hacking here.
+                    if entity is None:
+                        entity.remove(self)
+                    else:
+                        entity.add(self)
+                    self._entity = entity
+                else:
+                    Component.entity.fset(self, entity)
             else:
                 self._entity = entity
 
@@ -295,15 +335,38 @@ class Action(Component):
 
         if not self._running and not self._done and self._entity != None:
             self._tasksStatus = {}
-            for target in self._targets:
-                self._tasksStatus[target] = {}
-                for task in self._tasks:
-                    if not hasattr(target, task):
-                        raise Exception("Could not start action %s, %s does not have an attribute %s" % (self, target, task))
-                    self._tasksStatus[target][task] = {
-                        'targetValue': self._tasks[task],
-                        'initValue': getattr(target, task)
-                    }
+            if self._type == Action.TYPE_NORMAL:
+                for target in self._targets:
+                    self._tasksStatus[target] = {}
+                    for task in self._tasks:
+                        if not hasattr(target, task):
+                            raise Exception("Could not start action %s, %s does not have an attribute %s" % (self, target, task))
+                        self._tasksStatus[target][task] = {
+                            'targetValue': self._tasks[task],
+                            'initValue': getattr(target, task)
+                        }
+            elif self._type == Action.TYPE_ROCKET:
+                for target in self._targets:
+                    self._tasksStatus[target] = {}
+                    for task in self._tasks:
+                        prop, prop_type = self._valueToCSSProperty(target.GetProperty(task))
+                        propt, propt_type = self._valueToCSSProperty(self._tasks[task])
+
+                        if prop_type != propt_type:
+                            # We can't animate between different units types...
+                            if propt_type == Action.CSS_COLOR:
+                                prop = {'r':0.0, 'g': 0.0, 'b': 0.0}
+                            else:
+                                prop = 0.0
+
+                        self._tasksStatus[target][task] = {
+                            'targetValue': propt,
+                            'initValue': prop,
+                            'type': propt_type
+                        }
+            else:
+                raise Exception("Unknown associated entity type %s" % (self.entity,))
+
             self._running = True
             for a in self._runWith:
                 a.start()
@@ -418,18 +481,50 @@ class Action(Component):
                 for task in self._tasksStatus[target]:
                     init = self._tasksStatus[target][task]['initValue']
                     dest = self._tasksStatus[target][task]['targetValue']
-                    setattr(target, task, self._easingFunc(init, dest, step, self._relative))
+                    if self._type == Action.TYPE_NORMAL:
+                        setattr(target, task, self._easingFunc(init, dest, step, self._relative))
+                    else:
+                        type = self._tasksStatus[target][task]['type']
+                        if type == Action.CSS_COLOR:
+                            r = self._easingFunc(init['r'], dest['r'], step, self._relative)
+                            g = self._easingFunc(init['g'], dest['g'], step, self._relative)
+                            b = self._easingFunc(init['b'], dest['b'], step, self._relative)
+                            value = self._CSSPropertyToValue(type, r, g, b)
+                        else:
+                            value = self._CSSPropertyToValue(type, self._easingFunc(init, dest, step, self._relative))
+                        target.SetProperty(task, value)
         else:
             # The action should stop, set everything at their final value
             for target in self._tasksStatus:
                 for task in self._tasksStatus[target]:
                     init = self._tasksStatus[target][task]['initValue']
                     dest = self._tasksStatus[target][task]['targetValue']
-                    if self._relative:
-                        setattr(target, task, init+dest)
+                    if self._type == Action.TYPE_NORMAL:
+                        if self._relative:
+                            setattr(target, task, init+dest)
+                        else:
+                            setattr(target, task, dest)
                     else:
-                        setattr(target, task, dest)
-                    
+                        #self._type == Action.TYPE_ROCKET
+                        type = self._tasksStatus[target][task]['type']
+                        if type == Action.CSS_COLOR:
+                            if self._relative:
+                                r = init['r']+dest['r']
+                                g = init['g']+dest['g']
+                                b = init['b']+dest['b']
+                                value = self._CSSPropertyToValue(type, r, g, b)
+                            else:
+                                r = dest['r']
+                                g = dest['g']
+                                b = dest['b']
+                                value = self._CSSPropertyToValue(type, r, g, b)
+                        else:
+                            if self._relative:
+                                value = self._CSSPropertyToValue(type,init+dest)
+                            else:
+                                value = self._CSSPropertyToValue(type,dest)
+
+                        target.SetProperty(task, value)
             self._done = True
 
     @property    
@@ -542,4 +637,84 @@ class Action(Component):
             
 
         return retval
-            
+
+    def _valueToCSSProperty(self, prop):
+        """ Clean up a Rocket CSS property and determine its type """
+        # From Rocket core/Property.h
+        # enum Unit
+        #       UNKNOWN = 1 << 0,
+        #       KEYWORD = 1 << 1,			// generic keyword; fetch as < int >
+        #       STRING = 1 << 2,			// generic string; fetch as < String >
+        #       NUMBER = 1 << 3,			// number unsuffixed; fetch as < float >
+        #       PX = 1 << 4,				// number suffixed by 'px'; fetch as < float >
+        #       COLOUR = 1 << 5,			// colour; fetch as < Colourb >
+        #       ABSOLUTE_UNIT = NUMBER | PX | COLOUR,
+        #       // Relative values.
+        #       EM = 1 << 6,				// number suffixed by 'em'; fetch as < float >
+        #       PERCENT = 1 << 7,			// number suffixed by '%'; fetch as < float >
+        #       RELATIVE_UNIT = EM | PERCENT
+
+        prop = str(prop).lower()
+
+        if prop.startswith('#'):
+            # Colour #RRGGBB in hex
+            prop = prop[1:]
+            prop = {'r': float(int(prop[0:2],16)), 'g': float(int(prop[2:4],16)), 'b': float(int(prop[4:6],16))}
+            prop_type = Action.CSS_COLOR
+        elif prop.startswith('rgb'):
+            # rgb(rrr,ggg,bbb,aaa)
+            prop = prop[4:-1]
+            colors = prop.split(',')
+            prop = {'r': float(colors[0]), 'g': float(colors[1]), 'b': float(colors[2])}
+            prop_type = Action.CSS_COLOR
+        elif prop.endswith('px'):
+            # Pixels
+            prop = float(prop[:-2])
+            prop_type = Action.CSS_PX
+        elif prop.endswith('em'):
+            # EM units
+            prop = float(prop[:-2])
+            prop_type = Action.CSS_EM
+        elif prop.endswith('%'):
+            # Percentage
+            prop = float(prop[:-1])
+            prop_type = Action.CSS_PERCENTAGE
+        else:
+            # Assume regular float with no suffix
+            try:
+                prop = float(prop)
+            except:
+                prop = 0.0
+            prop_type = Action.CSS_PX
+
+        return prop, prop_type
+
+    def _CSSPropertyToValue(self, type, *values):
+        if type == Action.CSS_COLOR:
+            values = list(values)
+            if values[0] > 255.0:
+                values[0] = 255.0
+            elif values[0] < 0.0:
+                values[0] = 0.0
+
+            if values[1] > 255.0:
+                values[1] = 255.0
+            elif values[1] < 0.0:
+                values[1] = 0.0
+
+            if values[2] > 255.0:
+                values[2] = 255.0
+            elif values[2] < 0.0:
+                values[2] = 0.0
+            value = "#%0.2X%0.2X%0.2X" % (values[0], values[1], values[2])
+        else:
+            if type == Action.CSS_PX:
+                suffix = 'px'
+            elif type == Action.CSS_EM:
+                suffix = 'em'
+            elif type == Action.CSS_PERCENTAGE:
+                suffix = '%'
+            value = str(values[0]) + suffix
+
+        return value
+

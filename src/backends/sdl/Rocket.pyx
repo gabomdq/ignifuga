@@ -114,7 +114,8 @@ class RocketComponent(Viewable, _RocketComponent):
             'document': None,
             'docCtx': None,
             'fonts': [],
-            'pQuery': None
+            'pQuery': None,
+            '_actions': []
         })
 
         super(RocketComponent, self).__init__(id, entity, active, frequency, **data)
@@ -201,5 +202,16 @@ class RocketComponent(Viewable, _RocketComponent):
                 self.show()
             else:
                 self.hide()
+
+    # These functions allow assigning an Action component to this Rocket component.
+    # This is technically outside the entity->components model, but as we want to use the same codebase
+    # to work on entities and on Rocket document elements, we do some minor hacking here.
+    def remove(self, action):
+        if action in self._actions:
+            self._actions.remove(action)
+    def add(self, action):
+        if action not in self._actions:
+            self._actions.append(action)
+
 
 #endif

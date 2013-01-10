@@ -9,6 +9,7 @@
 from ignifuga.Entity import Entity
 from ignifuga.Scene import Scene
 from ignifuga.components.Component import Component
+from ignifuga.components.Action import Action
 from ignifuga.Gilbert import Gilbert
 import re, inspect
 #if ROCKET
@@ -460,6 +461,10 @@ class pQueryWrapperRocket(pQueryWrapper):
                     target.SetProperty('width', value)
 
         return None
+
+    def animate(self, properties, duration = 0.400, easing='linear',complete = None):
+        pass
+
 
     # Attributes: http://api.jquery.com/category/attributes/
 
