@@ -8,7 +8,8 @@
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
 import pickle, math
-from copy import deepcopy
+from copy import deepcopy, copy
+
 from Component import Component
 from ignifuga.Gilbert import Gilbert
 from ignifuga.Task import STOP
@@ -541,30 +542,83 @@ class Action(Component):
     def forever(self):
         """ Loop action forever """
         self._loopMax = None
-    
+
+    # Deepcopying Actions doesn't work, see http://stackoverflow.com/questions/1941887/how-can-i-debug-a-problem-calling-pythons-copy-deepcopy-against-a-custom-type
+    def clone(self):
+        ''' Patch the deepcopy dispatcher to pass modules back unchanged '''
+        new_action = Action(id = self.id, entity=self._entity, persistent=self.persistent)
+        new_action._initParams = deepcopy(self._initParams)
+        new_action._tasks = deepcopy(self._tasks)
+        new_action._targets = self._targets
+        new_action._runWith = self._runWith
+        new_action._runNext = self._runNext
+        new_action._loopMax = self._loopMax
+        new_action._duration = self._duration
+        new_action._loop = self._loop
+        new_action._relative = self._relative
+        new_action._easing = self._easing
+        new_action._easingFunc = self._easingFunc
+
+        new_action._onStop = copy(self._onStop)
+        new_action._onStart = copy(self._onStart)
+        new_action._onLoop = copy(self._onLoop)
+        new_action._persistent = self._persistent
+        new_action._running = self._running
+        new_action._root = self._root
+        new_action._cancelUpdate = self._cancelUpdate
+        new_action._freePending = self._freePending
+        new_action._type = self._type
+
     def __add__(self, action):
-        """ Add an enclosing dummy action in line that harbors the two added actions, returns a new Action"""
+        """ Add an enclosing dummy action in line that harbors the two added actions, returns a new Action, can not be used on running actions"""
+        if self._running or action._running:
+            raise Exception('Can not add with a running Action, use the append method')
+
         new_action = Action(id = self.id, entity=self._entity, persistent=self.persistent)
         self.root = False
         action.root = False
-        a = new_action._runNext = deepcopy(self)
+        a = new_action._runNext = self.clone()
 
         while True:
             # Find a spot in the chain where to attach the new member of the chain
             if a._runNext == None:
-                a._runNext = deepcopy(action)
+                a._runNext = action.clone()
                 break
             a = a._runNext
         return new_action
 
     def __or__(self, action):
-        """ Add an enclosing dummy action in parallel that harbors the two or'ed actions, returns a new Action"""
+        """ Add an enclosing dummy action in parallel that harbors the two or'ed actions, returns a new Action, can not be used on running actions"""
+        if self._running or action._running:
+            raise Exception('Can not or with a running Action, use the parallel method')
+
         new_action = Action(id = self.id, entity=self._entity, persistent=self.persistent)
         self.root = False
         action.root = False
-        new_action._runWith.append(deepcopy(self))
-        new_action._runWith.append(deepcopy(action))
+        new_action._runWith.append(self.clone())
+        new_action._runWith.append(action.clone())
         return new_action
+
+    def append(self, action):
+        """ Append an action to the current action to be run when the current one finishes, can be used with running actions """
+        if action._running:
+            raise Exception('Can not append a running action')
+        action.root = False
+        a = self
+        while True:
+            # Find a spot in the chain where to attach the new member of the chain
+            if a._runNext == None:
+                a._runNext = action
+                break
+            a = a._runNext
+        return self
+
+    def parallel(self, action):
+        """ Append an action to the current action to be run in parallel, can be used with running actions """
+        if action._running:
+            raise Exception('Can not add running action in parallel')
+        action.root = False
+        self._runWith.append(action)
 
     def __mul__(self, other):
         """ Loop current action several times. If other=0, run the action in loop forever """

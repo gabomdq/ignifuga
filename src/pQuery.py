@@ -269,10 +269,15 @@ class pQueryWrapper(object):
     TYPE_IGNIFUGA = 1
     TYPE_ROCKET = 2
 
-    def __init__(self, targets, type):
+    def __init__(self, targets, type, ctx):
         # Do assignment like this to avoid endless loops due to __getattr__
         self.__dict__['_targets'] = targets
         self.__dict__['_type'] = type
+        self.__dict__['_ctx'] = ctx
+        self.__dict__['_action'] = None
+
+        if not (isinstance(ctx,  Entity) or isinstance(ctx, Component)): # Actually RocketComponent, but close enough ;)
+            raise Exception('pQueryWrapper ctx may only be an Entity or Rocket Component')
 
     @property
     def type(self):
@@ -282,8 +287,25 @@ class pQueryWrapper(object):
     def targets(self):
         return self._targets
 
+    @property
+    def context(self):
+        return self._ctx
+
     def pQuery(self, selector, context = None):
         return pQuery(selector, pQuery(context, self))
+
+
+    def animate(self, properties, duration = 0.400, easing='linear',onStart = None, onLoop=None, onStop=None):
+        if self._action != None and self._action.isRunning:
+            # There's a running action, append the new one
+            action = Action(entity = self._ctx, targets = self._targets, duration=duration, easing=easing, onStart=onStart, onLoop=onLoop, onStop=onStop, root=False, **properties)
+            action.init()
+            self.__dict__['_action'] = self.__dict__['_action'].append(action)
+        else:
+            action = Action(entity = self._ctx, targets = self._targets, duration=duration, easing=easing, onStart=onStart, onLoop=onLoop, onStop=onStop, **properties)
+            action.init()
+            self.__dict__['_action'] = action
+        return self
 
     def __repr__(self):
         if self.type == pQueryWrapper.TYPE_IGNIFUGA:
@@ -462,10 +484,6 @@ class pQueryWrapperRocket(pQueryWrapper):
 
         return None
 
-    def animate(self, properties, duration = 0.400, easing='linear',complete = None):
-        pass
-
-
     # Attributes: http://api.jquery.com/category/attributes/
 
     def attr(self, name, value=None):
@@ -555,7 +573,8 @@ def _splitSelector(selector):
                 selector_parts.append(part)
                 selector = selector[len(part):]
             else:
-                break
+                if selector != '':
+                    selector = selector[1:]
 
     return selector_parts
 
@@ -1254,13 +1273,24 @@ def pQuery(selector, context = None):
     if isinstance(selector, pQueryWrapper):
         # A pQueryWrapper is not really a selector, return it as is
         return selector
-    elif isinstance(selector,  Entity) or isinstance(selector, Component):
-        return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA)
+    if isinstance(selector,  Entity):
+        return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA, selector)
     #if ROCKET
-    elif isinstance(selector, rocket.Document) or isinstance(selector, rocket.Element):
-        return pQueryWrapperRocket([selector,], pQueryWrapper.TYPE_ROCKET)
+    if isinstance(selector, rocket.Document):
+        return pQueryWrapperRocket([selector,], pQueryWrapper.TYPE_ROCKET, selector.parent)
+    if isinstance(selector, rocket.Element):
+        return pQueryWrapperRocket([selector,], pQueryWrapper.TYPE_ROCKET, selector.owner_document.parent)
+
+    from ignifuga.backends.sdl.components import RocketComponent
+    if isinstance(selector, RocketComponent):
+        return pQueryWrapperRocket([selector.document,], pQueryWrapper.TYPE_ROCKET, selector)
     #endif
-    elif inspect.isclass(selector):
+
+    # Check this after checking for RocketComponent
+    if isinstance(selector, Component):
+        return pQueryWrapper([selector,], pQueryWrapper.TYPE_IGNIFUGA, selector.entity)
+
+    if inspect.isclass(selector):
         pass
     elif isinstance(selector, basestring):
         # Cast out the unicode pariahs just in case
@@ -1268,9 +1298,9 @@ def pQuery(selector, context = None):
     else:
         # Unknown selector, return an empty wrapper
         if context is None:
-            return pQueryWrapper([], pQueryWrapper.TYPE_UNKNOWN)
+            return pQueryWrapper([], pQueryWrapper.TYPE_UNKNOWN, None)
         else:
-            return pQueryWrapper(context.targets, context.type)
+            return pQueryWrapper(context.targets, context.type, context.context)
 
 
     # We arrive here only if we were provided a string selectors, so we need to figure out which type of query we got
@@ -1288,9 +1318,10 @@ def pQuery(selector, context = None):
         context = pQuery(Gilbert().scene)
 
     if inspect.isclass(selector):
-        return pQueryWrapper(_pQueryIgnifuga(selector, context.targets), pQueryWrapper.TYPE_IGNIFUGA)
+        return pQueryWrapper(_pQueryIgnifuga(selector, context.targets), pQueryWrapper.TYPE_IGNIFUGA, context.context)
 
     selector_parts = _splitSelector(selector)
+    print "selector", selector, "selector parts", selector_parts
 
     # Scan the selector for commas which act as the or operator
     new_selector = ''
@@ -1316,13 +1347,14 @@ def pQuery(selector, context = None):
     if new_selector != '':
         selectors.append(new_selector)
 
+
     targets = []
     if type == pQueryWrapper.TYPE_IGNIFUGA:
         for selector in selectors:
             for target in _pQueryIgnifuga(selector, context.targets):
                 if target not in targets:
                     targets.append(target)
-        return pQueryWrapper(targets, type)
+        return pQueryWrapper(targets, type, context.context)
 
     #if ROCKET
     elif type == pQueryWrapper.TYPE_ROCKET:
@@ -1330,7 +1362,7 @@ def pQuery(selector, context = None):
                 for target in _pQueryRocket(selector, context.targets):
                     if target not in targets:
                         targets.append(target)
-            return pQueryWrapperRocket(targets, type)
+            return pQueryWrapperRocket(targets, type, context.context)
     #endif
 
 

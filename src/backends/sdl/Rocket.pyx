@@ -103,7 +103,6 @@ cdef class _RocketComponent:
 
 
 
-
 class RocketComponent(Viewable, _RocketComponent):
     """ A viewable component based on a Rocket document wrapper"""
     PROPERTIES = Viewable.PROPERTIES + []
@@ -160,6 +159,7 @@ class RocketComponent(Viewable, _RocketComponent):
             return pQuery(selector, context)
 
         self.document = self.docCtx['document']
+        self.document.parent = self
         self.pQuery = _pQuery
         self.docCtx['pQuery'] = _pQuery
         self.docCtx['_'] = _pQuery
