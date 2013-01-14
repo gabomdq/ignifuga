@@ -19,7 +19,7 @@ DEF NUM_STREAMS = 20
 
 cdef class GameLoop(GameLoopBase):
     def __init__(self, fps = 30.0, remoteConsole = None, remoteScreen = False, ip='127.0.0.1', port=54322, pauseOnFocusLost=False):
-        super(GameLoop, self).__init__(fps, remoteConsole, remoteScreen, ip, port)
+        super(GameLoop, self).__init__(fps, remoteConsole, remoteScreen, ip, port, pauseOnFocusLost)
         self.renderer = <Renderer>Gilbert().renderer
         self._screen_w, self._screen_h = self.renderer.screenSize
         self.paused = False
@@ -208,17 +208,21 @@ cdef class GameLoop(GameLoopBase):
             elif winev.event == SDL_WINDOWEVENT_FOCUS_GAINED:
                 debug('Window focus gained')
                 if self.pauseOnFocusLost:
+                    debug('Resuming')
                     self.paused = False
                     Mix_ResumeMusic()
                     Mix_Resume(-1)
+                    debug('Resumed')
             elif winev.event == SDL_WINDOWEVENT_FOCUS_LOST:
-                # Pause here is strictly required for fullscreen Direct3D backed apps...
-                # but it doesn't hurt to pause in windowed apps or other platforms
+                # Pause here is strictly required for fullscreen Direct3D backed apps,
+                # and for mobile apps as well (at least iOS, Android is more lenient).
                 debug('Window focus lost')
                 if self.pauseOnFocusLost:
+                    debug('Pausing')
                     self.paused = True
                     Mix_PauseMusic()
                     Mix_Pause(-1)
+                    debug('Paused')
             elif winev.event == SDL_WINDOWEVENT_CLOSE:
                 debug('Window closed')
                 Gilbert().endLoop()
