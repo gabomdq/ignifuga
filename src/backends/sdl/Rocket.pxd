@@ -7,7 +7,6 @@
 
 # libRocket Cython wrapper
 
-from libcpp cimport bool
 from ignifuga.backends.sdl.SDL cimport *
 from cpython cimport *
 

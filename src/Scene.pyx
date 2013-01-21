@@ -12,7 +12,51 @@ from ignifuga.Entity import Entity
 from ignifuga.Task import *
 from ignifuga.Gilbert import Gilbert
 
-class Scene(Entity):
+cdef class _Scene:
+    def __init__(self):
+        self.released = False
+        self.walkAreas = new deque[_WalkAreaVertex]()
+        print "walk areas inited"
+        self.numWalkAreas = 0
+
+    cdef init(self):
+        pass
+
+    def __dealloc__(self):
+        self.free()
+
+    cdef free(self):
+        if not self.released:
+            del self.walkAreas
+            self.released = True
+
+    cpdef _updateWalkAreas(self, areas):
+        """
+        Update the internal structure holding the walk areas.
+        :param areas: list of polygon 2D vertex coordinates, eg [ [ (p1x1,p1y1),(p1x2,p1y2),(p1x3,p1y3),(p1x4,p1y4) ], [ (p2x1,p2y1),(p2x2,p2y2),(p2x3,p2y3),(p2x4,p2y4) ], ... ]
+        """
+        cdef _WalkAreaVertex v
+        cdef int numVertexs = 0
+
+        if isinstance(areas, list):
+            self.walkAreas.resize(0)
+            self.numWalkAreas = 0
+
+            for area in areas:
+                if isinstance(area, list):
+                    ndx = 0
+                    numVertexs = len(area)
+                    for vertex in area:
+                        v.x = <int>vertex[0]
+                        v.y = <int>vertex[1]
+                        v.index = self.numWalkAreas
+                        v.numVertexs = numVertexs
+                        ndx+=1
+                        self.walkAreas.push_back(v)
+                    self.numWalkAreas+=1
+
+
+class Scene(Entity, _Scene):
     def __init__(self, **data):
         # Default values
         self._loadDefaults({
@@ -32,10 +76,17 @@ class Scene(Entity):
             'reloadPreserveCamera': True,
             'data_url': None,
             'isolateEntities': False,
-            'runEnv': {}
+            'runEnv': {},
+            '_walkAreas': []
         })
+
+        # Call this before Entity.__init__ !
+        _Scene.__init__(self)
+
+
         # Add the Scene entity
         super(Scene, self).__init__(**data)
+
         #self.data_url = data['data_url']
 
         self.setup(**data)
@@ -47,6 +98,7 @@ class Scene(Entity):
     def free(self):
         # Scenes are not released as they are re entrant
         super(Scene, self).free()
+        _Scene.free(self)
         self._released = False
 
     def reset(self):
@@ -136,6 +188,7 @@ class Scene(Entity):
             self.scroll = self._scrollX, self._scrollY
 
         super(Scene, self).init(**data)
+        _Scene.init(self)
 
         # Add scene components to the runEnv
         for component_id, component in self._components.iteritems():
@@ -257,6 +310,18 @@ class Scene(Entity):
         self._scrollX, self._scrollY = value
         if self._ready:
             Gilbert().renderer.scrollTo(self._scrollX, self._scrollY)
+            
+            
+    @property
+    def walkAreas(self):
+        return self._walkAreas
+    @walkAreas.setter
+    def walkAreas(self, areas):
+        """ 
+        :param areas: list of polygon 2D vertex coordinates, eg [ [ (p1x1,p1y1),(p1x2,p1y2),(p1x3,p1y3),(p1x4,p1y4) ], [ (p2x1,p2y1),(p2x2,p2y2),(p2x3,p2y3),(p2x4,p2y4) ], ... ]   
+        """
+        self._walkAreas = areas
+        self._updateWalkAreas(areas)
 
     def __repr__(self):
         return 'Scene with ID: %s, Resolution %sx%s, KeepAspect: %s, AutoScale: %s, AutoCenter: %s, Size: %sx%s' % \

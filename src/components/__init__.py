@@ -11,4 +11,5 @@ __path__ = ['ignifuga/components',]
 from Component import Component
 from Action import Action
 from Text import Text
+from Pathfinder import Pathfinder
 
