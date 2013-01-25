@@ -80,6 +80,11 @@ void RocketSDLRenderInterfaceOpenGLES::RenderGeometry(Rocket::Core::Vertex* vert
 	render_data.glColor4f(1.0, 1.0, 1.0, 1.0);
 
 	render_data.glPopMatrix();
+
+	/* Reset blending and draw a fake point just outside the screen to let SDL know that it needs to reset its state in case it wants to render a texture */
+    render_data.glDisable(GL_BLEND);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    SDL_RenderDrawPoint(renderer, -1, -1);
 }
 // Called by Rocket when it wants to enable or disable scissoring to clip content.
 void RocketSDLRenderInterfaceOpenGLES::EnableScissorRegion(bool enable)

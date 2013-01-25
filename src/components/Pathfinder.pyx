@@ -7,13 +7,17 @@
 # Pathfinder Component class
 # Author: Gabriel Jacobo <gabriel@mdqinc.com>
 
+# The algorithm implemented here is based on http://alienryderflex.com/shortest_path/
+# Other source of useful information: http://www.bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
+
 from ignifuga.components.Component import Component
+from ignifuga.components.Action import Action
 from cython.operator cimport dereference as deref, preincrement as inc #dereference and increment operators
 
 cdef class _PathfinderComponent:
     cdef bint pointInArea(self, int x, int y, WalkAreaVertexDeque *areas, int numAreas):
         cdef bint oddNodes = False
-        cdef int xj, xi, x0, yj, yi, y0, n = 1
+        cdef int xj, xi, x0, yj, yi, y0, n = 0
         cdef _WalkAreaVertex *v
 
         cdef WalkAreaVertexIterator it = areas.begin()
@@ -21,23 +25,18 @@ cdef class _PathfinderComponent:
         while it != areas.end():
             v = &deref(it)
 
-            if n == 1:
+            if n == 0:
                 # This is the first point of the polygon, we need one more point to make a comparison
-
                 # Save this point for later
                 xi = x0 = v.x
                 yi = y0 = v.y
                 inc(it)
+                n+=1
                 if it == areas.end():
                     break
                 v = &deref(it)
                 xj = v.x
                 yj = v.y
-            elif n == v.numVertexs:
-                # This is the last point, compare it against the first one
-                xj = x0
-                yj = y0
-                n = 0
             else:
                 # Regular point, compare against the previous round point stored in xi,yi
                 xj = v.x
@@ -46,16 +45,24 @@ cdef class _PathfinderComponent:
             if ((yi>=y) != (yj>=y)) and (x < (xj-xi) * (y-yi) / (yj-yi) + xi):
                 oddNodes = not oddNodes
 
-            # Keep a reference to the last point to use for comparison in the next round
-            xi = xj
-            yi = yj
-            inc(it)
+
             n+=1
+            if n >= v.numVertexs:
+               # This is the last point, compare it against the first one
+                xi = x0
+                yi = y0
+                n = -1
+            else:
+                # Keep a reference to the last point to use for comparison in the next round
+                xi = xj
+                yi = yj
+                inc(it)
+
 
         return oddNodes
 
     cdef bint lineInArea(self, int Ax, int Ay, int Bx, int By, WalkAreaVertexDeque *areas, int numAreas):
-        cdef int Dx, Cx, x0, Dy, Cy, y0, n = 1
+        cdef int Dx, Cx, x0, Dy, Cy, y0, n = 0
         cdef bint ccw1,ccw2, ccw3, ccw4
         cdef _WalkAreaVertex *v
 
@@ -63,23 +70,19 @@ cdef class _PathfinderComponent:
 
         while it != areas.end():
             v = &deref(it)
-            if n == 1:
+            if n == 0:
                 # This is the first point of the polygon, we need one more point to make a comparison
 
                 # Save this point for later
                 Cx = x0 = v.x
                 Cy = y0 = v.y
                 inc(it)
+                n+=1
                 if it == areas.end():
                     break
                 v = &deref(it)
                 Dx = v.x
                 Dy = v.y
-            elif n == v.numVertexs:
-                # This is the last point, compare it against the first one
-                Dx = x0
-                Dy = y0
-                n = 0
             else:
                 # Regular point, compare against the previous round point stored in Cx,Cy
                 Dx = v.x
@@ -92,18 +95,26 @@ cdef class _PathfinderComponent:
 
             if (By - Ay) * (Cx - Dx)  != (Dy - Cy) * (Ax - Bx):
                 # Not colinear
-                ccw1 = (Dy-Ay)*(Cx-Ax) >= (Cy-Ay)*(Dx-Ax)
-                ccw2 = (Dy-By)*(Cx-Bx) >= (Cy-By)*(Dx-Bx)
-                ccw3 = (Cy-Ay)*(Bx-Ax) >= (By-Ay)*(Cx-Ax)
-                ccw4 = (Dy-Ay)*(Bx-Ax) >= (By-Ay)*(Dx-Ax)
+                ccw1 = (Dy-Ay)*(Cx-Ax) > (Cy-Ay)*(Dx-Ax)
+                ccw2 = (Dy-By)*(Cx-Bx) > (Cy-By)*(Dx-Bx)
+                ccw3 = (Cy-Ay)*(Bx-Ax) > (By-Ay)*(Cx-Ax)
+                ccw4 = (Dy-Ay)*(Bx-Ax) > (By-Ay)*(Dx-Ax)
                 if ccw1 != ccw2 and ccw3 != ccw4:
                     # Intersection
                     return False
 
-            # Keep a reference to the last point to use for comparison in the next round
-            Cx = Dx
-            Cy = Dy
-            inc(it)
+            n += 1
+            if n >= v.numVertexs:
+                # This is the last point, compare it against the first one
+                Cx = x0
+                Cy = y0
+                n = -1
+            else:
+                # Keep a reference to the last point to use for comparison in the next round
+                Cx = Dx
+                Cy = Dy
+                inc(it)
+
 
         return True
 
@@ -182,9 +193,8 @@ cdef class _PathfinderComponent:
                 while j != nodes.end() and not solutionFound:
                     vj = &deref(j)
                     if self.lineInArea(vi.x,vi.y,vj.x,vj.y,areas, numAreas):
-                        # Distance is actually the sqrt of the sum of the squared sides, but...close enough ;)
                         dx = (vj.x-vi.x)
-                        dy = (vj.y-vj.y)
+                        dy = (vj.y-vi.y)
                         newDist=vi.distance + sqrt(<double>(dx*dx + dy*dy))
                         if bestDist == -1 or newDist<bestDist:
                             bestDist=newDist
@@ -250,21 +260,65 @@ cdef class _PathfinderComponent:
             else:
                 return None
 
-    cpdef bint goto(self, int x, int y):
+    cpdef bint goto(self, int x, int y, float speed):
+        """ Find a path to x,y, then walk it at a fixed speed """
         cdef _Scene scene
         cdef PathfinderNodeDeque *solution = new PathfinderNodeDeque()
         cdef PathfinderNodeIterator it
         cdef _PathfinderNode *n
+        cdef double prevDistance = 0
 
         if self._entity is not None and self._entity.scene is not None:
             #self._entity.scene is a weakref
             scene = <_Scene>self._entity.scene()
 
             if self.shortestPath(self._entity.x, self._entity.y, x, y, scene.walkAreas, scene.numWalkAreas, solution):
+                if self.activeAction is not None:
+                    self.activeAction.stop()
+
+                self.activeAction = Action(entity = self._entity)
                 it = solution.begin()
                 while it != solution.end():
                     n = &deref(it)
+                    self.activeAction.append(Action(entity=self._entity, duration=(n.distance-prevDistance)/speed, root=False, x=n.x, y=n.y))
+                    prevDistance = n.distance
                     inc(it)
+
+                self.activeAction.init()
+                del solution
+            else:
+                return False
+
+    cpdef bint gotox(self, int x, int y, float time):
+        """ Like goto, but instead of fixed speed we walk the resulting path in a fixed time"""
+        cdef _Scene scene
+        cdef PathfinderNodeDeque *solution = new PathfinderNodeDeque()
+        cdef PathfinderNodeIterator it
+        cdef _PathfinderNode *n
+        cdef double prevDistance = 0
+        cdef float speed
+
+        if self._entity is not None and self._entity.scene is not None:
+            #self._entity.scene is a weakref
+            scene = <_Scene>self._entity.scene()
+
+            if self.shortestPath(self._entity.x, self._entity.y, x, y, scene.walkAreas, scene.numWalkAreas, solution):
+                if self.activeAction is not None:
+                    self.activeAction.stop()
+
+                self.activeAction = Action(entity = self._entity)
+                n = &solution.back()
+                speed = n.distance / time
+
+                it = solution.begin()
+                while it != solution.end():
+                    n = &deref(it)
+                    self.activeAction.append(Action(entity=self._entity, duration=(n.distance-prevDistance)/speed, root=False, x=n.x, y=n.y))
+                    prevDistance = n.distance
+                    inc(it)
+
+                self.activeAction.init()
+                del solution
             else:
                 return False
 
@@ -272,10 +326,11 @@ cdef class _PathfinderComponent:
 
 class Pathfinder(Component, _PathfinderComponent):
     """ A viewable component based on a Rocket document wrapper"""
-    PROPERTIES = Component.PROPERTIES + ['goto', 'path']
+    PROPERTIES = Component.PROPERTIES + ['goto', 'gotox', 'path']
     def __init__(self, id=None, entity=None, active=True, frequency=15.0,  **data):
         # Default values
         self._loadDefaults({
+            'activeAction': None
         })
 
         super(Pathfinder, self).__init__(id, entity, active, frequency, **data)

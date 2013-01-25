@@ -23,6 +23,7 @@ from cython.parallel cimport parallel, prange, threadid
 cimport cython
 import sys
 from cpython cimport *
+from ignifuga.Scene cimport _Scene, _WalkAreaVertex, WalkAreaVertexIterator, WalkAreaVertexDeque
 
 ctypedef unsigned long ULong
 ctypedef deque[Sprite_p].iterator deque_Sprite_iterator
@@ -45,8 +46,25 @@ cdef class Renderer:
         self._scroll_x = 0
         self._scroll_y = 0
         self.autoflip = autoflip
+        self.renderWalkAreas = False
+        self.renderWalkAreasR = 0
+        self.renderWalkAreasRMin = 128
+        self.renderWalkAreasRMax = 255
+        self.renderWalkAreasRStep = 10
+        self.renderWalkAreasRDir = True
+        self.renderWalkAreasG = 0
+        self.renderWalkAreasGMin = 0
+        self.renderWalkAreasGMax = 10
+        self.renderWalkAreasGStep = 10
+        self.renderWalkAreasGDir = True
+        self.renderWalkAreasB = 0
+        self.renderWalkAreasBMin = 0
+        self.renderWalkAreasBMax = 10
+        self.renderWalkAreasBStep = 10
+        self.renderWalkAreasBDir = True
 
-        # Create target window and renderer
+
+    # Create target window and renderer
         self._fullscreen = fullscreen
 
         if 'display' in kwargs:
@@ -317,10 +335,17 @@ cdef class Renderer:
                 inc(iter)
             inc (ziter)
 
+        if self.renderWalkAreas:
+            self._renderWalkAreas()
+
+
 #if ROCKET
         self.rocket.update()
         self.rocket.render()
 #endif
+
+
+
         # If remote screen is enabled, don't flip automatically, the gameloop will flip for us after it's taken the screenshot
         if self.autoflip:
             self.flip()
@@ -842,6 +867,76 @@ cdef class Renderer:
     cdef bint releaseCapturedScreenBufferJPEG(self, unsigned char *jpegBuffer) nogil:
         tjFree(jpegBuffer)
         return True
+
+    cdef bint _renderWalkAreas(self):
+        cdef _Scene scene
+        cdef WalkAreaVertexIterator walkAreasIt
+        cdef _WalkAreaVertex *wav0, *wav1, *wav2
+        cdef int ndx, x1, x2, y1, y2
+
+        scene = <_Scene>Gilbert().scene
+        walkAreasIt = scene.walkAreas.begin()
+
+        ndx = 0
+
+        if self.renderWalkAreasRDir: self.renderWalkAreasR +=self.renderWalkAreasRStep
+        else: self.renderWalkAreasR-=self.renderWalkAreasRStep
+
+        if self.renderWalkAreasGDir: self.renderWalkAreasG +=self.renderWalkAreasGStep
+        else: self.renderWalkAreasG-=self.renderWalkAreasGStep
+
+        if self.renderWalkAreasBDir: self.renderWalkAreasB +=self.renderWalkAreasBStep
+        else: self.renderWalkAreasB-=self.renderWalkAreasBStep
+
+        if self.renderWalkAreasR > self.renderWalkAreasRMax:
+            self.renderWalkAreasR = self.renderWalkAreasRMax
+            self.renderWalkAreasRDir = not self.renderWalkAreasRDir
+        elif  self.renderWalkAreasR < self.renderWalkAreasRMin:
+            self.renderWalkAreasR = self.renderWalkAreasRMin
+            self.renderWalkAreasRDir = not self.renderWalkAreasRDir
+
+        if self.renderWalkAreasG > self.renderWalkAreasGMax:
+            self.renderWalkAreasG = self.renderWalkAreasGMax
+            self.renderWalkAreasGDir = not self.renderWalkAreasGDir
+        elif  self.renderWalkAreasG < self.renderWalkAreasGMin:
+            self.renderWalkAreasG = self.renderWalkAreasGMin
+            self.renderWalkAreasGDir = not self.renderWalkAreasGDir
+
+        if self.renderWalkAreasB > self.renderWalkAreasBMax:
+            self.renderWalkAreasB = self.renderWalkAreasBMax
+            self.renderWalkAreasBDir = not self.renderWalkAreasBDir
+        elif  self.renderWalkAreasB < self.renderWalkAreasBMin:
+            self.renderWalkAreasB = self.renderWalkAreasBMin
+            self.renderWalkAreasBDir = not self.renderWalkAreasBDir
+
+        SDL_SetRenderDrawBlendMode(self.renderer, SDL_BLENDMODE_NONE)
+        SDL_SetRenderDrawColor(self.renderer, self.renderWalkAreasR, self.renderWalkAreasG, self.renderWalkAreasB, 255)
+        while walkAreasIt != scene.walkAreas.end():
+            wav1 = &deref(walkAreasIt)
+            if ndx == 0:
+                wav0 = wav1
+                inc(walkAreasIt)
+                if walkAreasIt == scene.walkAreas.end():
+                    break
+                ndx+=1
+                wav1 = &deref(walkAreasIt)
+                wav2 = wav0
+                
+            x1 = <int> ((wav1.x*self._scale_x)-self._scroll_x)
+            x2 = <int> ((wav2.x*self._scale_x)-self._scroll_x)
+            y1 = <int> ((wav1.y*self._scale_y)-self._scroll_y)
+            y2 = <int> ((wav2.y*self._scale_y)-self._scroll_y)
+
+            SDL_RenderDrawLine(self.renderer, x1, y1, x2, y2)
+
+            ndx+=1
+            if ndx >= wav1.numVertexs:
+                wav2 = wav0
+                ndx = -1
+            else:
+                inc(walkAreasIt)
+                wav2 = wav1
+
 
 
 

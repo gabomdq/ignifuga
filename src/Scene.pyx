@@ -16,7 +16,6 @@ cdef class _Scene:
     def __init__(self):
         self.released = False
         self.walkAreas = new deque[_WalkAreaVertex]()
-        print "walk areas inited"
         self.numWalkAreas = 0
 
     cdef init(self):

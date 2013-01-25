@@ -32,4 +32,5 @@ cdef class _PathfinderComponent:
     cdef bint shortestPath(self, int sX, int sY, int eX, int eY, WalkAreaVertexDeque *areas, int numAreas, PathfinderNodeDeque *solution)
 
     cpdef path(self, int x, int y)
-    cpdef bint goto(self, int x, int y)
+    cpdef bint goto(self, int x, int y, float speed)
+    cpdef bint gotox(self, int x, int y, float time)

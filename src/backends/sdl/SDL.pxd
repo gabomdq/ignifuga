@@ -409,6 +409,10 @@ cdef extern from "SDL.h":
     cdef int SDL_GL_UnbindTexture(SDL_Texture *texture)
     cdef int SDL_RenderReadPixels(SDL_Renderer * renderer, SDL_Rect * rect, Uint32 format, void *pixels, int pitch) nogil
     cdef int SDL_PushEvent(SDL_Event * event) nogil
+    cdef int SDL_RenderDrawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2) nogil
+    cdef int SDL_SetRenderDrawColor(SDL_Renderer* renderer, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
+    cdef int SDL_SetRenderDrawBlendMode(SDL_Renderer* renderer, SDL_BlendMode blendMode)
+
     
     # Sound audio formats
     Uint16 AUDIO_U8	#0x0008  /**< Unsigned 8-bit samples */

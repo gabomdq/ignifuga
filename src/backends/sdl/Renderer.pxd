@@ -62,6 +62,12 @@ cdef class Renderer:
     cdef int _scroll_x, _scroll_y
     cdef bint autoflip
 
+    cdef public bint renderWalkAreas
+    cdef int renderWalkAreasR, renderWalkAreasRMin, renderWalkAreasRMax, renderWalkAreasRStep
+    cdef int renderWalkAreasG, renderWalkAreasGMin, renderWalkAreasGMax, renderWalkAreasGStep
+    cdef int renderWalkAreasB, renderWalkAreasBMin, renderWalkAreasBMax, renderWalkAreasBStep
+    cdef bint renderWalkAreasRDir, renderWalkAreasGDir,  renderWalkAreasBDir
+
     # Sprites
     cdef map[int,deque[Sprite_p]] *zmap
     cdef deque[_Sprite] *active_sprites
@@ -124,7 +130,7 @@ cdef class Renderer:
     cdef void updateTexture(self, SDL_Texture *oldt, SDL_Texture *newt) nogil
     cdef bint captureScreenJPEG(self, unsigned char **jpegBuffer, unsigned long *jpegSize) nogil
     cdef bint releaseCapturedScreenBufferJPEG(self, unsigned char *jpegBuffer) nogil
-
+    cdef bint _renderWalkAreas(self)
 
     cpdef cleanup(self)
 
