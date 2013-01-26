@@ -12,7 +12,7 @@
                   android:xlargeScreens="true"
 /> 
     <application android:label="@string/app_name" android:icon="@drawable/icon">
-        <activity android:name="SDLActivity"
+        <activity android:name="IgnifugaActivity"
                   android:label="@string/app_name"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
                   android:windowSoftInputMode="adjustResize"

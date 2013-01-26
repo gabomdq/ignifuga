@@ -36,11 +36,11 @@ def make(options, env, target, sources, cython_src, cfiles):
             shutil.move(join(android_project, 'AndroidManifest.wallpaper.xml'), join(android_project, 'AndroidManifest.xml'))
 
     # Modify the glue code to suit the project
-    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
-    Popen(shlex.split(cmd), cwd = jni_src).communicate()
+    #cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project.replace('.', '_'), join(jni_src, 'jni_glue.cpp'))
+    #Popen(shlex.split(cmd), cwd = jni_src).communicate()
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'AndroidManifest.xml'))
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
-    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.java'))
+    cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'IgnifugaActivity.java'))
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
     cmd = SED_CMD + "'s|\[\[PROJECT_NAME\]\]|%s|g' %s" % (options.project, join(android_project, 'src', 'SDLActivity.wallpaper.java'))
     Popen(shlex.split(cmd), cwd = jni_src).communicate()
@@ -84,7 +84,7 @@ def make(options, env, target, sources, cython_src, cfiles):
         shutil.move(join(android_project, 'src', 'SDLActivity.wallpaper.java'), join(sdlActivityDir, 'SDLActivity.java'))
         os.unlink(join(android_project, 'src', 'SDLActivity.java'))
     else:
-        shutil.move(join(android_project, 'src', 'SDLActivity.java'), join(sdlActivityDir, 'SDLActivity.java'))
+        shutil.move(join(android_project, 'src', 'IgnifugaActivity.java'), join(sdlActivityDir, 'IgnifugaActivity.java'))
         os.unlink(join(android_project, 'src', 'SDLActivity.wallpaper.java'))
 
     # Copy cythonized sources
