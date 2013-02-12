@@ -243,7 +243,7 @@ cdef class GameLoopBase(object):
         Py_XDECREF(taskp.runnable)
 
 
-    cpdef update(self, int now=0, bint wrapup=False):
+    cpdef update(self, unsigned long now=0, bint wrapup=False):
         """ Update everything, then render the scene
         now is the current time, specified in milliseconds
         wrapup = True forces the update loop to be broken, all running entities eventually stop running
@@ -355,7 +355,7 @@ cdef class GameLoopBase(object):
         return False
 
 
-    cdef bint _processTask(self, _Task *task, int now=0, bint wrapup=False, bint init=False):
+    cdef bint _processTask(self, _Task *task, unsigned long now=0, bint wrapup=False, bint init=False):
         cdef PyObject *args, *kwargs
 
 
@@ -371,7 +371,6 @@ cdef class GameLoopBase(object):
             kwargs = <PyObject*>kw_data
             data = (now,)
             args = <PyObject*>data
-
 
         # This is for tasks on their way out! They've been marked for release but we have to keep them looping until they die
         if task.release and not isdead(task.greenlet):
