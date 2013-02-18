@@ -26,8 +26,8 @@ from modules.pypreprocessor import preprocessor
 AVAILABLE_PLATFORMS, SED_CMD = get_available_platforms()
 PLATFORM_ALIASES = get_platform_aliases()
 
-ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else '/opt/android-ndk'
-ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else '/opt/android-sdk'
+ANDROID_NDK =  os.environ['ANDROID_NDK'] if 'ANDROID_NDK' in os.environ else join(os.getenv('HOME'), 'android-ndk')
+ANDROID_SDK =  os.environ['ANDROID_SDK'] if 'ANDROID_SDK' in os.environ else join(os.getenv('HOME'), 'android-sdk')
 
 HOST_DIST_DIR = join(ROOT_DIR, 'host')
 HOSTPYTHON = join(HOST_DIST_DIR, 'bin', 'python')

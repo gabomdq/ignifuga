@@ -13,12 +13,6 @@ from log import info, log, error
 import multiprocessing, tempfile
 
 
-ANDROID_NDK_URL = {'Linux': 'http://dl.google.com/android/ndk/android-ndk-r8-linux-x86.tar.bz2',
-                   'Darwin': 'http://dl.google.com/android/ndk/android-ndk-r8-darwin-x86.tar.bz2'}
-ANDROID_SDK_URL = {'Linux': 'http://dl.google.com/android/android-sdk_r18-linux.tgz',
-                   'Darwin': 'http://dl.google.com/android/android-sdk_r18-macosx.zip' }
-
-
 def find_cython():
     cmd = 'which cython'
     output = Popen(shlex.split(cmd), stdout=PIPE).communicate()[0]
@@ -195,11 +189,11 @@ def check_host_tools():
     if system == 'Linux':
         if processor == 'x86_64':
             if distro_name == 'Ubuntu':
-                if distro_id in ['natty', 'oneiric', 'precise']:
+                if distro_id in ['precise', 'quantal']:
                     supported_platform = True
     elif system == 'Darwin':
         if arch == '64bit':
-            if distro_name.startswith('10.7'):
+            if distro_name.startswith('10.7') or distro_name.startswith('10.8'):
                 supported_platform = True
 
     if not supported_platform:
@@ -235,12 +229,15 @@ def check_host_tools():
         if automake is None:
             error('We need a automake version of at least 2.69, try running schafer -D or install a newer version manually, for example using Mac Ports')
             exit()
-        # Try the standard Mac Ports path
-        libtool = check_version('/opt/local/libexec/gnubin/libtool', (2,4))
+        # Try the Mac Ports path first
+        port = check_tool('port')
+        port_path = dirname(port)
+        libtool = check_version(join(port_path, '..', 'libexec/gnubin/libtool'), (2,4))
         if libtool is None:
+            # Check the system path
             libtool = check_version('libtool', (2,4))
         if libtool is None:
-            error('We need a Libtool version of at least 2.4, try running schafer -D or install a newer version manually, for example using Mac Ports')
+            error('We need a Libtool version of at least 2.4, try running bootstrap.py, or install a newer version manually, for example using Mac Ports')
             exit()
 
 
@@ -276,176 +273,6 @@ def check_host_tools():
             error('Could not build Python for host system')
             exit()
         shutil.copy(join(python_build, 'Parser', 'pgen'), HOSTPGEN)
-
-def install_mac_ports():
-    if check_tool('port', False) == None:
-        # Install Mac Ports
-        log('This tool needs to install Mac Ports, is that ok? (y/N)')
-        choice = raw_input().lower()
-        if choice != 'y':
-            error('Can not proceed without Mac Ports, install dependencies manually')
-            exit()
-
-        log('Installing Mac Ports (macports.org)')
-        portsdmg = join(tempfile.gettempdir(), 'MacPorts.dmg')
-        cmd = 'curl -o %s https://distfiles.macports.org/MacPorts/MacPorts-2.0.3-10.7-Lion.dmg' % portsdmg
-        Popen(shlex.split(cmd)).communicate()
-
-        if isfile(portsdmg):
-            cmd = 'hdiutil attach %s' % portsdmg
-            Popen(shlex.split(cmd)).communicate()
-            if exists('/Volumes/MacPorts-2.0.3/MacPorts-2.0.3.pkg'):
-                cmd = 'sudo installer -pkg /Volumes/MacPorts-2.0.3/MacPorts-2.0.3.pkg -target "/"'
-                Popen(shlex.split(cmd)).communicate()
-                cmd = 'hdiutil detach /Volumes/MacPorts-2.0.3'
-                Popen(shlex.split(cmd)).communicate()
-                if check_tool('port', False) == None:
-                    error('Could not install Mac Ports, please install manually and try again')
-                    exit()
-            else:
-                cmd = 'hdiutil detach /Volumes/MacPorts-2.0.3'
-                Popen(shlex.split(cmd)).communicate()
-                error('Could not mount Mac Ports dmg')
-                exit()
-        else:
-            error('Could not download Mac Ports dmg. Please install manually and try again')
-            exit()
-    else:
-        log('Mac Ports is available')
-
-def install_host_tools(ROOT_DIR, ANDROID_NDK, ANDROID_SDK):
-    """ Install all the required host tools.
-    Platforms supported:
-    * Ubuntu 64 Natty 11.04
-    * Ubuntu 64 Oneiric 11.10
-    * Ubuntu 32 Precise 12.04
-    * Ubuntu 64 Precise 12.04
-    * OS X Lion 64
-    """
-    processor, system, arch, distro_name, distro_version, distro_id = get_build_platform()
-
-    log ('Installing development packages')
-    if system == 'Linux':
-        if processor == 'x86_64':
-            cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk ia32-libs gcc-multilib libX11-dev'
-            Popen(shlex.split(cmd)).communicate()
-            # 32 bit versions
-            cmd = 'sudo apt-get -y install libX11-dev:i386'
-            Popen(shlex.split(cmd)).communicate()
-        elif processor in ['i386', 'i486', 'i586', 'i686']:
-            cmd = 'sudo apt-get -y install rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk gcc-multilib libX11-dev'
-            Popen(shlex.split(cmd)).communicate()
-
-    elif system == 'Darwin':
-        check_xcode()
-        install_mac_ports()
-        cmd = 'sudo port selfupdate'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install rsync'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install nasm'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install libtool'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install autoconf'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install automake'
-        Popen(shlex.split(cmd)).communicate()
-        cmd = 'sudo port install pkgconfig'
-        Popen(shlex.split(cmd)).communicate()
-
-    cython = find_cython()
-    if cython == None:
-        pip = check_tool('pip', False)
-        if pip == None:
-            # Try to install GIT
-            log('Trying to install PIP')
-            if system == 'Linux':
-                cmd = 'sudo apt-get -y install python-pip'
-                Popen(shlex.split(cmd)).communicate()
-            else:
-                cmd = 'sudo port install py-pip'
-                Popen(shlex.split(cmd)).communicate()
-            git = check_tool('pip', False)
-            if git == None:
-                error('Could not install PIP which we need to install Cython. Try installing it manually')
-                exit()
-        log ('PIP is available')
-
-        log ('Installing Cython')
-        cmd = 'sudo pip install cython'
-        Popen(shlex.split(cmd)).communicate()
-        cython = find_cython()
-        if cython == None:
-            error('Could not install Cython (0.17 or higher). Try installing it manually')
-            exit()
-    else:
-        log('Cython is available')
-
-    # Android SDK and NDK
-    if ANDROID_NDK == None or not isdir(ANDROID_NDK) or not isfile(join(ANDROID_NDK, 'ndk-build')) or\
-       not isdir(join(ANDROID_NDK,"toolchains/arm-linux-androideabi-4.4.3")):
-        log('Installing Android NDK to %s' % ANDROID_NDK)
-        if system == 'Linux':
-            cmd = 'wget %s' % ANDROID_NDK_URL[system]
-        elif system == 'Darwin':
-            cmd = 'curl -O %s' % ANDROID_NDK_URL[system]
-        else:
-            error ('Can not install dependencies for this system')
-            exit()
-
-
-        ndkfile = ANDROID_NDK_URL[system].split('/')[-1]
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'tar -jxvf %s' % ndkfile
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'sudo mv %s %s' % ('-'.join(ndkfile.split('-')[0:3]), ANDROID_NDK)
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        log('Adding ANDROID_NDK variable %s to .bashrc' % ANDROID_NDK)
-        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
-        f.write('export ANDROID_NDK="%s"\n' % ANDROID_NDK)
-        f.close()
-    else:
-        log('Android NDK is available at %s' % ANDROID_NDK)
-
-    if ANDROID_SDK == None or not isdir(ANDROID_SDK) or  not isfile(join(ANDROID_SDK, 'tools', 'android')):
-        log('Installing Android SDK to %s' % ANDROID_SDK)
-        if system == 'Linux':
-            cmd = 'wget %s' % ANDROID_SDK_URL[system]
-        elif system == 'Darwin':
-            cmd = 'curl -O %s' % ANDROID_SDK_URL[system]
-        else:
-            error ('Can not install dependencies for this system')
-            exit()
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        cmd = 'tar -zxvf %s' % ANDROID_SDK_URL[system].split('/')[-1]
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        if system == 'Linux':
-            cmd = 'sudo mv android-sdk-linux %s' % ANDROID_SDK
-        elif system == 'Darwin':
-            cmd = 'sudo mv android-sdk-macosx %s' % ANDROID_SDK
-        Popen(shlex.split(cmd), cwd=tempfile.gettempdir()).communicate()
-        log('Adding ANDROID_SDK variable %s to .bashrc' % ANDROID_SDK)
-        f = open(join(os.environ['HOME'],'.bashrc'), 'a')
-        f.write('export ANDROID_SDK="%s"\n' % ANDROID_SDK)
-        f.close()
-    else:
-        log('Android SDK is available at %s' % ANDROID_SDK)
-
-    # Rfoo
-    install_rfoo = True
-    try:
-        import rfoo
-        install_rfoo = False
-    except:
-        pass
-
-    if install_rfoo:
-        log('Installing RFOO')
-        rfoo_dir = join(ROOT_DIR, 'external', 'rfoo-1.3.0')
-        cmd = 'sudo ' + sys.executable + ' setup.py install'
-        Popen(shlex.split(cmd), cwd=rfoo_dir).communicate()
-
 
 def locate(pattern, root=os.curdir, skip = []):
     '''Locate all files matching supplied filename pattern in and below
