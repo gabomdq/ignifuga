@@ -279,8 +279,10 @@ def prepare_arm_android_env(target, pp=None, openmp=False, api_level=10, gcc='4.
         env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk"
 
     if not isdir(env['JAVA_HOME']) or  not isfile(join(env['JAVA_HOME'], 'bin', 'java')):
-        error('Can not locate JAVA at %s . Please set the JAVA_HOME environment variable accordingly' % (env['JAVA_HOME'],))
-        exit()
+        env['JAVA_HOME'] = "/usr/lib/jvm/java-6-openjdk-amd64"
+        if not isdir(env['JAVA_HOME']) or  not isfile(join(env['JAVA_HOME'], 'bin', 'java')):
+            error('Can not locate JAVA. Please set the JAVA_HOME environment variable accordingly' % (env['JAVA_HOME'],))
+            exit()
 
     env['PATH'] = "%s/toolchains/arm-linux-androideabi-%s/prebuilt/linux-x86/bin/:%s:%s/tools:/usr/local/bin:/usr/bin:/bin:%s" % (ANDROID_NDK, gcc, ANDROID_NDK, ANDROID_SDK, '') #env['PATH'])
     env['ARCH'] = "armeabi"

@@ -259,7 +259,7 @@ if __name__ == '__main__':
 
     if system == 'Linux':
         print 'I need to install the followin development packages and build dependencies:'
-        base_pkgs = 'mercurial git-core rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk gcc-multilib g++-multilib libx11-dev wget nasm libxext-dev libxinerama-dev mesa-common-dev libusb-1.0-0-dev libasound2-dev libpulse-dev'
+        base_pkgs = 'mercurial git-core rsync python-dev mingw-w64 g++-mingw-w64 mingw-w64-tools make gcc-4.6 automake autoconf openjdk-6-jdk gcc-multilib g++-multilib libx11-dev wget nasm libxext-dev libxinerama-dev mesa-common-dev libusb-1.0-0-dev libasound2-dev libpulse-dev libtool'
         print base_pkgs
         if processor == 'x86_64':
             cmd = 'sudo apt-get -y install ' + base_pkgs
@@ -270,7 +270,7 @@ if __name__ == '__main__':
                 Popen(shlex.split(cmd)).communicate()
                 cmd = 'sudo apt-get update'
                 Popen(shlex.split(cmd)).communicate()
-                cmd = 'sudo apt-get -y install ia32-libs libx11-dev:i386 libxext-dev:i386 libxinerama-dev:i386 mesa-common-dev:i386 libasound2-dev:i386 '
+                cmd = 'sudo apt-get -y install ia32-libs libx11-dev:i386 libxext-dev:i386 libxinerama-dev:i386 libasound2-dev:i386 '
                 Popen(shlex.split(cmd)).communicate()
         elif processor in ['i386', 'i486', 'i586', 'i686']:
             cmd = 'sudo apt-get -y install ' + base_pkgs
@@ -385,6 +385,16 @@ if __name__ == '__main__':
             print 'Adding ANDROID_SDK variable %s to bash profile' % ANDROID_SDK
             with open(bash_profile, "a") as f:
                 f.write('export ANDROID_SDK="%s"\n' % ANDROID_SDK)
+
+            # Update the SDK using the android tool
+            print 'Updating Android platform tools'
+            cmd = join(ANDROID_SDK, 'tools', 'android') + ' update sdk -u --filter platform-tools'
+            Popen(shlex.split(cmd)).communicate()
+            print 'Installing android-10 SDK and tools'
+            cmd = join(ANDROID_SDK, 'tools', 'android') + ' update sdk -u --filter tools,android-10'
+            Popen(shlex.split(cmd)).communicate()
+            cmd = join(ANDROID_SDK, 'tools', 'android') + ' update adb'
+            Popen(shlex.split(cmd)).communicate()
         else:
             print 'Android SDK is available at %s' % ANDROID_SDK
 

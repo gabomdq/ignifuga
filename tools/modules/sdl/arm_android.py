@@ -41,7 +41,8 @@ def prepare(env, target, options):
     # Update projects files - required in case SDL project files become outdated.
     if isfile(join(target.builds.SDL, 'build.xml')):
         os.unlink(join(target.builds.SDL, 'build.xml'))
-    cmd = 'android update project -t %s -p %s' % (env['TARGET'], target.builds.SDL)
+    android_tool = join(ANDROID_SDK, 'tools', 'android')
+    cmd = android_tool + ' update project -t %s -p %s' % (env['TARGET'], target.builds.SDL)
     Popen(shlex.split(cmd)).communicate()
 
     ####################################################
